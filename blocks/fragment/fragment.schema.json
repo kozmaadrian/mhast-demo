@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Fragment Block",
+  "description": "Fragment inclusion block with reference URLs",
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "x-aem-selector": "a",
+      "x-aem-attribute": "href"
+    },
+    "text": {
+      "type": "string",
+      "x-aem-selector": "a"
+    }
+  },
+  "required": [
+    "url",
+    "text"
+  ]
+}

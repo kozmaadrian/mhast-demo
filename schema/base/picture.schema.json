@@ -1,0 +1,34 @@
+{
+  "$id": "primitives/picture.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Picture",
+  "description": "Primitive schema for HTML picture elements with responsive images",
+  "type": "object",
+  "x-aem-selector": "picture",
+  "properties": {
+    "picture": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string",
+          "format": "uri",
+          "description": "Default image source from img element",
+          "x-aem-selector": "img",
+          "x-aem-attribute": "src"
+        },
+        "alt": {
+          "type": "string",
+          "description": "Alternative text from img element",
+          "x-aem-selector": "img",
+          "x-aem-attribute": "alt"
+        }
+      },
+      "required": [
+        "src"
+      ]
+    }
+  },
+  "required": [
+    "picture"
+  ]
+}

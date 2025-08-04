@@ -1,0 +1,25 @@
+{
+  "$id": "blocks/cards.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cards Block",
+  "description": "Collection of multiple cards",
+  "type": "array",
+  "x-aem-selector": "div",
+  "items": {
+    "type": "object",
+    "properties": {
+      "picture": {
+        "$ref": "primitives/picture.schema.json",
+        "x-aem-selector": "div:first-child > picture"
+      },
+      "link": {
+        "$ref": "primitives/link.schema.json",
+        "x-aem-selector": "div:last-child > a"
+      }
+    },
+    "required": [
+      "picture",
+      "link"
+    ]
+  }
+}

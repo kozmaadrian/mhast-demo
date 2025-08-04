@@ -1,0 +1,21 @@
+{
+  "$id": "primitives/list.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "List",
+  "description": "Primitive schema for HTML list elements (ul, ol)",
+  "type": "object",
+  "x-aem-selector": "ul, ol",
+  "properties": {
+    "list": {
+      "type": "array",
+      "description": "List items",
+      "x-aem-selector": "li",
+      "items": {
+        "$ref": "primitives/text.schema.json"
+      }
+    }
+  },
+  "required": [
+    "list"
+  ]
+}

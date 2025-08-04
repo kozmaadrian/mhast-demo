@@ -1,0 +1,16 @@
+{
+  "$id": "primitives/h2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "H2 Heading",
+  "description": "Primitive schema for HTML h2 elements - section headings",
+  "type": "object",
+  "x-aem-selector": "h2",
+  "properties": {
+    "subTitle": {
+      "$ref": "primitives/text.schema.json"
+    }
+  },
+  "required": [
+    "subTitle"
+  ]
+}

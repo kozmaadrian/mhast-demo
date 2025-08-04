@@ -1,0 +1,21 @@
+{
+  "$id": "blocks/hero.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Hero Block",
+  "description": "Main hero section with title and image/picture",
+  "type": "object",
+  "properties": {
+    "title": {
+      "$ref": "primitives/h1.schema.json",
+      "x-aem-selector": "div > div h1"
+    },
+    "image": {
+      "$ref": "primitives/picture.schema.json",
+      "x-aem-selector": "div > div picture"
+    }
+  },
+  "required": [
+    "title",
+    "image"
+  ]
+}
