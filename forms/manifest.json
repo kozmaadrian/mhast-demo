@@ -1,6 +1,9 @@
 {
   "schemas": [
-    "user-profile"
+    "user-profile",
+    "products",
+    "layout",
+    "campaign"
   ],
   "description": "Example manifest file for schema discovery. This should be placed at the GitHub repository as manifest.json"
 }
