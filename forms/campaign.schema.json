@@ -1,0 +1,868 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Marketing Campaign Management",
+  "description": "Comprehensive marketing campaign configuration and tracking system",
+  "type": "object",
+  "required": ["campaignBasics", "targeting", "content"],
+  "properties": {
+    "campaignBasics": {
+      "type": "object",
+      "title": "Campaign Basics",
+      "required": ["name", "type", "objective"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Campaign Name",
+          "minLength": 3,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "title": "Campaign Description",
+          "maxLength": 500
+        },
+        "type": {
+          "type": "string",
+          "title": "Campaign Type",
+          "enum": ["email", "social", "display", "search", "video", "influencer", "content", "event"]
+        },
+        "objective": {
+          "type": "string",
+          "title": "Campaign Objective",
+          "enum": ["awareness", "consideration", "conversion", "retention", "advocacy"]
+        },
+        "status": {
+          "type": "string",
+          "title": "Campaign Status",
+          "enum": ["draft", "scheduled", "active", "paused", "completed", "cancelled"],
+          "default": "draft"
+        },
+        "priority": {
+          "type": "string",
+          "title": "Priority Level",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "timeline": {
+          "type": "object",
+          "title": "Campaign Timeline",
+          "required": ["startDate"],
+          "properties": {
+            "startDate": {
+              "type": "string",
+              "title": "Start Date",
+              "format": "date"
+            },
+            "endDate": {
+              "type": "string",
+              "title": "End Date",
+              "format": "date"
+            },
+            "launchTime": {
+              "type": "string",
+              "title": "Launch Time",
+              "format": "time"
+            },
+            "timezone": {
+              "type": "string",
+              "title": "Timezone",
+              "enum": ["UTC", "EST", "CST", "MST", "PST", "GMT", "CET"]
+            },
+            "milestones": {
+              "type": "object",
+              "title": "Campaign Milestones",
+              "properties": {
+                "contentDeadline": {
+                  "type": "string",
+                  "title": "Content Creation Deadline",
+                  "format": "date"
+                },
+                "reviewDeadline": {
+                  "type": "string",
+                  "title": "Review Deadline",
+                  "format": "date"
+                },
+                "approvalDeadline": {
+                  "type": "string",
+                  "title": "Final Approval Deadline",
+                  "format": "date"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "targeting": {
+      "type": "object",
+      "title": "Audience Targeting",
+      "required": ["primaryAudience"],
+      "properties": {
+        "primaryAudience": {
+          "type": "object",
+          "title": "Primary Audience",
+          "required": ["segment"],
+          "properties": {
+            "segment": {
+              "type": "string",
+              "title": "Audience Segment",
+              "enum": ["existing-customers", "prospects", "leads", "subscribers", "website-visitors", "custom"]
+            },
+            "size": {
+              "type": "number",
+              "title": "Estimated Audience Size",
+              "minimum": 1
+            },
+            "demographics": {
+              "type": "object",
+              "title": "Demographics",
+              "properties": {
+                "ageGroups": {
+                  "type": "object",
+                  "title": "Age Groups",
+                  "properties": {
+                    "age18_24": {
+                      "type": "boolean",
+                      "title": "18-24 years"
+                    },
+                    "age25_34": {
+                      "type": "boolean",
+                      "title": "25-34 years"
+                    },
+                    "age35_44": {
+                      "type": "boolean",
+                      "title": "35-44 years"
+                    },
+                    "age45_54": {
+                      "type": "boolean",
+                      "title": "45-54 years"
+                    },
+                    "age55_64": {
+                      "type": "boolean",
+                      "title": "55-64 years"
+                    },
+                    "age65plus": {
+                      "type": "boolean",
+                      "title": "65+ years"
+                    }
+                  }
+                },
+                "gender": {
+                  "type": "object",
+                  "title": "Gender Targeting",
+                  "properties": {
+                    "male": {
+                      "type": "boolean",
+                      "title": "Male"
+                    },
+                    "female": {
+                      "type": "boolean",
+                      "title": "Female"
+                    },
+                    "nonBinary": {
+                      "type": "boolean",
+                      "title": "Non-binary"
+                    },
+                    "all": {
+                      "type": "boolean",
+                      "title": "All genders"
+                    }
+                  }
+                },
+                "income": {
+                  "type": "object",
+                  "title": "Income Levels",
+                  "properties": {
+                    "low": {
+                      "type": "boolean",
+                      "title": "Low income"
+                    },
+                    "middle": {
+                      "type": "boolean",
+                      "title": "Middle income"
+                    },
+                    "high": {
+                      "type": "boolean",
+                      "title": "High income"
+                    }
+                  }
+                }
+              }
+            },
+            "psychographics": {
+              "type": "object",
+              "title": "Psychographics",
+              "properties": {
+                "interests": {
+                  "type": "string",
+                  "title": "Interests (comma-separated)"
+                },
+                "behaviors": {
+                  "type": "string",
+                  "title": "Behaviors (comma-separated)"
+                },
+                "values": {
+                  "type": "string",
+                  "title": "Values (comma-separated)"
+                },
+                "lifestyle": {
+                  "type": "string",
+                  "title": "Lifestyle Preferences"
+                }
+              }
+            },
+            "geographic": {
+              "type": "object",
+              "title": "Geographic Targeting",
+              "properties": {
+                "countries": {
+                  "type": "string",
+                  "title": "Target Countries (comma-separated)"
+                },
+                "regions": {
+                  "type": "string",
+                  "title": "Regions/States (comma-separated)"
+                },
+                "cities": {
+                  "type": "string",
+                  "title": "Cities (comma-separated)"
+                },
+                "radius": {
+                  "type": "object",
+                  "title": "Radius Targeting",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "title": "Enable Radius Targeting"
+                    },
+                    "centerPoint": {
+                      "type": "string",
+                      "title": "Center Point (address/coordinates)"
+                    },
+                    "radiusKm": {
+                      "type": "number",
+                      "title": "Radius (km)",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "secondaryAudiences": {
+          "type": "object",
+          "title": "Secondary Audiences",
+          "properties": {
+            "lookalike": {
+              "type": "object",
+              "title": "Lookalike Audience",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Lookalike Targeting"
+                },
+                "sourceAudience": {
+                  "type": "string",
+                  "title": "Source Audience"
+                },
+                "similarity": {
+                  "type": "string",
+                  "title": "Similarity Level",
+                  "enum": ["1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "9%", "10%"]
+                }
+              }
+            },
+            "retargeting": {
+              "type": "object",
+              "title": "Retargeting Audience",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Retargeting"
+                },
+                "websiteVisitors": {
+                  "type": "object",
+                  "title": "Website Visitors",
+                  "properties": {
+                    "timeframe": {
+                      "type": "string",
+                      "title": "Visitor Timeframe",
+                      "enum": ["7-days", "14-days", "30-days", "60-days", "90-days", "180-days"]
+                    },
+                    "specificPages": {
+                      "type": "string",
+                      "title": "Specific Pages (comma-separated URLs)"
+                    }
+                  }
+                },
+                "customAudiences": {
+                  "type": "object",
+                  "title": "Custom Audiences",
+                  "properties": {
+                    "emailList": {
+                      "type": "boolean",
+                      "title": "Email Subscriber List"
+                    },
+                    "customerList": {
+                      "type": "boolean",
+                      "title": "Customer Database"
+                    },
+                    "appUsers": {
+                      "type": "boolean",
+                      "title": "Mobile App Users"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "exclusions": {
+          "type": "object",
+          "title": "Audience Exclusions",
+          "properties": {
+            "existingCustomers": {
+              "type": "boolean",
+              "title": "Exclude Existing Customers"
+            },
+            "recentPurchasers": {
+              "type": "boolean",
+              "title": "Exclude Recent Purchasers"
+            },
+            "employees": {
+              "type": "boolean",
+              "title": "Exclude Company Employees"
+            },
+            "competitors": {
+              "type": "boolean",
+              "title": "Exclude Competitor Audiences"
+            },
+            "customExclusions": {
+              "type": "string",
+              "title": "Custom Exclusion Lists (comma-separated)"
+            }
+          }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "title": "Campaign Content",
+      "required": ["messaging"],
+      "properties": {
+        "messaging": {
+          "type": "object",
+          "title": "Core Messaging",
+          "required": ["headline"],
+          "properties": {
+            "headline": {
+              "type": "string",
+              "title": "Primary Headline",
+              "maxLength": 100
+            },
+            "subheadline": {
+              "type": "string",
+              "title": "Subheadline",
+              "maxLength": 150
+            },
+            "bodyText": {
+              "type": "string",
+              "title": "Body Text",
+              "maxLength": 1000
+            },
+            "callToAction": {
+              "type": "object",
+              "title": "Call to Action",
+              "properties": {
+                "primary": {
+                  "type": "object",
+                  "title": "Primary CTA",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "title": "CTA Text",
+                      "maxLength": 25
+                    },
+                    "url": {
+                      "type": "string",
+                      "title": "CTA URL"
+                    },
+                    "type": {
+                      "type": "string",
+                      "title": "CTA Type",
+                      "enum": ["button", "link", "banner", "popup"]
+                    }
+                  }
+                },
+                "secondary": {
+                  "type": "object",
+                  "title": "Secondary CTA",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "title": "Secondary CTA Text",
+                      "maxLength": 25
+                    },
+                    "url": {
+                      "type": "string",
+                      "title": "Secondary CTA URL"
+                    },
+                    "type": {
+                      "type": "string",
+                      "title": "Secondary CTA Type",
+                      "enum": ["button", "link", "banner", "text"]
+                    }
+                  }
+                }
+              }
+            },
+            "valueProposition": {
+              "type": "object",
+              "title": "Value Proposition",
+              "properties": {
+                "primary": {
+                  "type": "string",
+                  "title": "Primary Value Proposition"
+                },
+                "secondary": {
+                  "type": "string",
+                  "title": "Secondary Value Proposition"
+                },
+                "benefits": {
+                  "type": "string",
+                  "title": "Key Benefits (comma-separated)"
+                },
+                "features": {
+                  "type": "string",
+                  "title": "Key Features (comma-separated)"
+                }
+              }
+            }
+          }
+        },
+        "creativeAssets": {
+          "type": "object",
+          "title": "Creative Assets",
+          "properties": {
+            "images": {
+              "type": "object",
+              "title": "Image Assets",
+              "properties": {
+                "hero": {
+                  "type": "object",
+                  "title": "Hero Image",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "title": "Image URL"
+                    },
+                    "altText": {
+                      "type": "string",
+                      "title": "Alt Text"
+                    },
+                    "dimensions": {
+                      "type": "string",
+                      "title": "Dimensions (WxH)"
+                    }
+                  }
+                },
+                "thumbnail": {
+                  "type": "object",
+                  "title": "Thumbnail Image",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "title": "Thumbnail URL"
+                    },
+                    "altText": {
+                      "type": "string",
+                      "title": "Alt Text"
+                    }
+                  }
+                },
+                "gallery": {
+                  "type": "object",
+                  "title": "Image Gallery",
+                  "properties": {
+                    "urls": {
+                      "type": "string",
+                      "title": "Gallery URLs (comma-separated)"
+                    },
+                    "captions": {
+                      "type": "string",
+                      "title": "Image Captions (comma-separated)"
+                    }
+                  }
+                }
+              }
+            },
+            "videos": {
+              "type": "object",
+              "title": "Video Assets",
+              "properties": {
+                "mainVideo": {
+                  "type": "object",
+                  "title": "Main Video",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "title": "Video URL"
+                    },
+                    "thumbnail": {
+                      "type": "string",
+                      "title": "Video Thumbnail URL"
+                    },
+                    "duration": {
+                      "type": "string",
+                      "title": "Duration (mm:ss)"
+                    },
+                    "format": {
+                      "type": "string",
+                      "title": "Video Format",
+                      "enum": ["mp4", "mov", "avi", "webm"]
+                    }
+                  }
+                },
+                "testimonials": {
+                  "type": "object",
+                  "title": "Testimonial Videos",
+                  "properties": {
+                    "urls": {
+                      "type": "string",
+                      "title": "Testimonial URLs (comma-separated)"
+                    },
+                    "speakers": {
+                      "type": "string",
+                      "title": "Speaker Names (comma-separated)"
+                    }
+                  }
+                }
+              }
+            },
+            "graphics": {
+              "type": "object",
+              "title": "Graphic Elements",
+              "properties": {
+                "logo": {
+                  "type": "string",
+                  "title": "Brand Logo URL"
+                },
+                "icons": {
+                  "type": "string",
+                  "title": "Icon URLs (comma-separated)"
+                },
+                "illustrations": {
+                  "type": "string",
+                  "title": "Illustration URLs (comma-separated)"
+                },
+                "infographics": {
+                  "type": "string",
+                  "title": "Infographic URLs (comma-separated)"
+                }
+              }
+            }
+          }
+        },
+        "personalization": {
+          "type": "object",
+          "title": "Content Personalization",
+          "properties": {
+            "dynamicContent": {
+              "type": "object",
+              "title": "Dynamic Content",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Dynamic Content"
+                },
+                "variables": {
+                  "type": "object",
+                  "title": "Personalization Variables",
+                  "properties": {
+                    "firstName": {
+                      "type": "boolean",
+                      "title": "Use First Name"
+                    },
+                    "lastName": {
+                      "type": "boolean",
+                      "title": "Use Last Name"
+                    },
+                    "company": {
+                      "type": "boolean",
+                      "title": "Use Company Name"
+                    },
+                    "location": {
+                      "type": "boolean",
+                      "title": "Use Location"
+                    },
+                    "pastPurchases": {
+                      "type": "boolean",
+                      "title": "Reference Past Purchases"
+                    }
+                  }
+                }
+              }
+            },
+            "abtesting": {
+              "type": "object",
+              "title": "A/B Testing",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable A/B Testing"
+                },
+                "variants": {
+                  "type": "object",
+                  "title": "Test Variants",
+                  "properties": {
+                    "variantA": {
+                      "type": "object",
+                      "title": "Variant A (Control)",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "title": "Variant Name"
+                        },
+                        "trafficSplit": {
+                          "type": "number",
+                          "title": "Traffic Split (%)",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      }
+                    },
+                    "variantB": {
+                      "type": "object",
+                      "title": "Variant B (Test)",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "title": "Variant Name"
+                        },
+                        "trafficSplit": {
+                          "type": "number",
+                          "title": "Traffic Split (%)",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      }
+                    }
+                  }
+                },
+                "testDuration": {
+                  "type": "number",
+                  "title": "Test Duration (days)",
+                  "minimum": 1
+                },
+                "successMetric": {
+                  "type": "string",
+                  "title": "Primary Success Metric",
+                  "enum": ["click-through-rate", "conversion-rate", "engagement-rate", "time-on-page"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "title": "Budget & Bidding",
+      "required": ["totalBudget", "currency"],
+      "properties": {
+        "totalBudget": {
+          "type": "number",
+          "title": "Total Campaign Budget",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "title": "Currency",
+          "enum": ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"]
+        },
+        "budgetType": {
+          "type": "string",
+          "title": "Budget Type",
+          "enum": ["daily", "lifetime", "monthly"]
+        },
+        "allocation": {
+          "type": "object",
+          "title": "Budget Allocation",
+          "properties": {
+            "creative": {
+              "type": "number",
+              "title": "Creative Development (%)",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "media": {
+              "type": "number",
+              "title": "Media Spend (%)",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "platform": {
+              "type": "number",
+              "title": "Platform Fees (%)",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "other": {
+              "type": "number",
+              "title": "Other Costs (%)",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "bidding": {
+          "type": "object",
+          "title": "Bidding Strategy",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "title": "Bidding Strategy",
+              "enum": ["manual-cpc", "enhanced-cpc", "target-cpa", "target-roas", "maximize-clicks", "maximize-conversions"]
+            },
+            "maxBid": {
+              "type": "number",
+              "title": "Maximum Bid",
+              "minimum": 0
+            },
+            "targetCPA": {
+              "type": "number",
+              "title": "Target CPA",
+              "minimum": 0
+            },
+            "targetROAS": {
+              "type": "number",
+              "title": "Target ROAS (%)",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "tracking": {
+      "type": "object",
+      "title": "Tracking & Analytics",
+      "properties": {
+        "goals": {
+          "type": "object",
+          "title": "Campaign Goals",
+          "properties": {
+            "primary": {
+              "type": "object",
+              "title": "Primary Goal",
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "title": "Primary Metric",
+                  "enum": ["impressions", "clicks", "conversions", "leads", "sales", "brand-awareness"]
+                },
+                "target": {
+                  "type": "number",
+                  "title": "Target Value",
+                  "minimum": 1
+                }
+              }
+            },
+            "secondary": {
+              "type": "object",
+              "title": "Secondary Goals",
+              "properties": {
+                "engagement": {
+                  "type": "number",
+                  "title": "Target Engagement Rate (%)"
+                },
+                "reachGoal": {
+                  "type": "number",
+                  "title": "Target Reach"
+                },
+                "brandLift": {
+                  "type": "number",
+                  "title": "Target Brand Lift (%)"
+                }
+              }
+            }
+          }
+        },
+        "conversionTracking": {
+          "type": "object",
+          "title": "Conversion Tracking",
+          "properties": {
+            "pixelId": {
+              "type": "string",
+              "title": "Tracking Pixel ID"
+            },
+            "conversionEvents": {
+              "type": "object",
+              "title": "Conversion Events",
+              "properties": {
+                "purchase": {
+                  "type": "boolean",
+                  "title": "Track Purchases"
+                },
+                "signup": {
+                  "type": "boolean",
+                  "title": "Track Sign-ups"
+                },
+                "download": {
+                  "type": "boolean",
+                  "title": "Track Downloads"
+                },
+                "contact": {
+                  "type": "boolean",
+                  "title": "Track Contact Forms"
+                },
+                "custom": {
+                  "type": "string",
+                  "title": "Custom Events (comma-separated)"
+                }
+              }
+            },
+            "attribution": {
+              "type": "object",
+              "title": "Attribution Settings",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "title": "Attribution Model",
+                  "enum": ["first-click", "last-click", "linear", "time-decay", "position-based"]
+                },
+                "window": {
+                  "type": "string",
+                  "title": "Attribution Window",
+                  "enum": ["1-day", "7-day", "14-day", "30-day", "60-day", "90-day"]
+                }
+              }
+            }
+          }
+        },
+        "reporting": {
+          "type": "object",
+          "title": "Reporting Configuration",
+          "properties": {
+            "frequency": {
+              "type": "string",
+              "title": "Report Frequency",
+              "enum": ["daily", "weekly", "bi-weekly", "monthly"]
+            },
+            "recipients": {
+              "type": "string",
+              "title": "Report Recipients (comma-separated emails)"
+            },
+            "dashboardUrl": {
+              "type": "string",
+              "title": "Campaign Dashboard URL"
+            },
+            "customMetrics": {
+              "type": "string",
+              "title": "Custom Metrics to Track (comma-separated)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

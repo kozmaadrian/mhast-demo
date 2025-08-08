@@ -1,0 +1,543 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Page Layout Configuration",
+  "description": "Comprehensive layout management for web pages and components",
+  "type": "object",
+  "required": ["pageSettings", "layout"],
+  "properties": {
+    "pageSettings": {
+      "type": "object",
+      "title": "Page Settings",
+      "required": ["title", "type"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "title": "Page Title",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "type": {
+          "type": "string",
+          "title": "Page Type",
+          "enum": ["landing", "product", "article", "dashboard", "form", "gallery", "contact"]
+        },
+        "slug": {
+          "type": "string",
+          "title": "URL Slug",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "metadata": {
+          "type": "object",
+          "title": "Page Metadata",
+          "properties": {
+            "description": {
+              "type": "string",
+              "title": "Meta Description",
+              "maxLength": 160
+            },
+            "keywords": {
+              "type": "string",
+              "title": "Keywords (comma-separated)"
+            },
+            "author": {
+              "type": "string",
+              "title": "Author"
+            },
+            "publishDate": {
+              "type": "string",
+              "title": "Publish Date",
+              "format": "date"
+            }
+          }
+        },
+        "seo": {
+          "type": "object",
+          "title": "SEO Configuration",
+          "properties": {
+            "canonicalUrl": {
+              "type": "string",
+              "title": "Canonical URL"
+            },
+            "robotsDirective": {
+              "type": "string",
+              "title": "Robots Directive",
+              "enum": ["index,follow", "noindex,nofollow", "index,nofollow", "noindex,follow"]
+            },
+            "openGraph": {
+              "type": "object",
+              "title": "Open Graph Settings",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "title": "OG Title"
+                },
+                "description": {
+                  "type": "string",
+                  "title": "OG Description"
+                },
+                "image": {
+                  "type": "string",
+                  "title": "OG Image URL"
+                },
+                "type": {
+                  "type": "string",
+                  "title": "OG Type",
+                  "enum": ["website", "article", "product"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "title": "Layout Structure",
+      "required": ["template", "grid"],
+      "properties": {
+        "template": {
+          "type": "string",
+          "title": "Base Template",
+          "enum": ["single-column", "two-column", "three-column", "custom-grid", "full-width", "boxed"]
+        },
+        "grid": {
+          "type": "object",
+          "title": "Grid Configuration",
+          "properties": {
+            "columns": {
+              "type": "number",
+              "title": "Number of Columns",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "gap": {
+              "type": "string",
+              "title": "Grid Gap",
+              "enum": ["none", "small", "medium", "large", "xlarge"]
+            },
+            "breakpoints": {
+              "type": "object",
+              "title": "Responsive Breakpoints",
+              "properties": {
+                "mobile": {
+                  "type": "object",
+                  "title": "Mobile (< 768px)",
+                  "properties": {
+                    "columns": {
+                      "type": "number",
+                      "title": "Columns",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "gap": {
+                      "type": "string",
+                      "title": "Gap Size",
+                      "enum": ["none", "small", "medium"]
+                    }
+                  }
+                },
+                "tablet": {
+                  "type": "object",
+                  "title": "Tablet (768px - 1024px)",
+                  "properties": {
+                    "columns": {
+                      "type": "number",
+                      "title": "Columns",
+                      "minimum": 1,
+                      "maximum": 8
+                    },
+                    "gap": {
+                      "type": "string",
+                      "title": "Gap Size",
+                      "enum": ["none", "small", "medium", "large"]
+                    }
+                  }
+                },
+                "desktop": {
+                  "type": "object",
+                  "title": "Desktop (> 1024px)",
+                  "properties": {
+                    "columns": {
+                      "type": "number",
+                      "title": "Columns",
+                      "minimum": 1,
+                      "maximum": 12
+                    },
+                    "gap": {
+                      "type": "string",
+                      "title": "Gap Size",
+                      "enum": ["none", "small", "medium", "large", "xlarge"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "regions": {
+          "type": "object",
+          "title": "Layout Regions",
+          "properties": {
+            "header": {
+              "type": "object",
+              "title": "Header Configuration",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Header"
+                },
+                "type": {
+                  "type": "string",
+                  "title": "Header Type",
+                  "enum": ["standard", "minimal", "hero", "sticky", "transparent"]
+                },
+                "height": {
+                  "type": "string",
+                  "title": "Header Height",
+                  "enum": ["auto", "small", "medium", "large", "custom"]
+                },
+                "navigation": {
+                  "type": "object",
+                  "title": "Navigation Settings",
+                  "properties": {
+                    "style": {
+                      "type": "string",
+                      "title": "Navigation Style",
+                      "enum": ["horizontal", "vertical", "dropdown", "mega-menu"]
+                    },
+                    "position": {
+                      "type": "string",
+                      "title": "Navigation Position",
+                      "enum": ["top", "bottom", "left", "right", "center"]
+                    },
+                    "mobileMenu": {
+                      "type": "object",
+                      "title": "Mobile Menu",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "title": "Mobile Menu Type",
+                          "enum": ["hamburger", "slide-out", "overlay", "accordion"]
+                        },
+                        "breakpoint": {
+                          "type": "number",
+                          "title": "Mobile Breakpoint (px)",
+                          "default": 768
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "sidebar": {
+              "type": "object",
+              "title": "Sidebar Configuration",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Sidebar"
+                },
+                "position": {
+                  "type": "string",
+                  "title": "Sidebar Position",
+                  "enum": ["left", "right", "both"]
+                },
+                "width": {
+                  "type": "string",
+                  "title": "Sidebar Width",
+                  "enum": ["narrow", "medium", "wide", "custom"]
+                },
+                "sticky": {
+                  "type": "boolean",
+                  "title": "Sticky Sidebar"
+                },
+                "collapsible": {
+                  "type": "object",
+                  "title": "Collapsible Settings",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "title": "Allow Collapse"
+                    },
+                    "defaultState": {
+                      "type": "string",
+                      "title": "Default State",
+                      "enum": ["expanded", "collapsed"]
+                    },
+                    "breakpoint": {
+                      "type": "number",
+                      "title": "Auto-collapse Breakpoint (px)"
+                    }
+                  }
+                }
+              }
+            },
+            "content": {
+              "type": "object",
+              "title": "Content Area Configuration",
+              "properties": {
+                "maxWidth": {
+                  "type": "string",
+                  "title": "Maximum Content Width",
+                  "enum": ["none", "narrow", "medium", "wide", "full", "custom"]
+                },
+                "padding": {
+                  "type": "object",
+                  "title": "Content Padding",
+                  "properties": {
+                    "top": {
+                      "type": "string",
+                      "title": "Top Padding",
+                      "enum": ["none", "small", "medium", "large", "xlarge"]
+                    },
+                    "bottom": {
+                      "type": "string",
+                      "title": "Bottom Padding",
+                      "enum": ["none", "small", "medium", "large", "xlarge"]
+                    },
+                    "left": {
+                      "type": "string",
+                      "title": "Left Padding",
+                      "enum": ["none", "small", "medium", "large", "xlarge"]
+                    },
+                    "right": {
+                      "type": "string",
+                      "title": "Right Padding",
+                      "enum": ["none", "small", "medium", "large", "xlarge"]
+                    }
+                  }
+                },
+                "sections": {
+                  "type": "object",
+                  "title": "Content Sections",
+                  "properties": {
+                    "hero": {
+                      "type": "object",
+                      "title": "Hero Section",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean",
+                          "title": "Enable Hero Section"
+                        },
+                        "height": {
+                          "type": "string",
+                          "title": "Hero Height",
+                          "enum": ["viewport", "half-viewport", "custom", "auto"]
+                        },
+                        "backgroundType": {
+                          "type": "string",
+                          "title": "Background Type",
+                          "enum": ["color", "image", "video", "gradient"]
+                        }
+                      }
+                    },
+                    "featured": {
+                      "type": "object",
+                      "title": "Featured Content",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean",
+                          "title": "Enable Featured Section"
+                        },
+                        "layout": {
+                          "type": "string",
+                          "title": "Featured Layout",
+                          "enum": ["grid", "carousel", "masonry", "list"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "footer": {
+              "type": "object",
+              "title": "Footer Configuration",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "title": "Enable Footer"
+                },
+                "type": {
+                  "type": "string",
+                  "title": "Footer Type",
+                  "enum": ["minimal", "standard", "mega", "sticky"]
+                },
+                "columns": {
+                  "type": "object",
+                  "title": "Footer Columns",
+                  "properties": {
+                    "desktop": {
+                      "type": "number",
+                      "title": "Desktop Columns",
+                      "minimum": 1,
+                      "maximum": 6
+                    },
+                    "tablet": {
+                      "type": "number",
+                      "title": "Tablet Columns",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "mobile": {
+                      "type": "number",
+                      "title": "Mobile Columns",
+                      "minimum": 1,
+                      "maximum": 2
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "styling": {
+      "type": "object",
+      "title": "Visual Styling",
+      "properties": {
+        "theme": {
+          "type": "object",
+          "title": "Theme Configuration",
+          "properties": {
+            "colorScheme": {
+              "type": "string",
+              "title": "Color Scheme",
+              "enum": ["light", "dark", "auto"]
+            },
+            "primaryColor": {
+              "type": "string",
+              "title": "Primary Color"
+            },
+            "secondaryColor": {
+              "type": "string",
+              "title": "Secondary Color"
+            },
+            "accentColor": {
+              "type": "string",
+              "title": "Accent Color"
+            }
+          }
+        },
+        "typography": {
+          "type": "object",
+          "title": "Typography Settings",
+          "properties": {
+            "fontFamily": {
+              "type": "object",
+              "title": "Font Families",
+              "properties": {
+                "primary": {
+                  "type": "string",
+                  "title": "Primary Font"
+                },
+                "secondary": {
+                  "type": "string",
+                  "title": "Secondary Font"
+                },
+                "monospace": {
+                  "type": "string",
+                  "title": "Monospace Font"
+                }
+              }
+            },
+            "scale": {
+              "type": "object",
+              "title": "Typography Scale",
+              "properties": {
+                "baseSize": {
+                  "type": "string",
+                  "title": "Base Font Size",
+                  "enum": ["small", "medium", "large"]
+                },
+                "scaleRatio": {
+                  "type": "string",
+                  "title": "Scale Ratio",
+                  "enum": ["minor-second", "major-second", "minor-third", "major-third", "perfect-fourth"]
+                }
+              }
+            }
+          }
+        },
+        "animations": {
+          "type": "object",
+          "title": "Animation Settings",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "title": "Enable Animations"
+            },
+            "reducedMotion": {
+              "type": "boolean",
+              "title": "Respect Reduced Motion Preference"
+            },
+            "transitions": {
+              "type": "object",
+              "title": "Transition Settings",
+              "properties": {
+                "duration": {
+                  "type": "string",
+                  "title": "Default Duration",
+                  "enum": ["fast", "normal", "slow"]
+                },
+                "easing": {
+                  "type": "string",
+                  "title": "Easing Function",
+                  "enum": ["ease", "ease-in", "ease-out", "ease-in-out", "linear"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "title": "Performance Optimization",
+      "properties": {
+        "loading": {
+          "type": "object",
+          "title": "Loading Strategy",
+          "properties": {
+            "lazyLoading": {
+              "type": "boolean",
+              "title": "Enable Lazy Loading"
+            },
+            "preloadCritical": {
+              "type": "boolean",
+              "title": "Preload Critical Resources"
+            },
+            "progressiveEnhancement": {
+              "type": "boolean",
+              "title": "Progressive Enhancement"
+            }
+          }
+        },
+        "optimization": {
+          "type": "object",
+          "title": "Optimization Settings",
+          "properties": {
+            "minifyCSS": {
+              "type": "boolean",
+              "title": "Minify CSS"
+            },
+            "minifyJS": {
+              "type": "boolean",
+              "title": "Minify JavaScript"
+            },
+            "optimizeImages": {
+              "type": "boolean",
+              "title": "Optimize Images"
+            },
+            "enableCaching": {
+              "type": "boolean",
+              "title": "Enable Browser Caching"
+            }
+          }
+        }
+      }
+    }
+  }
+}

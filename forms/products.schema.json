@@ -1,0 +1,422 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Management Form",
+  "description": "Comprehensive product information management system",
+  "type": "object",
+  "required": ["basicInfo", "pricing", "inventory"],
+  "properties": {
+    "basicInfo": {
+      "type": "object",
+      "title": "Basic Information",
+      "required": ["name", "category", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Product Name",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "sku": {
+          "type": "string",
+          "title": "SKU",
+          "pattern": "^[A-Z0-9-]+$",
+          "description": "Stock Keeping Unit (uppercase letters, numbers, and hyphens only)"
+        },
+        "category": {
+          "type": "string",
+          "title": "Category",
+          "enum": ["Electronics", "Clothing", "Home & Garden", "Sports", "Books", "Beauty", "Automotive", "Food & Beverages"]
+        },
+        "subcategory": {
+          "type": "string",
+          "title": "Subcategory",
+          "description": "More specific product classification"
+        },
+        "description": {
+          "type": "string",
+          "title": "Description",
+          "minLength": 10,
+          "maxLength": 1000
+        },
+        "shortDescription": {
+          "type": "string",
+          "title": "Short Description",
+          "maxLength": 160,
+          "description": "Brief description for search results"
+        },
+        "brand": {
+          "type": "object",
+          "title": "Brand Information",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Brand Name"
+            },
+            "manufacturer": {
+              "type": "string",
+              "title": "Manufacturer"
+            },
+            "countryOfOrigin": {
+              "type": "string",
+              "title": "Country of Origin"
+            }
+          }
+        }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "title": "Pricing Information",
+      "required": ["basePrice", "currency"],
+      "properties": {
+        "basePrice": {
+          "type": "number",
+          "title": "Base Price",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "title": "Currency",
+          "enum": ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"]
+        },
+        "discounting": {
+          "type": "object",
+          "title": "Discount Configuration",
+          "properties": {
+            "salePrice": {
+              "type": "number",
+              "title": "Sale Price",
+              "minimum": 0
+            },
+            "discountPercentage": {
+              "type": "number",
+              "title": "Discount Percentage",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "promotionalPeriod": {
+              "type": "object",
+              "title": "Promotional Period",
+              "properties": {
+                "startDate": {
+                  "type": "string",
+                  "title": "Start Date",
+                  "format": "date"
+                },
+                "endDate": {
+                  "type": "string",
+                  "title": "End Date",
+                  "format": "date"
+                }
+              }
+            }
+          }
+        },
+        "bulkPricing": {
+          "type": "object",
+          "title": "Bulk Pricing Tiers",
+          "properties": {
+            "tier1": {
+              "type": "object",
+              "title": "Tier 1 (10-49 units)",
+              "properties": {
+                "minQuantity": {
+                  "type": "number",
+                  "title": "Minimum Quantity",
+                  "default": 10
+                },
+                "pricePerUnit": {
+                  "type": "number",
+                  "title": "Price Per Unit"
+                }
+              }
+            },
+            "tier2": {
+              "type": "object",
+              "title": "Tier 2 (50-99 units)",
+              "properties": {
+                "minQuantity": {
+                  "type": "number",
+                  "title": "Minimum Quantity",
+                  "default": 50
+                },
+                "pricePerUnit": {
+                  "type": "number",
+                  "title": "Price Per Unit"
+                }
+              }
+            },
+            "tier3": {
+              "type": "object",
+              "title": "Tier 3 (100+ units)",
+              "properties": {
+                "minQuantity": {
+                  "type": "number",
+                  "title": "Minimum Quantity",
+                  "default": 100
+                },
+                "pricePerUnit": {
+                  "type": "number",
+                  "title": "Price Per Unit"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "title": "Inventory Management",
+      "required": ["trackingEnabled"],
+      "properties": {
+        "trackingEnabled": {
+          "type": "boolean",
+          "title": "Enable Inventory Tracking"
+        },
+        "stockLevels": {
+          "type": "object",
+          "title": "Stock Levels",
+          "properties": {
+            "currentStock": {
+              "type": "number",
+              "title": "Current Stock",
+              "minimum": 0
+            },
+            "reservedStock": {
+              "type": "number",
+              "title": "Reserved Stock",
+              "minimum": 0
+            },
+            "availableStock": {
+              "type": "number",
+              "title": "Available Stock",
+              "minimum": 0
+            },
+            "reorderPoint": {
+              "type": "number",
+              "title": "Reorder Point",
+              "minimum": 0
+            },
+            "maxStockLevel": {
+              "type": "number",
+              "title": "Maximum Stock Level"
+            }
+          }
+        },
+        "warehouseLocations": {
+          "type": "object",
+          "title": "Warehouse Locations",
+          "properties": {
+            "primary": {
+              "type": "object",
+              "title": "Primary Warehouse",
+              "properties": {
+                "warehouseId": {
+                  "type": "string",
+                  "title": "Warehouse ID"
+                },
+                "location": {
+                  "type": "string",
+                  "title": "Location"
+                },
+                "binLocation": {
+                  "type": "string",
+                  "title": "Bin Location"
+                }
+              }
+            },
+            "secondary": {
+              "type": "object",
+              "title": "Secondary Warehouse",
+              "properties": {
+                "warehouseId": {
+                  "type": "string",
+                  "title": "Warehouse ID"
+                },
+                "location": {
+                  "type": "string",
+                  "title": "Location"
+                },
+                "binLocation": {
+                  "type": "string",
+                  "title": "Bin Location"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "specifications": {
+      "type": "object",
+      "title": "Product Specifications",
+      "properties": {
+        "physical": {
+          "type": "object",
+          "title": "Physical Attributes",
+          "properties": {
+            "dimensions": {
+              "type": "object",
+              "title": "Dimensions",
+              "properties": {
+                "length": {
+                  "type": "number",
+                  "title": "Length (cm)"
+                },
+                "width": {
+                  "type": "number",
+                  "title": "Width (cm)"
+                },
+                "height": {
+                  "type": "number",
+                  "title": "Height (cm)"
+                },
+                "weight": {
+                  "type": "number",
+                  "title": "Weight (kg)"
+                }
+              }
+            },
+            "materials": {
+              "type": "object",
+              "title": "Materials",
+              "properties": {
+                "primary": {
+                  "type": "string",
+                  "title": "Primary Material"
+                },
+                "secondary": {
+                  "type": "string",
+                  "title": "Secondary Material"
+                },
+                "finish": {
+                  "type": "string",
+                  "title": "Finish/Coating"
+                }
+              }
+            }
+          }
+        },
+        "performance": {
+          "type": "object",
+          "title": "Performance Specifications",
+          "properties": {
+            "powerRequirements": {
+              "type": "object",
+              "title": "Power Requirements",
+              "properties": {
+                "voltage": {
+                  "type": "string",
+                  "title": "Voltage"
+                },
+                "wattage": {
+                  "type": "number",
+                  "title": "Wattage"
+                },
+                "batteryLife": {
+                  "type": "string",
+                  "title": "Battery Life"
+                }
+              }
+            },
+            "operatingConditions": {
+              "type": "object",
+              "title": "Operating Conditions",
+              "properties": {
+                "temperatureRange": {
+                  "type": "string",
+                  "title": "Temperature Range"
+                },
+                "humidityRange": {
+                  "type": "string",
+                  "title": "Humidity Range"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "title": "Media Assets",
+      "properties": {
+        "images": {
+          "type": "object",
+          "title": "Product Images",
+          "properties": {
+            "primaryImage": {
+              "type": "string",
+              "title": "Primary Image URL"
+            },
+            "galleryImages": {
+              "type": "string",
+              "title": "Gallery Images (comma-separated URLs)"
+            },
+            "thumbnailImage": {
+              "type": "string",
+              "title": "Thumbnail Image URL"
+            }
+          }
+        },
+        "videos": {
+          "type": "object",
+          "title": "Product Videos",
+          "properties": {
+            "demoVideo": {
+              "type": "string",
+              "title": "Demo Video URL"
+            },
+            "instructionalVideo": {
+              "type": "string",
+              "title": "Instructional Video URL"
+            }
+          }
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "title": "Compliance & Certifications",
+      "properties": {
+        "certifications": {
+          "type": "object",
+          "title": "Product Certifications",
+          "properties": {
+            "safety": {
+              "type": "string",
+              "title": "Safety Certification"
+            },
+            "quality": {
+              "type": "string",
+              "title": "Quality Certification"
+            },
+            "environmental": {
+              "type": "string",
+              "title": "Environmental Certification"
+            }
+          }
+        },
+        "regulatory": {
+          "type": "object",
+          "title": "Regulatory Information",
+          "properties": {
+            "restrictions": {
+              "type": "string",
+              "title": "Shipping/Import Restrictions"
+            },
+            "warningLabels": {
+              "type": "string",
+              "title": "Required Warning Labels"
+            },
+            "ageRestrictions": {
+              "type": "boolean",
+              "title": "Age Restricted Product"
+            }
+          }
+        }
+      }
+    }
+  }
+}
