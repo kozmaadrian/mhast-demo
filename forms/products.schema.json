@@ -119,6 +119,7 @@
             "tier1": {
               "type": "object",
               "title": "Tier 1 (10-49 units)",
+              "required": ["minQuantity"],
               "properties": {
                 "minQuantity": {
                   "type": "number",
