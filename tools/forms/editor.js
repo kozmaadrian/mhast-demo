@@ -156,24 +156,39 @@ class FormsEditor extends LitElement {
     if (!schemaId || !mountEl) return;
     try {
       const { schema, initialData } = await loadSchemaWithDefaults(schemaId);
+      // Prefer existing form data from the loaded page if present
+      const dataToUse = (this.documentData && this.documentData.formData)
+        ? this.documentData.formData
+        : initialData;
       if (!this._formApi) {
         this._formApi = mountFormUI({
           mount: mountEl,
           schema,
-          data: initialData,
+          data: dataToUse,
           onChange: (next) => {
-            // hook for future sync
+            // Sync live changes back to pageData.formData
+            if (!this.documentData) this.documentData = {};
+            this.documentData.formData = next;
+            this.requestUpdate('documentData');
           },
           onRemove: () => {
             try { this._formApi?.destroy(); } catch {}
             this._formApi = null;
             mountEl.innerHTML = '';
+            if (this.documentData && 'formData' in this.documentData) {
+              delete this.documentData.formData;
+              this.requestUpdate('documentData');
+            }
           },
         });
       } else {
         this._formApi.updateSchema(schema);
-        this._formApi.updateData(initialData);
+        this._formApi.updateData(dataToUse);
       }
+      // Ensure the page data reflects the current form state immediately
+      if (!this.documentData) this.documentData = {};
+      this.documentData.formData = dataToUse;
+      this.requestUpdate('documentData');
       // Close dialog after successful load
       this.showSchemaDialog = false;
     } catch (e) {
