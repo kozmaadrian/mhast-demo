@@ -10,6 +10,7 @@
  *   onRemove,
  *   ui: {
  *     showRemove: true,
+ *     fixedSidebar: false, // when true: sidebar is always expanded and collapse control is hidden
  *   }
  *   // Note: legacy top-level `showRemove` is still supported for backwards compatibility
  * });
@@ -61,6 +62,13 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     if (removeBtn) removeBtn.remove();
   }
 
+  // Optionally make the sidebar fixed open (no collapse control)
+  const fixedSidebar = !!controls.fixedSidebar;
+  if (fixedSidebar) {
+    const collapseBtn = sideEl.querySelector('.form-side-panel-collapse');
+    if (collapseBtn) collapseBtn.remove();
+  }
+
   // Insert wrapper into mount
   mount.appendChild(wrapper);
 
@@ -73,8 +81,14 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
   // Convert to inline panel
   sideEl.classList.remove('floating-panel');
-  sideEl.classList.add('form-inline-panel', 'collapsed');
-  sidebar.setCollapsed(true);
+  sideEl.classList.add('form-inline-panel');
+  if (fixedSidebar) {
+    sideEl.classList.remove('collapsed');
+    sidebar.setCollapsed(false);
+  } else {
+    sideEl.classList.add('collapsed');
+    sidebar.setCollapsed(true);
+  }
 
   // Toggle raw/form view
   let isRawMode = false;

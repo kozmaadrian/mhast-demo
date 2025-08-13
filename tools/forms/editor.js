@@ -199,7 +199,7 @@ class FormsEditor extends LitElement {
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { showRemove: false },
+          ui: { showRemove: false, fixedSidebar: true },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);
