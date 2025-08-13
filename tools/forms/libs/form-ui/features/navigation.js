@@ -139,6 +139,8 @@ export default class FormNavigation {
 
     // Add hover syncing: hovering groups moves the active indicator
     this.enableHoverSync();
+    // Add scroll syncing: move active indicator while user scrolls the form
+    this.enableScrollSync();
   }
 
   /**
@@ -175,6 +177,94 @@ export default class FormNavigation {
       g.removeEventListener('click', handleGroupClick);
       g.addEventListener('click', handleGroupClick);
     });
+  }
+
+  /**
+   * Keep sidebar indicator in sync with scroll position (scrollspy)
+   */
+  enableScrollSync() {
+    const { el, type } = this.getScrollSource();
+    if (!el && type !== 'window') return;
+
+    let scheduled = false;
+    const onScroll = () => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        this.updateActiveGroupFromScroll();
+      });
+    };
+
+    this._onScrollHandler = onScroll;
+    if (type === 'window') {
+      window.removeEventListener('scroll', onScroll);
+      window.addEventListener('scroll', onScroll, { passive: true });
+    } else if (el) {
+      el.removeEventListener('scroll', onScroll);
+      el.addEventListener('scroll', onScroll, { passive: true });
+    }
+    this._onResizeHandler = () => this.updateActiveGroupFromScroll();
+    window.removeEventListener('resize', this._onResizeHandler);
+    window.addEventListener('resize', this._onResizeHandler, { passive: true });
+
+    this.updateActiveGroupFromScroll();
+  }
+
+  getScrollSource() {
+    const bodyEl = this.formGenerator?.container?.querySelector?.('.form-ui-body') || null;
+    const isScrollable = (el) => !!el && el.scrollHeight > el.clientHeight;
+    if (isScrollable(bodyEl)) return { el: bodyEl, type: 'element' };
+    // Fall back to document/window scrolling
+    return { el: null, type: 'window' };
+  }
+
+  updateActiveGroupFromScroll() {
+    if (!this.formGenerator?.groupElements || this.formGenerator.groupElements.size === 0) return;
+    const { el, type } = this.getScrollSource();
+
+    let candidateId = null;
+    let candidateMetric = -Infinity; // larger is better
+
+    if (type === 'element' && el) {
+      const activeOffset = el.scrollTop + 20;
+      const getOffsetTopWithinContainer = (element, containerEl) => {
+        let top = 0;
+        let node = element;
+        while (node && node !== containerEl) {
+          top += node.offsetTop;
+          node = node.offsetParent;
+        }
+        return top;
+      };
+      for (const [groupId, info] of this.formGenerator.groupElements) {
+        const top = getOffsetTopWithinContainer(info.element, el);
+        if (top <= activeOffset && top >= candidateMetric) {
+          candidateMetric = top;
+          candidateId = groupId;
+        }
+      }
+    } else {
+      // Window scroll: use viewport positions
+      const viewportTop = 0; // relative in getBoundingClientRect()
+      const threshold = 80; // px from top of viewport
+      for (const [groupId, info] of this.formGenerator.groupElements) {
+        const rect = info.element.getBoundingClientRect();
+        const top = rect.top;
+        if (top <= threshold && top >= candidateMetric) {
+          candidateMetric = top;
+          candidateId = groupId;
+        }
+      }
+    }
+
+    if (!candidateId) {
+      const first = this.formGenerator.groupElements.keys().next();
+      if (!first.done) candidateId = first.value;
+    }
+    if (!candidateId) return;
+    this.updateNavigationActiveState(candidateId);
+    this.formGenerator.activeGroupId = candidateId;
   }
 
   /**
