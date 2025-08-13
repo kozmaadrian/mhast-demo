@@ -380,7 +380,6 @@ class FormsEditor extends LitElement {
           <div class="schema-banner">
             <span class="schema-label">Schema:</span>
             <span class="schema-name">${this._selectedSchemaName}</span>
-            <button class="btn btn-secondary" @click=${() => this._resetFormToPageData()} title="Reset to last loaded data">Reset</button>
           </div>
         ` : nothing}
         <div id="form-root"></div>
@@ -397,11 +396,6 @@ class FormsEditor extends LitElement {
     `;
   }
 
-  _resetFormToPageData() {
-    if (!this._formApi) return;
-    const data = this.documentData?.formData || {};
-    this._formApi.updateData(data);
-  }
 }
 
 customElements.define("da-forms-editor", FormsEditor);
