@@ -2,6 +2,7 @@
  * Form Navigation
  * Handles sidebar navigation, group management, and form interaction
  */
+import { getDeepActiveElement } from '../utils/dom-utils.js';
 
 export default class FormNavigation {
   constructor(formGenerator) {
@@ -319,8 +320,9 @@ export default class FormNavigation {
     const activeGroup = this.formGenerator.groupElements.get(this.formGenerator.activeGroupId);
     if (!activeGroup) return false;
 
-    const focusedElement = document.activeElement;
-    return activeGroup.element.contains(focusedElement)
+    const focusedElement = getDeepActiveElement();
+    return !!focusedElement
+           && activeGroup.element.contains(focusedElement)
            && (focusedElement.matches('input, select, textarea, button') || focusedElement.contentEditable === 'true');
   }
 }
