@@ -2,15 +2,29 @@
  * mountFormUI - vanilla API to mount the form UI into a DOM node
  *
  * Usage:
- * const api = mountFormUI({ mount, schema, data, onChange, onRemove });
+ * const api = mountFormUI({
+ *   mount,
+ *   schema,
+ *   data,
+ *   onChange,
+ *   onRemove,
+ *   ui: {
+ *     showRemove: true,
+ *   }
+ *   // Note: legacy top-level `showRemove` is still supported for backwards compatibility
+ * });
  * api.updateData(next); api.toggleRawMode(); api.destroy();
  */
 
 import FormGenerator from './form-generator.js';
 import FormSidebar from '../components/sidebar.js';
 
-export function mountFormUI({ mount, schema, data, onChange, onRemove } = {}) {
+export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showRemove: legacyShowRemove } = {}) {
   if (!mount) throw new Error('mountFormUI: mount element is required');
+  const controls = ui || {};
+  const effectiveShowRemove = typeof controls.showRemove === 'boolean'
+    ? controls.showRemove
+    : (typeof legacyShowRemove === 'boolean' ? legacyShowRemove : true);
 
   // Wrapper
   const wrapper = document.createElement('div');
@@ -40,6 +54,12 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove } = {}) {
   const sideEl = sidebar.createElement();
   // Start as floating (class needed by CSS), then move inline under header
   sideEl.classList.add('floating-panel');
+
+  // Optionally hide remove button for this mount
+  if (!effectiveShowRemove) {
+    const removeBtn = sideEl.querySelector('.form-ui-remove');
+    if (removeBtn) removeBtn.remove();
+  }
 
   // Insert wrapper into mount
   mount.appendChild(wrapper);
@@ -86,9 +106,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove } = {}) {
     const isRaw = mode === 'raw';
     toggleRaw(isRaw);
   });
-  sidebar.onRemoveHandler(() => {
-    if (typeof onRemove === 'function') onRemove();
-  });
+  if (effectiveShowRemove) {
+    sidebar.onRemoveHandler(() => {
+      if (typeof onRemove === 'function') onRemove();
+    });
+  }
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
     if (!navItem) return;

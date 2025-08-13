@@ -3,7 +3,7 @@ import getStyle from "https://da.live/nx/utils/styles.js";
 import { LitElement, html, nothing } from "da-lit";
 import { readDocument } from "./actions.js";
 // Form UI library (standalone mounting API)
-import mountFormUI from "./libs/form-ui/core/form-mount.js";
+// mountFormUI is lazily imported on demand to reduce initial load
 import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
 import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/commands/form-commands.js";
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
@@ -36,6 +36,10 @@ class FormsEditor extends LitElement {
     this.loadingSchemas = false;
     this.schemaError = null;
     this.showSchemaDialog = false;
+    this._previouslyFocused = null;
+    this._onFormChangeDebounced = null;
+    this._pagePath = '';
+    this._selectedSchemaName = '';
   }
 
   async connectedCallback() {
@@ -45,6 +49,7 @@ class FormsEditor extends LitElement {
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
     const pagePath = urlParams.get('page');
+    const schemaFromUrl = urlParams.get('schema');
     
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
@@ -53,12 +58,20 @@ class FormsEditor extends LitElement {
     
     // Load document data before initial render
     await this.loadDocumentData(pagePath);
+    this._pagePath = pagePath;
     // Prepare Form UI (styles + schema loader), and discover schemas for selection
     await this.ensureFormUICSS();
     await this.configureSchemaLoader();
     await this.discoverSchemas();
-    // Open dialog when schemas are ready
-    this.showSchemaDialog = true;
+    // If schema provided in URL and is valid, auto-load and skip dialog
+    if (schemaFromUrl && this.schemas.some((s) => s.id === schemaFromUrl)) {
+      this.selectedSchema = schemaFromUrl;
+      await this.loadSelectedSchema();
+      this.showSchemaDialog = false;
+    } else {
+      // Open dialog when schemas are ready
+      this.showSchemaDialog = true;
+    }
   }
 
   async loadDocumentData(pagePath) {
@@ -137,7 +150,18 @@ class FormsEditor extends LitElement {
     try {
       this.loadingSchemas = true;
       this.schemaError = null;
-      const items = await discoverSchemasPlain();
+      // Try cache first
+      const cacheKey = 'forms.schemas.manifest';
+      const cached = sessionStorage.getItem(cacheKey);
+      let items = [];
+      if (cached) {
+        try { items = JSON.parse(cached) || []; } catch {}
+      }
+      if (!items || items.length === 0) {
+        const discovered = await discoverSchemasPlain();
+        items = Array.isArray(discovered) ? discovered : [];
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(items)); } catch {}
+      }
       this.schemas = Array.isArray(items) ? items : [];
       // Preselect first if available, but do not auto-load
       this.selectedSchema = this.schemas[0]?.id || '';
@@ -156,28 +180,36 @@ class FormsEditor extends LitElement {
     if (!schemaId || !mountEl) return;
     try {
       const { schema, initialData } = await loadSchemaWithDefaults(schemaId);
+      this._selectedSchemaName = this.schemas.find((s) => s.id === schemaId)?.name || schema?.title || schemaId;
       // Prefer existing form data from the loaded page if present
       const dataToUse = (this.documentData && this.documentData.formData)
         ? this.documentData.formData
         : initialData;
       if (!this._formApi) {
+        // Lazy-load the form mount API
+        const { default: mountFormUI } = await import('./libs/form-ui/core/form-mount.js');
+        // Debounced sync function
+        if (!this._onFormChangeDebounced) {
+          this._onFormChangeDebounced = this._debounce((next) => {
+            const updated = { ...(this.documentData || {}), formData: next, schemaId };
+            this.documentData = updated;
+          }, 200);
+        }
         this._formApi = mountFormUI({
           mount: mountEl,
           schema,
           data: dataToUse,
+          ui: { showRemove: false },
           onChange: (next) => {
-            // Sync live changes back to pageData.formData
-            if (!this.documentData) this.documentData = {};
-            this.documentData.formData = next;
-            this.requestUpdate('documentData');
+            // Sync live changes back to pageData.formData (debounced)
+            this._onFormChangeDebounced(next);
           },
           onRemove: () => {
             try { this._formApi?.destroy(); } catch {}
             this._formApi = null;
-            mountEl.innerHTML = '';
-            if (this.documentData && 'formData' in this.documentData) {
-              delete this.documentData.formData;
-              this.requestUpdate('documentData');
+            if (this.documentData) {
+              const { formData, ...rest } = this.documentData;
+              this.documentData = { ...rest };
             }
           },
         });
@@ -186,11 +218,15 @@ class FormsEditor extends LitElement {
         this._formApi.updateData(dataToUse);
       }
       // Ensure the page data reflects the current form state immediately
-      if (!this.documentData) this.documentData = {};
-      this.documentData.formData = dataToUse;
-      this.requestUpdate('documentData');
+      this.documentData = { ...(this.documentData || {}), formData: dataToUse, schemaId };
       // Close dialog after successful load
       this.showSchemaDialog = false;
+      // Update URL with selected schema without reloading
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('schema', schemaId);
+        window.history.replaceState({}, '', url);
+      } catch {}
     } catch (e) {
       this.schemaError = `Failed to load schema: ${e?.message || e}`;
     }
@@ -203,7 +239,98 @@ class FormsEditor extends LitElement {
   disconnectedCallback() {
     try { this._formApi?.destroy(); } catch {}
     this._formApi = null;
+    this._disableDialogFocusTrap();
+    window.removeEventListener('keydown', this._onGlobalKeydown);
     super.disconnectedCallback();
+  }
+
+  firstUpdated() {
+    // Global shortcuts
+    this._onGlobalKeydown = (e) => {
+      const isMac = navigator.platform.toUpperCase().includes('MAC');
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        this._emitSave();
+      }
+    };
+    window.addEventListener('keydown', this._onGlobalKeydown);
+  }
+
+  updated(changed) {
+    if (changed.has('showSchemaDialog')) {
+      if (this.showSchemaDialog) {
+        this._previouslyFocused = this.shadowRoot.activeElement || document.activeElement;
+        const dialog = this.renderRoot?.querySelector('.modal-dialog');
+        const select = this.renderRoot?.querySelector('#schema-select');
+        if (select) select.focus();
+        this._enableDialogFocusTrap(dialog);
+      } else {
+        this._disableDialogFocusTrap();
+        if (this._previouslyFocused && typeof this._previouslyFocused.focus === 'function') {
+          try { this._previouslyFocused.focus(); } catch {}
+        }
+      }
+    }
+  }
+
+  _enableDialogFocusTrap(dialog) {
+    if (!dialog) return;
+    const overlay = this.renderRoot?.querySelector('.modal-overlay');
+    const focusable = () => Array.from(dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .filter((el) => !el.hasAttribute('disabled'));
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.showSchemaDialog = false;
+        return;
+      }
+      if (e.key === 'Enter') {
+        if (document.activeElement && document.activeElement.tagName === 'SELECT') {
+          e.preventDefault();
+          this.loadSelectedSchema();
+          return;
+        }
+      }
+      if (e.key === 'Tab') {
+        const nodes = focusable();
+        if (!nodes.length) return;
+        const first = nodes[0];
+        const last = nodes[nodes.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault(); first.focus();
+        }
+      }
+    };
+    this._dialogKeyHandler = keyHandler;
+    overlay?.addEventListener('keydown', keyHandler);
+  }
+
+  _disableDialogFocusTrap() {
+    const overlay = this.renderRoot?.querySelector('.modal-overlay');
+    if (overlay && this._dialogKeyHandler) {
+      overlay.removeEventListener('keydown', this._dialogKeyHandler);
+      this._dialogKeyHandler = null;
+    }
+  }
+
+  _debounce(fn, wait) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), wait);
+    };
+  }
+
+  _emitSave() {
+    const detail = {
+      pagePath: this._pagePath,
+      schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      formData: this.documentData?.formData || null,
+    };
+    this.dispatchEvent(new CustomEvent('editor-save', { detail }));
   }
 
   render() {
@@ -249,6 +376,13 @@ class FormsEditor extends LitElement {
         ` : nothing}
 
         <h2>Form UI</h2>
+        ${!this.showSchemaDialog && this._selectedSchemaName ? html`
+          <div class="schema-banner">
+            <span class="schema-label">Schema:</span>
+            <span class="schema-name">${this._selectedSchemaName}</span>
+            <button class="btn btn-secondary" @click=${() => this._resetFormToPageData()} title="Reset to last loaded data">Reset</button>
+          </div>
+        ` : nothing}
         <div id="form-root"></div>
 
         <h2>Document Data</h2>
@@ -261,6 +395,12 @@ class FormsEditor extends LitElement {
         >${JSON.stringify(this.documentData, null, 2)}</textarea>
       </div>
     `;
+  }
+
+  _resetFormToPageData() {
+    if (!this._formApi) return;
+    const data = this.documentData?.formData || {};
+    this._formApi.updateData(data);
   }
 }
 
