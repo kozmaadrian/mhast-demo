@@ -8,8 +8,9 @@ h2 {
     background: rgba(15, 23, 42, 0.45);
     backdrop-filter: saturate(120%) blur(2px);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    padding-top: 25vh;
     z-index: 9999;
     animation: modal-fade 120ms ease-out;
 }
@@ -170,4 +171,25 @@ label[for="schema-select"] {
         opacity: 1;
         transform: translateY(0) scale(1);
     }
+}
+
+.schema-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin: 6px 0 10px 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f8fafc, #ffffff);
+}
+
+.schema-label {
+    color: #475569;
+    font-size: 13px;
+}
+
+.schema-name {
+    color: #0f172a;
+    font-weight: 600;
 }
