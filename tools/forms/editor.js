@@ -1,7 +1,8 @@
+import { LitElement, html, nothing } from "da-lit";
 import "https://da.live/nx/public/sl/components.js";
 import getStyle from "https://da.live/nx/utils/styles.js";
-import { LitElement, html, nothing } from "da-lit";
-import { readDocument } from "./actions.js";
+import { readDocument, saveDocument } from "./actions.js";
+import "./libs/form-ui/components/title/title.js";
 // Form UI library (standalone mounting API)
 // mountFormUI is lazily imported on demand to reduce initial load
 import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
@@ -9,6 +10,7 @@ import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/com
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 
 const style = await getStyle(import.meta.url);
+const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
 
 class FormsEditor extends LitElement {
   static properties = {
@@ -20,6 +22,7 @@ class FormsEditor extends LitElement {
     loadingSchemas: { type: Boolean },
     schemaError: { type: String },
     showSchemaDialog: { type: Boolean },
+    context: { type: Object },
   };
 
   constructor() {
@@ -29,7 +32,6 @@ class FormsEditor extends LitElement {
     this.error = null;
     // Form UI runtime refs
     this._formApi = null;
-    this._formUiCssSheet = null;
     this._schemaLoaderConfigured = false;
     this.schemas = [];
     this.selectedSchema = '';
@@ -44,12 +46,16 @@ class FormsEditor extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    this.shadowRoot.adoptedStyleSheets = [style];
+    this.shadowRoot.adoptedStyleSheets = [style, formStyles];
+
+    // init DA SDK context
+    const { context } = await DA_SDK;
+    this.context = { ...context };
     
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
     const pagePath = urlParams.get('page');
-    const schemaFromUrl = urlParams.get('schema');
+    let schemaFromUrl = urlParams.get('schema');
     
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
@@ -59,8 +65,9 @@ class FormsEditor extends LitElement {
     // Load document data before initial render
     await this.loadDocumentData(pagePath);
     this._pagePath = pagePath;
+    schemaFromUrl = this.documentData?.schemaId || schemaFromUrl;
+
     // Prepare Form UI (styles + schema loader), and discover schemas for selection
-    await this.ensureFormUICSS();
     await this.configureSchemaLoader();
     await this.discoverSchemas();
     // If schema provided in URL and is valid, auto-load and skip dialog
@@ -72,6 +79,9 @@ class FormsEditor extends LitElement {
       // Open dialog when schemas are ready
       this.showSchemaDialog = true;
     }
+
+    this.addEventListener('editor-save', this._handleSave);
+    this.addEventListener('editor-preview-publish', this._handlePreviewPublish);
   }
 
   async loadDocumentData(pagePath) {
@@ -86,35 +96,10 @@ class FormsEditor extends LitElement {
     }
   }
 
-  async ensureFormUICSS() {
-    if (this._formUiCssSheet) return;
-    try {
-      const cssUrl = new URL('./libs/form-ui/form-ui.css', import.meta.url);
-      const res = await fetch(cssUrl);
-      const cssText = await res.text();
-      const sheet = new CSSStyleSheet();
-      await sheet.replace(cssText);
-      // Append to existing adopted sheets
-      this.shadowRoot.adoptedStyleSheets = [...this.shadowRoot.adoptedStyleSheets, sheet];
-      this._formUiCssSheet = sheet;
-    } catch (e) {
-      // Fallback: inline <style> if constructable stylesheets fail
-      try {
-        const cssUrl = new URL('./libs/form-ui/form-ui.css', import.meta.url);
-        const res = await fetch(cssUrl);
-        const cssText = await res.text();
-        const styleTag = document.createElement('style');
-        styleTag.textContent = cssText;
-        this.shadowRoot.appendChild(styleTag);
-      } catch {}
-    }
-  }
-
   async configureSchemaLoader() {
     if (this._schemaLoaderConfigured) return;
     try {
-      const { context } = await DA_SDK;
-      const { org, repo, ref } = context || {};
+      const { org, repo, ref } = this.context || {};
       const owner = org || 'kozmaadrian';
       const repository = repo || 'mhast-demo';
       const branch = ref || 'main';
@@ -333,6 +318,45 @@ class FormsEditor extends LitElement {
     this.dispatchEvent(new CustomEvent('editor-save', { detail }));
   }
 
+  _getPathDetails() {
+    const { org, repo, ref } = this.context || {};
+    return {
+      owner: org,
+      repo,
+      ref: ref,
+      parent: `/${org}/${repo}`,
+      parentName: `${this._pagePath}`,
+      name: "Form Editor"
+    }
+  }
+
+  async _handleSave(e) {
+    const resp = await saveDocument(e.detail);
+    console.log('editor-save', resp);
+  }
+
+  async _handlePreviewPublish(e) {
+    console.log('editor-preview-publish', e);
+    const { action, location } = e.detail;
+    location.classList.add("is-sending");
+
+
+    if (action === "preview" || action === "publish") {
+
+      const detail = {
+        pagePath: this._pagePath,
+        schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+        formData: this.documentData?.formData || null,
+      };
+      const daResp = await saveDocument(detail);
+      if (daResp.error) {
+        this.handleError(daResp, action);
+        return;
+      }
+    }
+    location.classList.remove("is-sending");
+  }
+
   render() {
     if (this.error) {
       return html`
@@ -353,6 +377,7 @@ class FormsEditor extends LitElement {
     }
 
     return html`
+      <da-title details=${JSON.stringify(this._getPathDetails())}></da-title>
       <div>
         ${this.showSchemaDialog ? html`
           <div class="modal-overlay" role="dialog" aria-modal="true">
@@ -375,7 +400,6 @@ class FormsEditor extends LitElement {
           </div>
         ` : nothing}
 
-        <h2>Form UI</h2>
         ${!this.showSchemaDialog && this._selectedSchemaName ? html`
           <div class="schema-banner">
             <span class="schema-label">Schema:</span>
@@ -385,7 +409,6 @@ class FormsEditor extends LitElement {
         <div id="form-root"></div>
 
         <h2>Document Data</h2>
-        <p><strong>Page Path:</strong> ${this.documentData.pagePath}</p>
         <textarea 
           readonly 
           rows="20" 
