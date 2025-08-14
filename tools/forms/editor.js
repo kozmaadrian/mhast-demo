@@ -55,12 +55,18 @@ class FormsEditor extends LitElement {
     
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
-    const pagePath = urlParams.get('page');
+    let pagePath = window.location.hash?.replace('#/', '') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
     
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
       return;
+    }
+
+    // Remove org and site from the start of the pagePath, so only the path remains
+    const parts = pagePath.split('/');
+    if (parts.length > 3) {
+      pagePath = '/' + parts.slice(3).join('/');
     }
     
     // Load document data before initial render
