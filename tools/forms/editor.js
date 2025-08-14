@@ -1,7 +1,7 @@
 import { LitElement, html, nothing } from "da-lit";
 import "https://da.live/nx/public/sl/components.js";
 import getStyle from "https://da.live/nx/utils/styles.js";
-import { readDocument, saveDocument } from "./actions.js";
+import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./actions.js";
 import "./libs/form-ui/components/title/title.js";
 // Form UI library (standalone mounting API)
 // mountFormUI is lazily imported on demand to reduce initial load
@@ -66,7 +66,7 @@ class FormsEditor extends LitElement {
     await this.loadDocumentData(pagePath);
     this._pagePath = pagePath;
     schemaFromUrl = this.documentData?.schemaId || schemaFromUrl;
-
+    
     // Prepare Form UI (styles + schema loader), and discover schemas for selection
     await this.configureSchemaLoader();
     await this.discoverSchemas();
@@ -336,13 +336,12 @@ class FormsEditor extends LitElement {
   }
 
   async _handlePreviewPublish(e) {
-    console.log('editor-preview-publish', e);
     const { action, location } = e.detail;
+    const { org, repo } = this.context;
+
     location.classList.add("is-sending");
 
-
     if (action === "preview" || action === "publish") {
-
       const detail = {
         pagePath: this._pagePath,
         schemaId: this.documentData?.schemaId || this.selectedSchema || '',
@@ -353,6 +352,25 @@ class FormsEditor extends LitElement {
         this.handleError(daResp, action);
         return;
       }
+
+      const aemPath = `/${org}/${repo}${this._pagePath}`;
+      let json = await saveToAem(aemPath, "preview");
+      if (json.error) {
+        this.handleError(json, action, sendBtn);
+        return;
+      }
+      if (action === "publish") {
+        json = await saveToAem(aemPath, "live");
+        if (json.error) {
+          this.handleError(json, action, sendBtn);
+          return;
+        }
+        saveDaVersion(aemPath);
+      } 
+     
+      const { url: href } = action === "publish" ? json.live : json.preview;
+      const toOpenInAem = href.replace(".hlx.", ".aem.");
+      window.open(`${toOpenInAem}?nocache=${Date.now()}`, toOpenInAem);
     }
     location.classList.remove("is-sending");
   }

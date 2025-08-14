@@ -1,6 +1,9 @@
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
 import { readBlockConfig } from "./utils.js";
 
+const AEM_ORIGIN = 'https://admin.hlx.page';
+const DA_ORIGIN = 'https://admin.da.live';
+
 /**
  * Reads document data using the DA SDK
  * @param {string} pagePath - The page path to read document for
@@ -13,7 +16,7 @@ export async function readDocument(pagePath) {
     const opts = {
       headers: { Authorization: `Bearer ${token}` },
     };
-    const fullpath = `https://admin.da.live/source/${org}/${repo}${pagePath}.html`;
+    const fullpath = `${DA_ORIGIN}/source/${org}/${repo}${pagePath}.html`;
     const response = await fetch(fullpath, opts);
 
     if (!response.ok) {
@@ -91,7 +94,7 @@ export async function saveDocument(details) {
   };
 
   const daPath = `/${org}/${repo}${details.pagePath}`;
-  const fullpath = `https://admin.da.live/source${daPath}.html`;
+  const fullpath = `${DA_ORIGIN}/source${daPath}.html`;
 
   try {
     const daResp = await fetch(fullpath, opts);
@@ -99,5 +102,44 @@ export async function saveDocument(details) {
   } catch (error) {
     console.error('Error fetching document:', error);
     return { error };
+  }
+}
+
+export async function saveToAem(path, action) {
+  const [owner, repo, ...parts] = path.slice(1).toLowerCase().split('/');
+  const aemPath = parts.join('/');
+
+  const url = `${AEM_ORIGIN}/${action}/${owner}/${repo}/main/${aemPath}`;
+  const resp = await fetch(url, { method: 'POST' });
+  // eslint-disable-next-line no-console
+  if (!resp.ok) {
+    const { status } = resp;
+    const message = [401, 403].some((s) => s === status) ? 'Not authorized to' : 'Error during';
+    return {
+      error: {
+        status,
+        type: 'error',
+        message,
+      },
+    };
+  }
+  return resp.json();
+}
+
+export async function saveDaVersion(path, ext = 'html') {
+  const fullPath = `${DA_ORIGIN}/versionsource${path}.${ext}`;
+  const { token } = await DA_SDK;
+  
+  const opts = {
+    headers: { Authorization: `Bearer ${token}` },
+    method: 'POST',
+    body: JSON.stringify({ label: 'Published' }),
+  };
+
+  try {
+    await fetch(fullPath, opts);
+  } catch {
+    // eslint-disable-next-line no-console
+    console.log('Error creating auto version on publish.');
   }
 }
