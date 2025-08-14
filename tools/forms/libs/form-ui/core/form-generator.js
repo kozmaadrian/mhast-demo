@@ -113,6 +113,48 @@ export default class FormGenerator {
     this.setNestedValue(this.data, path, baseObject);
     // Notify listeners for data change
     this.listeners.forEach((listener) => listener(this.data));
+    // Rebuild the form body to materialize the newly activated group
+    this.rebuildBody();
+  }
+
+  /**
+   * Rebuild only the form body based on current activation state and data
+   */
+  rebuildBody() {
+    if (!this.container) return;
+    const body = this.container.querySelector('.form-ui-body');
+    if (!body) return;
+    // Preserve current scroll position of body
+    const previousScrollTop = body.scrollTop;
+    // Clear maps
+    this.groupElements.clear();
+    this.fieldSchemas.clear();
+    this.fieldElements.clear();
+    this.fieldToGroup.clear();
+    // Rebuild DOM
+    body.innerHTML = '';
+    const rootSchema = this.normalizeSchema(this.schema);
+    if (rootSchema?.type === 'object' && rootSchema.properties) {
+      this.groupElements = this.groupBuilder.build(
+        body,
+        rootSchema,
+        [rootSchema.title || 'Form'],
+        [],
+        new Map(),
+      );
+    }
+    // Re-attach overlay anchor
+    this.highlightOverlay.attach(this.container);
+    // Remap fields and validate
+    this.navigation.mapFieldsToGroups();
+    // Restore existing data into fields
+    this.loadData(this.data);
+    // Rebuild navigation tree
+    if (this.navigationTree) {
+      this.navigation.generateNavigationTree();
+    }
+    // Restore scroll
+    body.scrollTop = previousScrollTop;
   }
 
   /**

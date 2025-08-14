@@ -79,31 +79,9 @@ export default class GroupBuilder {
       const nestedPathStr = nestedSchemaPath.join('.');
       const isOptional = !(schema.required || []).includes(key);
 
-      // Optional nested object: if it's a $ref, render activator if not active yet. Non-$ref should render immediately.
+      // Optional nested object: if it's a $ref and inactive, do not render in content.
       if (hasRef && isOptional && !this.isOptionalGroupActive(nestedPathStr)) {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'form-ui-optional-object';
-        placeholder.dataset.optionalPath = nestedPathStr;
-        placeholder.id = `form-optional-${nestedPathStr.replace(/\./g, '-')}`;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'form-ui-optional-add';
-        const title = this.getSchemaTitle(propSchema, key);
-        button.textContent = `+ Add ${title}`;
-        button.addEventListener('click', () => {
-          this.onActivateOptionalGroup(nestedPathStr, propSchema);
-          // Build subtree into a fragment and replace placeholder in one operation
-          const fragment = document.createDocumentFragment();
-          this.build(fragment, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
-          if (placeholder.parentNode) {
-            placeholder.replaceWith(fragment);
-          }
-          // Refresh navigation and mappings to include new groups
-          this.refreshNavigation();
-        });
-        placeholder.appendChild(button);
-        container.appendChild(placeholder);
-        return; // Skip immediate build until activated
+        return; // content stays clean; sidebar handles activation
       }
 
       if (!this.hasPrimitiveFields(propSchema) && Object.keys(propSchema.properties || {}).length > 0) {

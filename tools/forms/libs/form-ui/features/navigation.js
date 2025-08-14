@@ -405,10 +405,20 @@ export default class FormNavigation {
     const { groupId } = navItem.dataset;
     if (!groupId) return;
     if (navItem.classList.contains('form-ui-nav-item-add')) {
-      // Activate corresponding optional group in content
-      const placeholder = this.formGenerator.container.querySelector(`#${groupId}`);
-      const btn = placeholder?.querySelector('.form-ui-optional-add');
-      if (btn) btn.click();
+      // Activate corresponding optional group directly from schema path
+      const path = groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
+      const parts = path.split('.');
+      let node = this.formGenerator.schema;
+      for (const part of parts) {
+        const n = this.formGenerator.normalizeSchema(node);
+        node = n?.properties?.[part];
+        if (!node) break;
+      }
+      if (node) {
+        this.formGenerator.onActivateOptionalGroup(path, node);
+        const newGroupId = `form-group-${path.replace(/\./g, '-')}`;
+        requestAnimationFrame(() => this.navigateToGroup(newGroupId));
+      }
       return;
     }
     this.navigateToGroup(groupId);
