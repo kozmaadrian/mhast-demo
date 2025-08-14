@@ -83,6 +83,8 @@ export default class GroupBuilder {
       if (hasRef && isOptional && !this.isOptionalGroupActive(nestedPathStr)) {
         const placeholder = document.createElement('div');
         placeholder.className = 'form-ui-optional-object';
+        placeholder.dataset.optionalPath = nestedPathStr;
+        placeholder.id = `form-optional-${nestedPathStr.replace(/\./g, '-')}`;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'form-ui-optional-add';

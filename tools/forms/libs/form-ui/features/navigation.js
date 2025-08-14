@@ -327,7 +327,26 @@ export default class FormNavigation {
       const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
       const isOptional = !(normalized.required || []).includes(key);
       const isActive = !isOptional || !hasRef || this.formGenerator.isOptionalGroupActive(nestedPath);
-      if (!isActive) return; // hide inactive optional $ref groups from nav
+      if (!isActive && hasRef) {
+        // Render a nav "Add" item for inactive optional refs
+        const addItem = document.createElement('div');
+        addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
+        addItem.dataset.groupId = `form-optional-${nestedPath.replace(/\./g, '-')}`;
+        addItem.dataset.level = level + 1;
+
+        const content = document.createElement('div');
+        content.className = 'form-ui-nav-item-content form-ui-nav-item-add-content';
+        content.style.setProperty('--nav-level', level + 1);
+
+        const titleEl = document.createElement('span');
+        titleEl.className = 'form-ui-nav-item-title form-ui-nav-item-add-title';
+        titleEl.textContent = `+ Add ${this.formGenerator.getSchemaTitle(propSchema, key)}`;
+
+        content.appendChild(titleEl);
+        addItem.appendChild(content);
+        items.push(addItem);
+        return;
+      }
 
       // If this nested group has no direct primitive fields, create a section header
       const hasPrimitives = this.formGenerator.hasPrimitiveFields(propSchema);
@@ -384,9 +403,15 @@ export default class FormNavigation {
     e.preventDefault();
     e.stopPropagation();
     const { groupId } = navItem.dataset;
-    if (groupId) {
-      this.navigateToGroup(groupId);
+    if (!groupId) return;
+    if (navItem.classList.contains('form-ui-nav-item-add')) {
+      // Activate corresponding optional group in content
+      const placeholder = this.formGenerator.container.querySelector(`#${groupId}`);
+      const btn = placeholder?.querySelector('.form-ui-optional-add');
+      if (btn) btn.click();
+      return;
     }
+    this.navigateToGroup(groupId);
   }
 
   /**
