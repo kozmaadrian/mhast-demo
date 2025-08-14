@@ -1249,13 +1249,14 @@
 
 .form-ui-nav-item .error-indicator {
   position: absolute;
-  left: calc(var(--nav-level, 0) * 14px);
-  /* Align with current indentation level */
+  right: 8px;
+  left: auto;
   top: 50%;
   transform: translateY(-50%);
   width: 12px;
   height: 12px;
   color: var(--spectrum-semantic-negative-color-icon, #d73502);
+  pointer-events: none;
 }
 
 .form-ui-nav-item.active .form-ui-nav-item-title {
@@ -1268,6 +1269,11 @@
   position: relative;
   padding-left: calc(var(--nav-level, 0) * 14px + 18px);
   /* Add 18px for error icon space */
+}
+
+/* Reserve space on the right for the error icon when present */
+.form-ui-nav-item.has-error .form-ui-nav-item-content {
+  padding-right: 24px;
 }
 
 .form-ui-nav-item-nested .form-ui-nav-item-title {
