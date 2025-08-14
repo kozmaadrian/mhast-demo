@@ -162,7 +162,15 @@ class FormsEditor extends LitElement {
         items = Array.isArray(discovered) ? discovered : [];
         try { sessionStorage.setItem(cacheKey, JSON.stringify(items)); } catch {}
       }
-      this.schemas = Array.isArray(items) ? items : [];
+      // Append local schemas (from tools/forms/local-schema/manifest.json if available)
+      const localSchemas = await this._discoverLocalSchemas().catch(() => []);
+      const combined = Array.isArray(items) ? [...items] : [];
+      // Ensure unique ids by prefixing local entries
+      for (const ls of localSchemas) {
+        const id = `local:${ls.id || ls.name || ls.url}`;
+        combined.push({ id, name: `${ls.name || ls.id || 'Local Schema'} (local)`, url: ls.url, _source: 'local' });
+      }
+      this.schemas = combined;
       // Preselect first if available, but do not auto-load
       this.selectedSchema = this.schemas[0]?.id || '';
     } catch (e) {
@@ -179,8 +187,20 @@ class FormsEditor extends LitElement {
     const mountEl = this.renderRoot?.querySelector('#form-root');
     if (!schemaId || !mountEl) return;
     try {
-      const { schema, initialData } = await loadSchemaWithDefaults(schemaId);
-      this._selectedSchemaName = this.schemas.find((s) => s.id === schemaId)?.name || schema?.title || schemaId;
+      const selected = this.schemas.find((s) => s.id === schemaId) || {};
+      let schema;
+      let initialData = {};
+      if (selected.url) {
+        // Load local schema directly by URL
+        const res = await fetch(new URL(selected.url, window.location.origin), { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Failed to fetch local schema (${res.status})`);
+        schema = await res.json();
+      } else {
+        // Load from default manifest-backed source
+        const loaded = await loadSchemaWithDefaults(schemaId);
+        schema = loaded.schema; initialData = loaded.initialData;
+      }
+      this._selectedSchemaName = selected.name || schema?.title || schemaId;
       // Prefer existing form data from the loaded page if present
       const dataToUse = (this.documentData && this.documentData.formData)
         ? this.documentData.formData
@@ -230,6 +250,44 @@ class FormsEditor extends LitElement {
     } catch (e) {
       this.schemaError = `Failed to load schema: ${e?.message || e}`;
     }
+  }
+
+  async _discoverLocalSchemas() {
+    const found = [];
+    const base = new URL('./local-schema/', import.meta.url);
+    const tryAdd = async (relPath, nameHint) => {
+      try {
+        const url = new URL(relPath, base);
+        const res = await fetch(url, { cache: 'no-store', method: 'HEAD' });
+        if (!res.ok) return;
+        found.push({ id: relPath, name: nameHint || relPath, url: url.pathname });
+      } catch {}
+    };
+
+    // 1) Conventional default: llrc.schema.json
+    await tryAdd('llrc.schema.json', 'LLRC (local)');
+
+    // 2) Allow query param overrides: ?localSchemas=a.json,b.json
+    try {
+      const url = new URL(window.location.href);
+      const list = url.searchParams.get('localSchemas') || url.searchParams.get('localSchema');
+      if (list) {
+        const parts = list.split(',').map((s) => s.trim()).filter(Boolean);
+        // Fetch with GET to ensure JSON is valid
+        for (const p of parts) {
+          try {
+            const u = new URL(p, base);
+            const r = await fetch(u, { cache: 'no-store' });
+            if (!r.ok) continue;
+            // Validate JSON shape quickly
+            await r.json();
+            found.push({ id: p, name: `${p} (local)`, url: u.pathname });
+          } catch {}
+        }
+      }
+    } catch {}
+
+    return found;
   }
 
   onSchemaChange(e) {
