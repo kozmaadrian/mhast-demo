@@ -109,6 +109,9 @@ export default class FormModel {
         } else {
           result[key] = value;
         }
+      } else {
+        // Include keys that are not part of base structure (e.g., newly activated optional groups)
+        result[key] = value;
       }
     });
 

@@ -419,12 +419,12 @@ export default class FormGenerator {
     const { container } = this;
     if (!container) return;
 
-    // Start with base structure
+    // Start with previous data merged over base structure to keep optional branches
     const baseStructure = this.model.generateBaseJSON(this.schema);
-    this.data = { ...baseStructure };
+    this.data = this.model.deepMerge(baseStructure, this.data || {});
 
     // Collect all form inputs and organize them into nested structure
-    const inputs = container.querySelectorAll('input, select, textarea');
+    const inputs = container.querySelectorAll('input[name], select[name], textarea[name]');
 
     inputs.forEach((input) => {
       const fieldName = input.name;
@@ -439,8 +439,10 @@ export default class FormGenerator {
         value = input.value;
       }
 
+      // Ignore synthetic array helper names like field[]; normalize to plain path
+      const normalizedName = fieldName.replace(/\[\]$/, '');
       // Set the value in the nested data structure
-      this.model.setNestedValue(this.data, fieldName, value);
+      this.model.setNestedValue(this.data, normalizedName, value);
     });
 
     // Notify listeners
@@ -528,6 +530,8 @@ export default class FormGenerator {
     try {
       const data = JSON.parse(jsonString);
       this.loadData(data);
+      // Ensure internal data is updated for listeners
+      this.data = this.model.deepMerge(this.model.generateBaseJSON(this.schema), data || {});
       return true;
     } catch (error) {
       // Keep behavior but avoid noisy console in lints; consumers can handle return value

@@ -156,7 +156,8 @@ export default class InputFactory {
     addButton.addEventListener('click', () => {
       const itemContainer = document.createElement('div');
       itemContainer.className = 'form-ui-array-item';
-      const itemInput = this.create(propSchema.items ? `${fieldPath}[]` : fieldPath, propSchema.items || { type: 'string' });
+      const itemIndexName = `${fieldPath}[${itemsContainer.children.length}]`;
+      const itemInput = this.create(itemIndexName, propSchema.items || { type: 'string' });
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
       removeButton.className = 'form-ui-array-remove';
@@ -176,10 +177,10 @@ export default class InputFactory {
 
     // Initialize with default items
     if (propSchema.default && Array.isArray(propSchema.default)) {
-      propSchema.default.forEach((value) => {
+      propSchema.default.forEach((value, idx) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
-        const itemInput = this.create(`${fieldPath}[]`, propSchema.items || { type: 'string' });
+        const itemInput = this.create(`${fieldPath}[${idx}]`, propSchema.items || { type: 'string' });
         const inputEl = itemInput.querySelector?.('input, select, textarea') || itemInput;
         if (inputEl) inputEl.value = value;
         const removeButton = document.createElement('button');
