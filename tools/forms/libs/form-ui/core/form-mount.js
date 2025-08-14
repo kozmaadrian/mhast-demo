@@ -90,6 +90,36 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     sidebar.setCollapsed(true);
   }
 
+  // Auto-float sidebar when it would be outside the viewport (keeps nav and blue marker visible)
+  let isAutoFloating = false;
+  const ensureSidebarVisibility = () => {
+    // Skip when user explicitly fixed sidebar inline
+    const rect = sideEl.getBoundingClientRect();
+    const offscreenRight = rect.left >= window.innerWidth - 8;
+    const offscreenLeft = rect.right <= 8;
+    const shouldFloat = offscreenRight || offscreenLeft;
+    if (shouldFloat && !isAutoFloating) {
+      // Switch to floating fixed panel
+      sideEl.classList.remove('form-inline-panel');
+      sideEl.classList.add('floating-panel');
+      isAutoFloating = true;
+    } else if (!shouldFloat && isAutoFloating) {
+      // Restore inline panel
+      sideEl.classList.remove('floating-panel');
+      sideEl.classList.add('form-inline-panel');
+      isAutoFloating = false;
+    }
+  };
+
+  // Listen to scroll/resize to keep panel visible
+  const onScrollOrResize = () => {
+    requestAnimationFrame(ensureSidebarVisibility);
+  };
+  window.addEventListener('scroll', onScrollOrResize, { passive: true });
+  window.addEventListener('resize', onScrollOrResize, { passive: true });
+  // Initial check
+  ensureSidebarVisibility();
+
   // Toggle raw/form view
   let isRawMode = false;
 
@@ -181,7 +211,13 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
   function navigateTo(groupId) { generator.navigation.navigateToGroup(groupId); }
   function getData() { return generator.data; }
-  function destroy() { generator.destroy(); wrapper.remove(); sidebar.destroy(); }
+  function destroy() {
+    window.removeEventListener('scroll', onScrollOrResize);
+    window.removeEventListener('resize', onScrollOrResize);
+    generator.destroy();
+    wrapper.remove();
+    sidebar.destroy();
+  }
 
   return {
     updateData,

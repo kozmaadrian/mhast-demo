@@ -118,7 +118,7 @@ export default class GroupBuilder {
         sectionHeader.className = 'form-ui-section-header';
         const sectionTitle = document.createElement('h2');
         sectionTitle.className = 'form-ui-section-title';
-        sectionTitle.textContent = propSchema.title || this.formatLabel(key);
+        sectionTitle.textContent = this.getSchemaTitle(propSchema, key);
         sectionHeader.appendChild(sectionTitle);
         sectionContainer.appendChild(sectionHeader);
         container.appendChild(sectionContainer);

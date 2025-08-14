@@ -143,7 +143,10 @@ export default class FormGenerator {
 
   getSchemaTitle(propSchema, fallbackKey) {
     const src = this.derefNode(propSchema) || propSchema;
-    return src.title || this.formatLabel(fallbackKey);
+    // Prefer explicit title on the effective schema; fallback to formatted key
+    return (src && typeof src.title === 'string' && src.title.trim().length > 0)
+      ? src.title
+      : this.formatLabel(fallbackKey);
   }
 
   /**

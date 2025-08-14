@@ -77,6 +77,11 @@
   margin-right: -280px;
 }
 
+/* When auto-floating, reuse floating panel visuals */
+.form-side-panel.floating-panel {
+  z-index: 1002;
+}
+
 .form-side-panel.form-inline-panel .form-side-panel-tabs {
   order: 1;
   border: none;
