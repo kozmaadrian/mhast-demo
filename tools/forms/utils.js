@@ -1,3 +1,6 @@
+export const AEM_ORIGIN = 'https://admin.hlx.page';
+export const DA_ORIGIN = 'https://admin.da.live';
+export const DA_LIVE = 'https://da.live';
 
 /**
  * Sanitizes a string for use as class name.
@@ -12,7 +15,9 @@ export function toClassName(name) {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
     : '';
-}/**
+}
+
+/**
  * Extracts the config from a block.
  * @param {Element} block The block element
  * @returns {object} The block config
@@ -55,4 +60,3 @@ export function readBlockConfig(block) {
   });
   return config;
 }
-

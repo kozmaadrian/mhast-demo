@@ -1,8 +1,5 @@
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
-import { readBlockConfig } from "./utils.js";
-
-const AEM_ORIGIN = 'https://admin.hlx.page';
-const DA_ORIGIN = 'https://admin.da.live';
+import { AEM_ORIGIN, DA_ORIGIN, readBlockConfig } from "./utils.js";
 
 /**
  * Reads document data using the DA SDK

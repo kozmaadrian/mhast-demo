@@ -55,7 +55,7 @@ export default class DaTitle extends LitElement {
       <div class="da-title-inner">
         <div class="da-title-name">
           <a
-            href="/#${this.details.parent}"
+            href="${this.details.parent}"
             target="${this.details.parent}"
             class="da-title-name-label"
             >${this.details.parentName}</a

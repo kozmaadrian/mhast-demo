@@ -8,6 +8,7 @@ import "./libs/form-ui/components/title/title.js";
 import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
 import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/commands/form-commands.js";
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
+import { DA_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
 const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
@@ -320,13 +321,16 @@ class FormsEditor extends LitElement {
 
   _getPathDetails() {
     const { org, repo, ref } = this.context || {};
+    const parentPath = this._pagePath.split('/').slice(0, -1).join('/');
+    const parentName = parentPath.split('/').pop();
+    const name = this._pagePath.split('/').pop();
     return {
       owner: org,
       repo,
       ref: ref,
-      parent: `/${org}/${repo}`,
-      parentName: `${this._pagePath}`,
-      name: "Form Editor"
+      parent: `${DA_LIVE}/#/${org}/${repo}${parentPath}`,
+      parentName,
+      name
     }
   }
 
