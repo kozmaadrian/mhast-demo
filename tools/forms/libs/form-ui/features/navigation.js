@@ -273,7 +273,8 @@ export default class FormNavigation {
   generateNavigationItems(schema, pathPrefix = '', level = 0) {
     const items = [];
 
-    if (schema.type !== 'object' || !schema.properties) {
+    const normalized = this.formGenerator.normalizeSchema ? this.formGenerator.normalizeSchema(schema) : schema;
+    if (normalized.type !== 'object' || !normalized.properties) {
       return items;
     }
 
@@ -281,9 +282,16 @@ export default class FormNavigation {
     const nestedGroups = {};
 
     // Separate primitive fields from nested objects
-    Object.entries(schema.properties).forEach(([key, propSchema]) => {
-      if (propSchema.type === 'object' && propSchema.properties) {
-        nestedGroups[key] = propSchema;
+    Object.entries(normalized.properties).forEach(([key, originalPropSchema]) => {
+      const propSchema = this.formGenerator.derefNode(originalPropSchema) || originalPropSchema;
+      const isObjectType = (
+        propSchema && (
+          propSchema.type === 'object'
+          || (Array.isArray(propSchema.type) && propSchema.type.includes('object'))
+        )
+      );
+      if (isObjectType && propSchema.properties) {
+        nestedGroups[key] = { schema: propSchema, original: originalPropSchema, hasRef: !!originalPropSchema?.$ref };
       } else {
         primitiveFields[key] = propSchema;
       }
@@ -293,7 +301,7 @@ export default class FormNavigation {
     if (Object.keys(primitiveFields).length > 0) {
       const groupPath = pathPrefix || 'root';
       const groupId = `form-group-${groupPath.replace(/\./g, '-')}`;
-      const groupTitle = schema.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()));
+      const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()))
 
       const navItem = document.createElement('div');
       navItem.className = 'form-ui-nav-item';
@@ -314,15 +322,19 @@ export default class FormNavigation {
     }
 
     // Process nested groups
-    Object.entries(nestedGroups).forEach(([key, propSchema]) => {
+    Object.entries(nestedGroups).forEach(([key, meta]) => {
+      const { schema: propSchema, original: originalPropSchema, hasRef } = meta;
       const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+      const isOptional = !(normalized.required || []).includes(key);
+      const isActive = !isOptional || !hasRef || this.formGenerator.isOptionalGroupActive(nestedPath);
+      if (!isActive) return; // hide inactive optional $ref groups from nav
 
       // If this nested group has no direct primitive fields, create a section header
       const hasPrimitives = this.formGenerator.hasPrimitiveFields(propSchema);
       const hasChildren = Object.keys(propSchema.properties || {}).length > 0;
       if (!hasPrimitives && hasChildren) {
         const sectionId = `form-section-${nestedPath.replace(/\./g, '-')}`;
-        const sectionTitle = propSchema.title || this.formGenerator.formatLabel(key);
+      const sectionTitle = this.formGenerator.getSchemaTitle(propSchema, key);
 
         const sectionItem = document.createElement('div');
         sectionItem.className = 'form-ui-nav-item form-ui-section-title-nav';

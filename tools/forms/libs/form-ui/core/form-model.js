@@ -20,6 +20,7 @@ export default class FormModel {
     const baseData = {};
 
     Object.entries(schema.properties).forEach(([key, propSchema]) => {
+      const isRequired = Array.isArray(schema.required) && schema.required.includes(key);
       switch (propSchema.type) {
         case 'string':
           baseData[key] = propSchema.default || '';
@@ -35,7 +36,14 @@ export default class FormModel {
           baseData[key] = propSchema.default || [];
           break;
         case 'object':
-          baseData[key] = this.generateBaseJSON(propSchema);
+          if (propSchema.properties) {
+            if (isRequired) {
+              baseData[key] = this.generateBaseJSON(propSchema);
+            }
+            // If optional object, do not pre-populate. It will be activated via UI.
+          } else {
+            baseData[key] = {};
+          }
           break;
         default:
           if (propSchema.enum) {

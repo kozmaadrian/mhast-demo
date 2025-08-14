@@ -13,8 +13,9 @@ export default class InputFactory {
   }
 
   create(fieldPath, propSchema) {
-    const { type, format, enum: enumValues } = propSchema;
-    switch (type) {
+    const primaryType = Array.isArray(propSchema.type) ? (propSchema.type.find((t) => t !== 'null') || propSchema.type[0]) : propSchema.type;
+    const { format, enum: enumValues } = propSchema;
+    switch (primaryType) {
       case 'string':
         if (enumValues) return this.createSelectInput(fieldPath, enumValues, propSchema);
         if (format === 'textarea') return this.createTextareaInput(fieldPath, propSchema);

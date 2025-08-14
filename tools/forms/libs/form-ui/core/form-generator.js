@@ -22,10 +22,11 @@ import getControlElement from '../utils/dom-utils.js';
 
 export default class FormGenerator {
   constructor(schema) {
+    // Use schema as-is; resolve only parts on-demand to avoid deep recursion on large graphs
     this.schema = schema;
     // Data model
-    this.model = new FormModel(schema);
-    this.data = this.model.generateBaseJSON(schema);
+    this.model = new FormModel(this.schema);
+    this.data = this.model.generateBaseJSON(this.schema);
     this.listeners = new Set();
     this.groupCounter = 0;
     this.groupElements = new Map();
@@ -34,6 +35,7 @@ export default class FormGenerator {
     this.fieldSchemas = new Map();
     this.fieldElements = new Map();
     this.fieldToGroup = new Map();
+    this.activeOptionalGroups = new Set();
 
     // Initialize validation and navigation
     this.validation = new FormValidation(this);
@@ -51,6 +53,7 @@ export default class FormGenerator {
       onFocus: (_fieldPath, _schema, target) => {
         this.navigation.highlightActiveGroup(target);
       },
+      derefNode: this.derefNode.bind(this),
     });
 
     // Group builder delegates DOM structuring
@@ -59,10 +62,88 @@ export default class FormGenerator {
       formatLabel: this.formatLabel.bind(this),
       hasPrimitiveFields: this.hasPrimitiveFields.bind(this),
       generateObjectFields: this.generateObjectFields.bind(this),
+      isOptionalGroupActive: this.isOptionalGroupActive.bind(this),
+      onActivateOptionalGroup: this.onActivateOptionalGroup.bind(this),
+      refreshNavigation: () => {
+        // Re-map fields to groups and rebuild navigation tree after dynamic insertion
+        this.navigation.mapFieldsToGroups();
+        if (this.navigationTree) {
+          this.navigation.generateNavigationTree();
+        }
+        // Re-run validation for newly added controls
+        this.validation.validateAllFields();
+      },
+      derefNode: this.derefNode.bind(this),
+      getSchemaTitle: this.getSchemaTitle.bind(this),
+      normalizeSchema: this.normalizeSchema.bind(this),
     });
 
     // Visual overlay
     this.highlightOverlay = new HighlightOverlay();
+  }
+
+  /**
+   * Decide if an optional nested object should be immediately rendered
+   * Defaults to false unless data already has any value at that path
+   */
+  isOptionalGroupActive(path) {
+    if (this.activeOptionalGroups.has(path)) return true;
+    const keys = path.split('.');
+    let cur = this.data;
+    for (const k of keys) {
+      if (!cur || typeof cur !== 'object' || !(k in cur)) return false;
+      cur = cur[k];
+    }
+    // Consider any existing object value as active, including empty objects
+    if (cur && typeof cur === 'object') return true;
+    return cur != null && cur !== '';
+  }
+
+  /**
+   * Handler when user activates an optional object via "+ Add" button
+   */
+  onActivateOptionalGroup(path, schema) {
+    // Mark path as active to include it in navigation
+    this.activeOptionalGroups.add(path);
+    // Ensure nested path exists in current data
+    const schemaNode = this.normalizeSchema(schema);
+    const baseObject = (schemaNode && schemaNode.type === 'object')
+      ? this.model.generateBaseJSON(schemaNode)
+      : {};
+    this.setNestedValue(this.data, path, baseObject);
+    // Notify listeners for data change
+    this.listeners.forEach((listener) => listener(this.data));
+  }
+
+  /**
+   * Resolve a single node shallowly (on-demand) for $ref using local $defs/definitions
+   */
+  derefNode(node) {
+    if (!node || typeof node !== 'object' || !node.$ref || typeof node.$ref !== 'string') return node;
+    const root = this.schema;
+    const resolvePointer = (ref) => {
+      if (!ref.startsWith('#')) return null;
+      let pointer = ref.slice(1);
+      if (pointer.startsWith('/')) pointer = pointer.slice(1);
+      if (!pointer) return root;
+      const parts = pointer.split('/').map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+      let current = root;
+      for (const part of parts) {
+        if (current && typeof current === 'object' && part in current) current = current[part];
+        else return null;
+      }
+      return current;
+    };
+    const target = resolvePointer(node.$ref);
+    if (!target) return { ...node };
+    // Merge extras over target (shallow for on-demand usage)
+    const extras = Object.fromEntries(Object.entries(node).filter(([k]) => k !== '$ref'));
+    return { ...target, ...extras };
+  }
+
+  getSchemaTitle(propSchema, fallbackKey) {
+    const src = this.derefNode(propSchema) || propSchema;
+    return src.title || this.formatLabel(fallbackKey);
   }
 
   /**
@@ -129,12 +210,13 @@ export default class FormGenerator {
     const body = document.createElement('div');
     body.className = 'form-ui-body';
 
-    if (this.schema.type === 'object' && this.schema.properties) {
+    const rootSchema = this.normalizeSchema(this.schema);
+    if (rootSchema.type === 'object' && rootSchema.properties) {
       // Build groups/sections via GroupBuilder to keep DOM identical
       this.groupElements = this.groupBuilder.build(
         body,
-        this.schema,
-        [this.schema.title || 'Form'],
+        rootSchema,
+        [rootSchema.title || 'Form'],
         [],
         new Map(),
       );
@@ -172,7 +254,8 @@ export default class FormGenerator {
    * Generate fields for object properties
    */
   generateObjectFields(container, properties, required = [], pathPrefix = '') {
-    Object.entries(properties).forEach(([key, propSchema]) => {
+    Object.entries(properties).forEach(([key, originalPropSchema]) => {
+      const propSchema = this.derefNode(originalPropSchema) || originalPropSchema;
       const field = this.generateField(key, propSchema, required.includes(key), pathPrefix);
       if (field) {
         container.appendChild(field);
@@ -524,9 +607,26 @@ export default class FormGenerator {
    * Check if a schema has primitive fields (non-object properties)
    */
   hasPrimitiveFields(schema) {
-    if (!schema.properties) return false;
+    if (!schema || !schema.properties) return false;
 
-    return Object.values(schema.properties).some((propSchema) => propSchema.type !== 'object' || !propSchema.properties);
+    return Object.values(schema.properties).some((propSchema) => {
+      const isObjectType = propSchema && (propSchema.type === 'object' || (Array.isArray(propSchema.type) && propSchema.type.includes('object')));
+      return !isObjectType || !propSchema.properties;
+    });
+  }
+
+  /**
+   * Normalize schema node: deref if needed and coerce type arrays
+   */
+  normalizeSchema(node) {
+    const s = this.derefNode(node) || node;
+    if (!s || typeof s !== 'object') return s;
+    const out = { ...s };
+    if (Array.isArray(out.type)) {
+      const primary = out.type.find((t) => t !== 'null') || out.type[0];
+      out.type = primary;
+    }
+    return out;
   }
 
   /**
