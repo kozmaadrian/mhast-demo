@@ -731,13 +731,32 @@ export default class FormGenerator {
    */
   scrollToFormGroup(groupId) {
     const targetGroup = this.container.querySelector(`#${groupId}`);
-    if (targetGroup) {
-      // Use center positioning with negative scroll margin
-      targetGroup.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+    if (!targetGroup) return;
+
+    const bodyEl = this.container.querySelector('.form-ui-body');
+    const scrollPadding = 8; // small padding from the top
+
+    const isScrollable = (el) => !!el && el.scrollHeight > el.clientHeight;
+    if (isScrollable(bodyEl)) {
+      // Compute offset of the group within the scrollable body
+      const getOffsetTopWithinContainer = (element, containerEl) => {
+        let top = 0;
+        let node = element;
+        while (node && node !== containerEl) {
+          top += node.offsetTop;
+          node = node.offsetParent;
+        }
+        return top;
+      };
+      const top = Math.max(0, getOffsetTopWithinContainer(targetGroup, bodyEl) - scrollPadding);
+      bodyEl.scrollTo({ top, behavior: 'smooth' });
+      return;
     }
+
+    // Fallback to window scroll
+    const rect = targetGroup.getBoundingClientRect();
+    const absoluteTop = window.pageYOffset + rect.top - scrollPadding;
+    window.scrollTo({ top: absoluteTop, behavior: 'smooth' });
   }
 
   /**
