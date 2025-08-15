@@ -62,6 +62,7 @@ export default class FormGenerator {
       formatLabel: this.formatLabel.bind(this),
       hasPrimitiveFields: this.hasPrimitiveFields.bind(this),
       generateObjectFields: this.generateObjectFields.bind(this),
+      generateInput: this.generateInput.bind(this),
       isOptionalGroupActive: this.isOptionalGroupActive.bind(this),
       onActivateOptionalGroup: this.onActivateOptionalGroup.bind(this),
       refreshNavigation: () => {
@@ -94,7 +95,9 @@ export default class FormGenerator {
       if (!cur || typeof cur !== 'object' || !(k in cur)) return false;
       cur = cur[k];
     }
-    // Consider any existing object value as active, including empty objects
+    // Consider arrays active only if they have elements
+    if (Array.isArray(cur)) return cur.length > 0;
+    // Consider existing objects active
     if (cur && typeof cur === 'object') return true;
     return cur != null && cur !== '';
   }
@@ -107,10 +110,15 @@ export default class FormGenerator {
     this.activeOptionalGroups.add(path);
     // Ensure nested path exists in current data
     const schemaNode = this.normalizeSchema(schema);
-    const baseObject = (schemaNode && schemaNode.type === 'object')
-      ? this.model.generateBaseJSON(schemaNode)
-      : {};
-    this.setNestedValue(this.data, path, baseObject);
+    let baseValue = {};
+    if (schemaNode) {
+      if (schemaNode.type === 'object') {
+        baseValue = this.model.generateBaseJSON(schemaNode);
+      } else if (schemaNode.type === 'array') {
+        baseValue = [];
+      }
+    }
+    this.setNestedValue(this.data, path, baseValue);
     // Notify listeners for data change
     this.listeners.forEach((listener) => listener(this.data));
     // Rebuild the form body to materialize the newly activated group
@@ -147,6 +155,7 @@ export default class FormGenerator {
     this.highlightOverlay.attach(this.container);
     // Remap fields and validate
     this.navigation.mapFieldsToGroups();
+    this.ensureGroupRegistry();
     // Restore existing data into fields
     this.loadData(this.data);
     // Rebuild navigation tree
@@ -155,6 +164,25 @@ export default class FormGenerator {
     }
     // Restore scroll
     body.scrollTop = previousScrollTop;
+  }
+
+  /**
+   * Ensure any groups created via generateField (arrays-of-objects) are registered in groupElements
+   */
+  ensureGroupRegistry() {
+    if (!this.container) return;
+    const groups = this.container.querySelectorAll('.form-ui-group[id]');
+    groups.forEach((el) => {
+      const id = el.id;
+      if (!this.groupElements.has(id)) {
+        this.groupElements.set(id, {
+          element: el,
+          path: el.dataset.groupPath ? el.dataset.groupPath.split(' > ') : [],
+          title: el.querySelector('.form-ui-group-title')?.textContent || '',
+          isSection: false,
+        });
+      }
+    });
   }
 
   /**
@@ -214,7 +242,8 @@ export default class FormGenerator {
           baseData[key] = propSchema.default || false;
           break;
         case 'array':
-          baseData[key] = propSchema.default || [];
+          // Always initialize arrays to [] even if optional; multifields should serialize as empty arrays
+          baseData[key] = Array.isArray(propSchema.default) ? propSchema.default : [];
           break;
         case 'object':
           // Recursively generate base structure for nested objects
@@ -265,6 +294,7 @@ export default class FormGenerator {
         [],
         new Map(),
       );
+      this.ensureGroupRegistry();
     }
 
     container.appendChild(body);
@@ -285,8 +315,12 @@ export default class FormGenerator {
     setTimeout(() => {
       // Map fields to groups now that DOM structure is complete
       this.navigation.mapFieldsToGroups();
+      this.ensureGroupRegistry();
       // Initial validation pass once in DOM
       this.validation.validateAllFields();
+      // Emit initial data so consumers have a complete default JSON,
+      // including empty arrays for multivalue fields
+      this.updateData();
     }, 100);
 
     // Setup form change listeners (kept for future extensions)
@@ -312,6 +346,37 @@ export default class FormGenerator {
    * Generate a single form field
    */
   generateField(key, propSchema, isRequired = false, pathPrefix = '') {
+    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+
+    // Special-case: arrays of objects should render as a sub-group, not a simple field
+    const itemSchema = this.derefNode(propSchema?.items) || propSchema?.items;
+    const isArrayOfObjects = propSchema && propSchema.type === 'array' && (
+      (itemSchema && (itemSchema.type === 'object' || itemSchema.properties)) || !!propSchema.items?.$ref
+    );
+    if (isArrayOfObjects) {
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'form-ui-group';
+      groupContainer.id = `form-group-${fullPath.replace(/\./g, '-')}`;
+      groupContainer.dataset.groupPath = fullPath;
+
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'form-ui-group-header';
+      const groupTitleElement = document.createElement('h3');
+      groupTitleElement.className = 'form-ui-group-title';
+      groupTitleElement.textContent = propSchema.title || this.formatLabel(key);
+      groupHeader.appendChild(groupTitleElement);
+      groupContainer.appendChild(groupHeader);
+
+      const groupContent = document.createElement('div');
+      groupContent.className = 'form-ui-group-content';
+      const arrayUI = this.generateInput(fullPath, propSchema);
+      if (arrayUI) groupContent.appendChild(arrayUI);
+      groupContainer.appendChild(groupContent);
+
+      groupContainer.dataset.fieldPath = fullPath;
+      return groupContainer;
+    }
+
     const fieldContainer = document.createElement('div');
     fieldContainer.className = 'form-ui-field';
     fieldContainer.dataset.field = key;
@@ -327,7 +392,6 @@ export default class FormGenerator {
     fieldContainer.appendChild(label);
 
     // Field input
-    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
     const input = this.generateInput(fullPath, propSchema);
     if (input) {
       fieldContainer.appendChild(input);
@@ -378,6 +442,77 @@ export default class FormGenerator {
    * @param {object} propSchema - The JSON schema for this property
    */
   generateInput(fieldPath, propSchema) {
+    // Special handling: arrays of objects render as repeatable object groups
+    if (
+      propSchema && propSchema.type === 'array'
+      && (propSchema.items && (
+        (propSchema.items.type === 'object')
+        || (this.derefNode(propSchema.items)?.type === 'object')
+        || !!propSchema.items.$ref
+      ))
+    ) {
+      const itemsSchema = this.derefNode(propSchema.items) || propSchema.items;
+      const container = document.createElement('div');
+      container.className = 'form-ui-array-container';
+      container.dataset.field = fieldPath;
+
+      const itemsContainer = document.createElement('div');
+      itemsContainer.className = 'form-ui-array-items';
+      container.appendChild(itemsContainer);
+
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'form-ui-array-add';
+      addButton.textContent = '+ Add Item';
+      const addItemAt = (index) => {
+        const itemContainer = document.createElement('div');
+        itemContainer.className = 'form-ui-array-item';
+        const groupContent = document.createElement('div');
+        groupContent.className = 'form-ui-group-content';
+        const pathPrefix = `${fieldPath}[${index}]`;
+        this.generateObjectFields(
+          groupContent,
+          itemsSchema.properties || {},
+          itemsSchema.required || [],
+          pathPrefix,
+        );
+        itemContainer.appendChild(groupContent);
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'form-ui-array-remove';
+        removeButton.textContent = '×';
+        removeButton.addEventListener('click', () => {
+          itemContainer.remove();
+          // Reindex remaining items' names to keep continuous indices
+          Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
+            el.querySelectorAll('[name]').forEach((inputEl) => {
+              inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
+            });
+          });
+          this.updateData();
+        });
+        itemContainer.appendChild(removeButton);
+        itemsContainer.appendChild(itemContainer);
+      };
+
+      addButton.addEventListener('click', () => {
+        const index = itemsContainer.children.length;
+        addItemAt(index);
+        this.updateData();
+        this.validation.validateAllFields();
+      });
+      addButton.addEventListener('focus', (e) => this.navigation.onTreeClick?.(e));
+      container.appendChild(addButton);
+
+      // Pre-populate items from existing data so rebuilds preserve entries
+      const existing = this.model.getNestedValue(this.data, fieldPath);
+      if (Array.isArray(existing)) {
+        existing.forEach((_, idx) => addItemAt(idx));
+      }
+
+      return container;
+    }
+
     // Delegate to factory (events are attached there)
     const input = this.inputFactory.create(fieldPath, propSchema);
 
@@ -440,7 +575,7 @@ export default class FormGenerator {
       }
 
       // Ignore synthetic array helper names like field[]; normalize to plain path
-      const normalizedName = fieldName.replace(/\[\]$/, '');
+      const normalizedName = fieldName;
       // Set the value in the nested data structure
       this.model.setNestedValue(this.data, normalizedName, value);
     });

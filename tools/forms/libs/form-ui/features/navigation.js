@@ -141,6 +141,9 @@ export default class FormNavigation {
     this.enableHoverSync();
     // Add scroll syncing: move active indicator while user scrolls the form
     this.enableScrollSync();
+
+    // Ensure clicks on array-group items work the same as object groups
+    // (handled by delegated onTreeClick using data-group-id)
   }
 
   /**
@@ -280,6 +283,8 @@ export default class FormNavigation {
 
     const primitiveFields = {};
     const nestedGroups = {};
+    const deferredAddItems = [];
+    const activeArrayGroups = [];
 
     // Separate primitive fields from nested objects
     Object.entries(normalized.properties).forEach(([key, originalPropSchema]) => {
@@ -290,8 +295,23 @@ export default class FormNavigation {
           || (Array.isArray(propSchema.type) && propSchema.type.includes('object'))
         )
       );
+      const isArrayOfObjects = (
+        propSchema && propSchema.type === 'array' && (
+          (propSchema.items && (propSchema.items.type === 'object' || propSchema.items.properties)) || !!propSchema.items?.$ref
+        )
+      );
       if (isObjectType && propSchema.properties) {
         nestedGroups[key] = { schema: propSchema, original: originalPropSchema, hasRef: !!originalPropSchema?.$ref };
+      } else if (isArrayOfObjects) {
+        const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+        const isOptional = !(normalized.required || []).includes(key);
+        const isActive = !isOptional || this.formGenerator.isOptionalGroupActive(nestedPath);
+        if (!isActive) {
+          deferredAddItems.push({ key, propSchema, nestedPath });
+        } else {
+          // Active arrays-of-objects are shown as their own group in nav
+          activeArrayGroups.push({ key, propSchema, nestedPath });
+        }
       } else {
         primitiveFields[key] = propSchema;
       }
@@ -327,7 +347,12 @@ export default class FormNavigation {
       const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
       const isOptional = !(normalized.required || []).includes(key);
       const isActive = !isOptional || !hasRef || this.formGenerator.isOptionalGroupActive(nestedPath);
-      if (!isActive && hasRef) {
+      const isArrayOfObjects = (
+        propSchema && propSchema.type === 'array' && (
+          (propSchema.items && (propSchema.items.type === 'object' || propSchema.items.properties)) || !!propSchema.items?.$ref
+        )
+      );
+      if (!isActive && (hasRef || isArrayOfObjects)) {
         // Render a nav "Add" item for inactive optional refs
         const addItem = document.createElement('div');
         addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
@@ -379,6 +404,47 @@ export default class FormNavigation {
       items.push(...nestedItems);
     });
 
+    // Append active array-of-object groups as child nav items
+    activeArrayGroups.forEach(({ key, propSchema, nestedPath }) => {
+      const groupId = `form-group-${nestedPath.replace(/\./g, '-')}`;
+      const navItem = document.createElement('div');
+      navItem.className = 'form-ui-nav-item';
+      navItem.dataset.groupId = groupId;
+      navItem.dataset.level = level + 1;
+
+      const content = document.createElement('div');
+      content.className = 'form-ui-nav-item-content';
+      content.style.setProperty('--nav-level', level + 1);
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'form-ui-nav-item-title';
+      titleEl.textContent = this.formGenerator.getSchemaTitle(propSchema, key);
+
+      content.appendChild(titleEl);
+      navItem.appendChild(content);
+      items.push(navItem);
+    });
+
+    // Append deferred Add items after sections/groups so parent appears first
+    deferredAddItems.forEach(({ key, propSchema, nestedPath }) => {
+      const addItem = document.createElement('div');
+      addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
+      addItem.dataset.groupId = `form-optional-${nestedPath.replace(/\./g, '-')}`;
+      addItem.dataset.level = level + 1;
+
+      const content = document.createElement('div');
+      content.className = 'form-ui-nav-item-content form-ui-nav-item-add-content';
+      content.style.setProperty('--nav-level', level + 1);
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'form-ui-nav-item-title form-ui-nav-item-add-title';
+      titleEl.textContent = `+ Add ${this.formGenerator.getSchemaTitle(propSchema, key)}`;
+
+      content.appendChild(titleEl);
+      addItem.appendChild(content);
+      items.push(addItem);
+    });
+
     return items;
   }
 
@@ -416,6 +482,15 @@ export default class FormNavigation {
       }
       if (node) {
         this.formGenerator.onActivateOptionalGroup(path, node);
+        // If activated node is array-of-objects, immediately add the first item
+        const normalized = this.formGenerator.normalizeSchema(node);
+        if (normalized && normalized.type === 'array') {
+          // Find the add button for this array within the group and click it once
+          requestAnimationFrame(() => {
+            const arrayAdd = this.formGenerator.container.querySelector(`#form-group-${path.replace(/\./g, '-')} .form-ui-array-add, [data-field="${path}"] .form-ui-array-add`);
+            if (arrayAdd) arrayAdd.click();
+          });
+        }
         const newGroupId = `form-group-${path.replace(/\./g, '-')}`;
         requestAnimationFrame(() => this.navigateToGroup(newGroupId));
       }
