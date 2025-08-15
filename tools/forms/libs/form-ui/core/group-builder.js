@@ -5,17 +5,82 @@
  */
 
 export default class GroupBuilder {
-  constructor({ inputFactory, formatLabel, hasPrimitiveFields, generateObjectFields, generateInput, isOptionalGroupActive = () => true, onActivateOptionalGroup = () => {}, refreshNavigation = () => {}, derefNode = (n) => n, getSchemaTitle = (s, k) => k }) {
+  constructor({ inputFactory, formatLabel, hasPrimitiveFields, generateObjectFields, generateInput, generateField, isOptionalGroupActive = () => true, onActivateOptionalGroup = () => {}, refreshNavigation = () => {}, derefNode = (n) => n, getSchemaTitle = (s, k) => k }) {
     this.inputFactory = inputFactory;
     this.formatLabel = formatLabel;
     this.hasPrimitiveFields = hasPrimitiveFields;
     this.generateObjectFields = generateObjectFields;
     this.generateInput = generateInput;
+    this.generateField = generateField;
     this.isOptionalGroupActive = isOptionalGroupActive;
     this.onActivateOptionalGroup = onActivateOptionalGroup;
     this.refreshNavigation = refreshNavigation;
     this.derefNode = derefNode;
     this.getSchemaTitle = getSchemaTitle;
+  }
+
+  // Inline builder that preserves property order and appends child groups/fields inline
+  buildInline(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map()) {
+    const schema = this.normalizeSchema ? this.normalizeSchema(rawSchema) : rawSchema;
+    if (!schema || schema.type !== 'object' || !schema.properties) return outMap;
+
+    const groupTitle = schema.title || (breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1] : 'Root');
+    const currentPath = [...breadcrumbPath];
+
+    const groupPath = schemaPath.length > 0 ? schemaPath.join('.') : 'root';
+    const groupId = `form-group-${groupPath.replace(/\./g, '-')}`;
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'form-ui-group';
+    groupContainer.id = groupId;
+    groupContainer.dataset.groupPath = currentPath.join(' > ');
+
+    if (currentPath.length > 0) {
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'form-ui-group-header';
+      const groupTitleElement = document.createElement('h3');
+      groupTitleElement.className = 'form-ui-group-title';
+      groupTitleElement.textContent = groupTitle;
+      groupHeader.appendChild(groupTitleElement);
+      groupContainer.appendChild(groupHeader);
+    }
+
+    const groupContent = document.createElement('div');
+    groupContent.className = 'form-ui-group-content';
+    groupContainer.appendChild(groupContent);
+    container.appendChild(groupContainer);
+    outMap.set(groupId, { element: groupContainer, path: currentPath, title: groupTitle, isSection: false });
+
+    const requiredSet = new Set(schema.required || []);
+    const pathPrefix = schemaPath.length > 0 ? schemaPath.join('.') : '';
+
+    Object.entries(schema.properties).forEach(([key, originalPropSchema]) => {
+      const propSchema = this.derefNode(originalPropSchema) || originalPropSchema;
+      const isObjectType = !!(propSchema && (propSchema.type === 'object' || (Array.isArray(propSchema.type) && propSchema.type.includes('object'))));
+      const isArrayOfObjects = !!(propSchema && propSchema.type === 'array' && ((propSchema.items && (propSchema.items.type === 'object' || propSchema.items.properties)) || !!propSchema.items?.$ref));
+      const hasRef = !!originalPropSchema?.$ref || !!propSchema?.$ref;
+
+      const nestedBreadcrumbPath = [...currentPath, this.getSchemaTitle(propSchema, key)];
+      const nestedSchemaPath = [...schemaPath, key];
+      const nestedPathStr = nestedSchemaPath.join('.');
+      const isOptional = !requiredSet.has(key);
+
+      if ((hasRef || isObjectType || isArrayOfObjects) && isOptional && !this.isOptionalGroupActive(nestedPathStr)) {
+        // skip until activated (sidebar handles add)
+        return;
+      }
+
+      if (isObjectType && propSchema.properties) {
+        // recurse as an inline child group
+        this.buildInline(groupContent, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
+        return;
+      }
+
+      // arrays-of-objects or primitive fields are handled by generateField()
+      const fieldEl = this.generateField(key, propSchema, requiredSet.has(key), pathPrefix);
+      if (fieldEl) groupContent.appendChild(fieldEl);
+    });
+
+    return outMap;
   }
 
   build(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map()) {
@@ -27,6 +92,7 @@ export default class GroupBuilder {
 
     const primitiveFields = {};
     const nestedGroups = {};
+    let childrenHost = container;
 
     Object.entries(schema.properties).forEach(([key, originalPropSchema]) => {
       const propSchema = this.derefNode(originalPropSchema) || originalPropSchema;
@@ -79,6 +145,7 @@ export default class GroupBuilder {
       container.appendChild(groupContainer);
 
       outMap.set(groupId, { element: groupContainer, path: currentPath, title: groupTitle, isSection: false });
+      childrenHost = groupContent;
     }
 
     Object.entries(nestedGroups).forEach(([key, meta]) => {
@@ -108,7 +175,7 @@ export default class GroupBuilder {
         sectionTitle.textContent = this.getSchemaTitle(propSchema, key);
         sectionHeader.appendChild(sectionTitle);
         sectionContainer.appendChild(sectionHeader);
-        container.appendChild(sectionContainer);
+        childrenHost.appendChild(sectionContainer);
 
         outMap.set(sectionId, { element: sectionContainer, path: nestedBreadcrumbPath, title: propSchema.title || this.formatLabel(key), isSection: true });
       }
@@ -137,10 +204,10 @@ export default class GroupBuilder {
         groupContainer.appendChild(groupContent);
         // Expose field-path for consistency with other groups
         groupContainer.dataset.fieldPath = pathPrefix;
-        container.appendChild(groupContainer);
+        childrenHost.appendChild(groupContainer);
         outMap.set(groupId, { element: groupContainer, path: nestedBreadcrumbPath, title: this.getSchemaTitle(propSchema, key), isSection: false });
       } else {
-        this.build(container, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
+        this.build(childrenHost, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
       }
     });
 

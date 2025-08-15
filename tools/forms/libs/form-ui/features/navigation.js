@@ -281,47 +281,12 @@ export default class FormNavigation {
       return items;
     }
 
-    const primitiveFields = {};
-    const nestedGroups = {};
-    const deferredAddItems = [];
-    const activeArrayGroups = [];
-
-    // Separate primitive fields from nested objects
-    Object.entries(normalized.properties).forEach(([key, originalPropSchema]) => {
-      const propSchema = this.formGenerator.derefNode(originalPropSchema) || originalPropSchema;
-      const isObjectType = (
-        propSchema && (
-          propSchema.type === 'object'
-          || (Array.isArray(propSchema.type) && propSchema.type.includes('object'))
-        )
-      );
-      const isArrayOfObjects = (
-        propSchema && propSchema.type === 'array' && (
-          (propSchema.items && (propSchema.items.type === 'object' || propSchema.items.properties)) || !!propSchema.items?.$ref
-        )
-      );
-      if (isObjectType && propSchema.properties) {
-        nestedGroups[key] = { schema: propSchema, original: originalPropSchema, hasRef: !!originalPropSchema?.$ref };
-      } else if (isArrayOfObjects) {
-        const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        const isOptional = !(normalized.required || []).includes(key);
-        const isActive = !isOptional || this.formGenerator.isOptionalGroupActive(nestedPath);
-        if (!isActive) {
-          deferredAddItems.push({ key, propSchema, nestedPath });
-        } else {
-          // Active arrays-of-objects are shown as their own group in nav
-          activeArrayGroups.push({ key, propSchema, nestedPath });
-        }
-      } else {
-        primitiveFields[key] = propSchema;
-      }
-    });
-
-    // Create navigation item for current level if it has primitive fields
-    if (Object.keys(primitiveFields).length > 0) {
+    // Does this level have any primitive fields? If yes, add a nav item for this group.
+    const hasPrimitivesAtThisLevel = this.formGenerator.hasPrimitiveFields(normalized);
+    if (hasPrimitivesAtThisLevel) {
       const groupPath = pathPrefix || 'root';
       const groupId = `form-group-${groupPath.replace(/\./g, '-')}`;
-      const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()))
+      const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()));
 
       const navItem = document.createElement('div');
       navItem.className = 'form-ui-nav-item';
@@ -341,19 +306,33 @@ export default class FormNavigation {
       items.push(navItem);
     }
 
-    // Process nested groups
-    Object.entries(nestedGroups).forEach(([key, meta]) => {
-      const { schema: propSchema, original: originalPropSchema, hasRef } = meta;
+    // Walk properties in declaration order and append items inline respecting order.
+    for (const [key, originalPropSchema] of Object.entries(normalized.properties)) {
+      const derefProp = this.formGenerator.derefNode(originalPropSchema) || originalPropSchema;
       const nestedPath = pathPrefix ? `${pathPrefix}.${key}` : key;
       const isOptional = !(normalized.required || []).includes(key);
-      const isActive = !isOptional || !hasRef || this.formGenerator.isOptionalGroupActive(nestedPath);
-      const isArrayOfObjects = (
-        propSchema && propSchema.type === 'array' && (
-          (propSchema.items && (propSchema.items.type === 'object' || propSchema.items.properties)) || !!propSchema.items?.$ref
+      const hasRef = !!originalPropSchema?.$ref;
+
+      const isObjectType = (
+        derefProp && (
+          derefProp.type === 'object'
+          || (Array.isArray(derefProp.type) && derefProp.type.includes('object'))
         )
       );
-      if (!isActive && (hasRef || isArrayOfObjects)) {
-        // Render a nav "Add" item for inactive optional refs
+      const isArrayOfObjects = (
+        derefProp && derefProp.type === 'array' && (
+          (derefProp.items && (derefProp.items.type === 'object' || derefProp.items.properties)) || !!derefProp.items?.$ref
+        )
+      );
+
+      // Skip primitives as they belong to the current group's form
+      const isPrimitive = !isObjectType && !isArrayOfObjects;
+      if (isPrimitive) continue;
+
+      // Optional inactive refs/array-groups: show an Add item IN PLACE
+      const requiresActivation = hasRef || isArrayOfObjects;
+      const isActive = !isOptional || !requiresActivation || this.formGenerator.isOptionalGroupActive(nestedPath);
+      if (!isActive && requiresActivation) {
         const addItem = document.createElement('div');
         addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
         addItem.dataset.groupId = `form-optional-${nestedPath.replace(/\./g, '-')}`;
@@ -365,85 +344,66 @@ export default class FormNavigation {
 
         const titleEl = document.createElement('span');
         titleEl.className = 'form-ui-nav-item-title form-ui-nav-item-add-title';
-        titleEl.textContent = `+ Add ${this.formGenerator.getSchemaTitle(propSchema, key)}`;
+        titleEl.textContent = `+ Add ${this.formGenerator.getSchemaTitle(derefProp, key)}`;
 
         content.appendChild(titleEl);
         addItem.appendChild(content);
         items.push(addItem);
-        return;
+        continue;
       }
 
-      // If this nested group has no direct primitive fields, create a section header
-      const hasPrimitives = this.formGenerator.hasPrimitiveFields(propSchema);
-      const hasChildren = Object.keys(propSchema.properties || {}).length > 0;
-      if (!hasPrimitives && hasChildren) {
-        const sectionId = `form-section-${nestedPath.replace(/\./g, '-')}`;
-      const sectionTitle = this.formGenerator.getSchemaTitle(propSchema, key);
+      // Active arrays-of-objects: render as their own group item
+      if (isArrayOfObjects) {
+        const groupId = `form-group-${nestedPath.replace(/\./g, '-')}`;
+        const navItem = document.createElement('div');
+        navItem.className = 'form-ui-nav-item';
+        navItem.dataset.groupId = groupId;
+        navItem.dataset.level = level + 1;
 
-        const sectionItem = document.createElement('div');
-        sectionItem.className = 'form-ui-nav-item form-ui-section-title-nav';
-        sectionItem.dataset.groupId = sectionId;
-        // Section header should be at same level as other children
-        sectionItem.dataset.level = level + 1;
+        const content = document.createElement('div');
+        content.className = 'form-ui-nav-item-content';
+        content.style.setProperty('--nav-level', level + 1);
 
-        const sectionContent = document.createElement('div');
-        sectionContent.className = 'form-ui-nav-item-content';
-        sectionContent.style.setProperty('--nav-level', level + 1);
+        const titleEl = document.createElement('span');
+        titleEl.className = 'form-ui-nav-item-title';
+        titleEl.textContent = this.formGenerator.getSchemaTitle(derefProp, key);
 
-        const sectionTitleEl = document.createElement('span');
-        sectionTitleEl.className = 'form-ui-nav-item-title';
-        sectionTitleEl.textContent = sectionTitle;
-
-        sectionContent.appendChild(sectionTitleEl);
-        sectionItem.appendChild(sectionContent);
-        items.push(sectionItem);
+        content.appendChild(titleEl);
+        navItem.appendChild(content);
+        items.push(navItem);
+        continue;
       }
 
-      // Recursively generate navigation for nested groups
-      const nestedItems = this.generateNavigationItems(propSchema, nestedPath, level + 1);
-      items.push(...nestedItems);
-    });
+      // Regular object group: create a section header if it has only children, then recurse
+      if (isObjectType && derefProp.properties) {
+        const hasNestedPrimitives = this.formGenerator.hasPrimitiveFields(derefProp);
+        const hasChildren = Object.keys(derefProp.properties || {}).length > 0;
+        if (!hasNestedPrimitives && hasChildren) {
+          const sectionId = `form-section-${nestedPath.replace(/\./g, '-')}`;
+          const sectionTitle = this.formGenerator.getSchemaTitle(derefProp, key);
 
-    // Append active array-of-object groups as child nav items
-    activeArrayGroups.forEach(({ key, propSchema, nestedPath }) => {
-      const groupId = `form-group-${nestedPath.replace(/\./g, '-')}`;
-      const navItem = document.createElement('div');
-      navItem.className = 'form-ui-nav-item';
-      navItem.dataset.groupId = groupId;
-      navItem.dataset.level = level + 1;
+          const sectionItem = document.createElement('div');
+          sectionItem.className = 'form-ui-nav-item form-ui-section-title-nav';
+          sectionItem.dataset.groupId = sectionId;
+          sectionItem.dataset.level = level + 1;
 
-      const content = document.createElement('div');
-      content.className = 'form-ui-nav-item-content';
-      content.style.setProperty('--nav-level', level + 1);
+          const sectionContent = document.createElement('div');
+          sectionContent.className = 'form-ui-nav-item-content';
+          sectionContent.style.setProperty('--nav-level', level + 1);
 
-      const titleEl = document.createElement('span');
-      titleEl.className = 'form-ui-nav-item-title';
-      titleEl.textContent = this.formGenerator.getSchemaTitle(propSchema, key);
+          const sectionTitleEl = document.createElement('span');
+          sectionTitleEl.className = 'form-ui-nav-item-title';
+          sectionTitleEl.textContent = sectionTitle;
 
-      content.appendChild(titleEl);
-      navItem.appendChild(content);
-      items.push(navItem);
-    });
+          sectionContent.appendChild(sectionTitleEl);
+          sectionItem.appendChild(sectionContent);
+          items.push(sectionItem);
+        }
 
-    // Append deferred Add items after sections/groups so parent appears first
-    deferredAddItems.forEach(({ key, propSchema, nestedPath }) => {
-      const addItem = document.createElement('div');
-      addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
-      addItem.dataset.groupId = `form-optional-${nestedPath.replace(/\./g, '-')}`;
-      addItem.dataset.level = level + 1;
-
-      const content = document.createElement('div');
-      content.className = 'form-ui-nav-item-content form-ui-nav-item-add-content';
-      content.style.setProperty('--nav-level', level + 1);
-
-      const titleEl = document.createElement('span');
-      titleEl.className = 'form-ui-nav-item-title form-ui-nav-item-add-title';
-      titleEl.textContent = `+ Add ${this.formGenerator.getSchemaTitle(propSchema, key)}`;
-
-      content.appendChild(titleEl);
-      addItem.appendChild(content);
-      items.push(addItem);
-    });
+        const nestedItems = this.generateNavigationItems(derefProp, nestedPath, level + 1);
+        items.push(...nestedItems);
+      }
+    }
 
     return items;
   }

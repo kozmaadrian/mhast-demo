@@ -63,6 +63,7 @@ export default class FormGenerator {
       hasPrimitiveFields: this.hasPrimitiveFields.bind(this),
       generateObjectFields: this.generateObjectFields.bind(this),
       generateInput: this.generateInput.bind(this),
+      generateField: this.generateField.bind(this),
       isOptionalGroupActive: this.isOptionalGroupActive.bind(this),
       onActivateOptionalGroup: this.onActivateOptionalGroup.bind(this),
       refreshNavigation: () => {
@@ -143,7 +144,7 @@ export default class FormGenerator {
     body.innerHTML = '';
     const rootSchema = this.normalizeSchema(this.schema);
     if (rootSchema?.type === 'object' && rootSchema.properties) {
-      this.groupElements = this.groupBuilder.build(
+      this.groupElements = this.groupBuilder.buildInline(
         body,
         rootSchema,
         [rootSchema.title || 'Form'],
