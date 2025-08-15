@@ -70,10 +70,10 @@ flowchart LR
    - The `<pre><code>` raw JSON node lives inside the container and is toggled by the factory.
 
 3) Generate DOM from schema in `FormGenerator`
-   - `GroupBuilder` splits objects into groups (primitives) and sections (containers without primitives).
+   - `GroupBuilder` builds the form inline and in order using `buildInline()`. It splits objects into groups (primitives) and sections (containers without primitives), and renders array-of-object references as nested groups inline at their schema position.
    - `InputFactory` creates controls and wires input/change/focus/blur to update data, validate, and highlight group.
    - `FormModel` maintains data shape and nested setting logic.
-   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar.
+   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items.
    - `Validation.validateAllFields()` runs once post-render so required/invalid states are visible on load.
 
 4) Sync back to ProseMirror
@@ -87,6 +87,65 @@ flowchart LR
 - Field container carries `data-field-path` with the dot path.
 - Sidebar nav items mirror these IDs via `data-group-id` and carry `data-level` for indentation.
 - All CSS in `form-ui.css` relies on the above; the implementation maintains exact markup/class names.
+
+### `$ref`/`$defs` resolution (on-demand)
+
+- The generator performs shallow, on-demand dereferencing via `FormGenerator.derefNode(node)`.
+- Only local `$ref` paths (e.g. `#/$defs/...`) are resolved when the node is accessed. We do not pre-expand the full schema to avoid deep recursion and stack overflows with large or recursive schemas.
+- `normalizeSchema()` is used wherever node access occurs to ensure unions and `$ref` are dereferenced just enough for rendering/typing decisions.
+
+### How content is built (inline, ordered)
+
+- `GroupBuilder.buildInline(container, schema, breadcrumbPath, schemaPath)` renders children in the exact order of `schema.properties`.
+- For each property:
+  - Primitive types render as fields inside the current group container.
+  - Object types render as nested groups inline. If the object has no primitives at that level, a section header is added and children are rendered beneath it.
+  - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` inline at the property position.
+  - Optional `$ref` objects and arrays-of-objects are skipped in content until activated; required ones always render.
+
+### How the sidebar is built (ordered, in-place Add)
+
+- `Navigation.generateNavigationItems(schema, path, level)` iterates `properties` in declaration order and mirrors the structure:
+  - If the current level contains primitive fields, it adds a nav item for the current group (`form-group-…`).
+  - Primitive child properties are not individually listed in the nav; they belong to the parent group.
+  - For each child property in order:
+    - Optional inactive `$ref` or arrays-of-objects: render an in-place, indented “Add <Title>” item with `data-group-id="form-optional-…"`.
+    - Active arrays-of-objects: render a clickable group item (`data-group-id="form-group-…"`).
+    - Object types: if they have no primitives but have children, render a section header (`form-section-…`) at the same indentation; then recurse into children.
+- Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
+- Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
+
+### What happens when clicking “+ Add …” in the sidebar
+
+1) Delegated click handler in `features/navigation.js` catches clicks on `.form-ui-nav-item.form-ui-nav-item-add`.
+2) It derives the schema path from `data-group-id` (`form-optional-…`) and resolves the corresponding node from the root schema.
+3) `FormGenerator.onActivateOptionalGroup(path, schemaNode)` is called:
+   - Adds `path` to `activeOptionalGroups`.
+   - Seeds `data` at the path with a base value derived from the node type:
+     - Object → `FormModel.generateBaseJSON(node)` ensures all child arrays are present as `[]`.
+     - Array → `[]` (empty array); the UI will immediately add the first item if the property is an array of objects.
+   - Emits the updated `data` to subscribers.
+   - Calls `rebuildBody()` which clears and rebuilds the form body inline, remaps groups/fields, restores data values, revalidates, and regenerates the navigation.
+4) If the activated node is an array-of-objects, the handler emulates one click on the array’s “add item” control to pre-create the first item.
+5) Finally, navigation is regenerated and the UI scrolls to the newly created group.
+
+### State tracking (form content and sidebar)
+
+- `activeOptionalGroups: Set<string>` tracks which optional groups (object or array) have been activated. Optional groups not present in this set remain hidden in content and appear as “Add …” in the sidebar.
+- `data: object` is the current JSON payload. It is updated via `updateData()` collecting field values and `FormModel.setNestedValue`, and via `onActivateOptionalGroup()` when seeding new groups.
+- `FormModel.generateBaseJSON(schema)` constructs the initial data tree for any object node, ensuring arrays exist as `[]` even when empty so their keys are emitted in JSON.
+- `FormModel.setNestedValue(obj, path, value)` supports dot and bracket notation (e.g., `array[0].prop`). It creates objects/arrays as needed.
+- `FormModel.deepMerge(base, incoming)` preserves keys present in `incoming` while merging into existing state to avoid losing dynamically added optional branches.
+- `groupElements: Map<groupId, { element, path, title, isSection }>` is rebuilt on each `rebuildBody()` and used by navigation, hover/scroll sync, and validation.
+- `fieldToGroup: Map<fieldPath, groupId>` links fields to their group container for navigation and error mapping.
+
+### Arrays (multi-value fields)
+
+- Array fields always exist in the JSON (`[]`) even when empty.
+- Inputs inside array items are named using bracketed indices (e.g., `tutorialList[0].title`) so `updateData()` can map them back correctly.
+- Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
+- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container.
+
 
 ### Positioning and visuals (CSS)
 
