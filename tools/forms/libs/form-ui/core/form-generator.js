@@ -19,6 +19,7 @@ import InputFactory from './input-factory.js';
 import GroupBuilder from './group-builder.js';
 import HighlightOverlay from './highlight-overlay.js';
 import getControlElement from '../utils/dom-utils.js';
+import FormIcons from '../utils/icons.js';
 
 export default class FormGenerator {
   constructor(schema) {
@@ -362,10 +363,16 @@ export default class FormGenerator {
 
       const groupHeader = document.createElement('div');
       groupHeader.className = 'form-ui-group-header';
-      const groupTitleElement = document.createElement('h3');
-      groupTitleElement.className = 'form-ui-group-title';
-      groupTitleElement.textContent = propSchema.title || this.formatLabel(key);
-      groupHeader.appendChild(groupTitleElement);
+      const sep = document.createElement('div');
+      sep.className = 'form-ui-separator-text';
+      const label = document.createElement('div');
+      label.className = 'form-ui-separator-label';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'form-ui-group-title';
+      titleSpan.textContent = propSchema.title || this.formatLabel(key);
+      label.appendChild(titleSpan);
+      sep.appendChild(label);
+      groupHeader.appendChild(sep);
       groupContainer.appendChild(groupHeader);
 
       const groupContent = document.createElement('div');
@@ -464,15 +471,28 @@ export default class FormGenerator {
       const addButton = document.createElement('button');
       addButton.type = 'button';
       addButton.className = 'form-ui-array-add';
-      addButton.textContent = '+ Add Item';
+      addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add Item</span>`;
       const addItemAt = (index) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
         // Assign a stable ID so navigation can point to specific items
         const itemId = `form-array-item-${fieldPath.replace(/\./g, '-')}-${index}`;
         itemContainer.id = itemId;
+        // Header wrapper containing title separator and actions on one line
+        const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
+        const headerWrap = document.createElement('div');
+        headerWrap.className = 'form-ui-array-item-header';
+        const itemTitleSep = document.createElement('div');
+        itemTitleSep.className = 'form-ui-separator-text';
+        const itemTitleLabel = document.createElement('div');
+        itemTitleLabel.className = 'form-ui-separator-label';
+        itemTitleLabel.textContent = `${baseTitle} #${index + 1}`;
+        itemTitleSep.appendChild(itemTitleLabel);
+        headerWrap.appendChild(itemTitleSep);
         const groupContent = document.createElement('div');
         groupContent.className = 'form-ui-group-content';
+        // Insert header row at the top of the content
+        groupContent.appendChild(headerWrap);
         const pathPrefix = `${fieldPath}[${index}]`;
         this.generateObjectFields(
           groupContent,
@@ -481,30 +501,61 @@ export default class FormGenerator {
           pathPrefix,
         );
         itemContainer.appendChild(groupContent);
+        // Actions container with delete + confirm flow
+        const actions = document.createElement('div');
+        actions.className = 'form-ui-array-item-actions';
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'form-ui-array-remove';
-        removeButton.textContent = '×';
+        removeButton.className = 'form-ui-remove';
+        removeButton.title = 'Remove item';
+        removeButton.innerHTML = FormIcons.getIconSvg('trash');
         removeButton.addEventListener('click', () => {
-          itemContainer.remove();
-          // Reindex remaining items' names to keep continuous indices
-          Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
-            el.querySelectorAll('[name]').forEach((inputEl) => {
-              inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
+          if (removeButton.classList.contains('confirm-state')) {
+            if (removeButton.dataset.confirmTimeoutId) {
+              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
+              delete removeButton.dataset.confirmTimeoutId;
+            }
+            itemContainer.remove();
+            // Reindex remaining items' names to keep continuous indices
+            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
+              el.querySelectorAll('[name]').forEach((inputEl) => {
+                inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
+              });
+              // Update IDs to reflect new indices
+              el.id = `form-array-item-${fieldPath.replace(/\./g, '-')}-${newIdx}`;
+              // Update per-item title labels to match new index
+              const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+              if (lbl) lbl.textContent = `${baseTitle} #${newIdx + 1}`;
             });
-            // Update IDs to reflect new indices
-            el.id = `form-array-item-${fieldPath.replace(/\./g, '-')}-${newIdx}`;
-          });
-          this.updateData();
-          // Refresh group registry and navigation to reflect item changes
-          this.ensureGroupRegistry();
-          if (this.navigationTree) {
-            this.navigation.generateNavigationTree();
+            this.updateData();
+            // Refresh group registry and navigation to reflect item changes
+            this.ensureGroupRegistry();
+            if (this.navigationTree) {
+              this.navigation.generateNavigationTree();
+            }
+            // Re-validate due to potential required fields in items
+            this.validation.validateAllFields();
+          } else {
+            const originalHTML = removeButton.innerHTML;
+            const originalTitle = removeButton.title;
+            const originalClass = removeButton.className;
+            removeButton.innerHTML = '✓';
+            removeButton.title = 'Click to confirm removal';
+            removeButton.classList.add('confirm-state');
+            const timeout = setTimeout(() => {
+              if (removeButton) {
+                removeButton.innerHTML = originalHTML;
+                removeButton.title = originalTitle;
+                removeButton.className = originalClass;
+                delete removeButton.dataset.confirmTimeoutId;
+              }
+            }, 3000);
+            removeButton.dataset.confirmTimeoutId = String(timeout);
           }
-          // Re-validate due to potential required fields in items
-          this.validation.validateAllFields();
         });
-        itemContainer.appendChild(removeButton);
+
+        actions.appendChild(removeButton);
+        headerWrap.appendChild(actions);
         itemsContainer.appendChild(itemContainer);
         // Ensure registry includes the new item for scroll/hover sync
         this.ensureGroupRegistry();
@@ -519,6 +570,12 @@ export default class FormGenerator {
           this.navigation.generateNavigationTree();
         }
         this.validation.validateAllFields();
+        // After add, refresh per-item labels to maintain continuous numbering
+        const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
+        Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, i) => {
+          const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+          if (lbl) lbl.textContent = `${baseTitle} #${i + 1}`;
+        });
       });
       addButton.addEventListener('focus', (e) => this.navigation.onTreeClick?.(e));
       container.appendChild(addButton);
@@ -962,6 +1019,11 @@ export default class FormGenerator {
       el.querySelectorAll('[name]').forEach((inputEl) => {
         inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${idx}]`);
       });
+      const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+      if (lbl) {
+        const baseTitle = this.getSchemaTitle({ title: '' }, arrayPath.split('.').pop());
+        lbl.textContent = `${baseTitle} #${idx + 1}`;
+      }
     });
 
     // Update internal maps/data and refresh nav/validation

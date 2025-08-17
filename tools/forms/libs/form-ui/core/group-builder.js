@@ -37,10 +37,16 @@ export default class GroupBuilder {
     if (currentPath.length > 0) {
       const groupHeader = document.createElement('div');
       groupHeader.className = 'form-ui-group-header';
-      const groupTitleElement = document.createElement('h3');
-      groupTitleElement.className = 'form-ui-group-title';
-      groupTitleElement.textContent = groupTitle;
-      groupHeader.appendChild(groupTitleElement);
+      const sep = document.createElement('div');
+      sep.className = 'form-ui-separator-text';
+      const label = document.createElement('div');
+      label.className = 'form-ui-separator-label';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'form-ui-group-title';
+      titleSpan.textContent = groupTitle;
+      label.appendChild(titleSpan);
+      sep.appendChild(label);
+      groupHeader.appendChild(sep);
       groupContainer.appendChild(groupHeader);
     }
 
@@ -53,6 +59,7 @@ export default class GroupBuilder {
     const requiredSet = new Set(schema.required || []);
     const pathPrefix = schemaPath.length > 0 ? schemaPath.join('.') : '';
 
+    let pendingParentSeparator = false;
     Object.entries(schema.properties).forEach(([key, originalPropSchema]) => {
       const propSchema = this.derefNode(originalPropSchema) || originalPropSchema;
       const isObjectType = !!(propSchema && (propSchema.type === 'object' || (Array.isArray(propSchema.type) && propSchema.type.includes('object'))));
@@ -72,12 +79,30 @@ export default class GroupBuilder {
       if (isObjectType && propSchema.properties) {
         // recurse as an inline child group
         this.buildInline(groupContent, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
+        // mark that after this inline group ends, if we continue with parent primitives, we should show a separator with parent title
+        pendingParentSeparator = true;
         return;
       }
 
       // arrays-of-objects or primitive fields are handled by generateField()
       const fieldEl = this.generateField(key, propSchema, requiredSet.has(key), pathPrefix);
-      if (fieldEl) groupContent.appendChild(fieldEl);
+      if (fieldEl) {
+        if (pendingParentSeparator && !isArrayOfObjects) {
+          // Insert a separator label to visually indicate continuation of parent group
+          const sep = document.createElement('div');
+          sep.className = 'form-ui-separator-text';
+          const label = document.createElement('div');
+          label.className = 'form-ui-separator-label';
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'form-ui-group-title';
+          titleSpan.textContent = groupTitle;
+          label.appendChild(titleSpan);
+          sep.appendChild(label);
+          groupContent.appendChild(sep);
+          pendingParentSeparator = false;
+        }
+        groupContent.appendChild(fieldEl);
+      }
     });
 
     return outMap;
@@ -128,10 +153,16 @@ export default class GroupBuilder {
       if (currentPath.length > 0) {
         const groupHeader = document.createElement('div');
         groupHeader.className = 'form-ui-group-header';
-        const groupTitleElement = document.createElement('h3');
-        groupTitleElement.className = 'form-ui-group-title';
-        groupTitleElement.textContent = groupTitle;
-        groupHeader.appendChild(groupTitleElement);
+        const sep = document.createElement('div');
+        sep.className = 'form-ui-separator-text';
+        const label = document.createElement('div');
+        label.className = 'form-ui-separator-label';
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'form-ui-group-title';
+        titleSpan.textContent = groupTitle;
+        label.appendChild(titleSpan);
+        sep.appendChild(label);
+        groupHeader.appendChild(sep);
         groupContainer.appendChild(groupHeader);
       }
 
@@ -190,10 +221,16 @@ export default class GroupBuilder {
 
         const groupHeader = document.createElement('div');
         groupHeader.className = 'form-ui-group-header';
-        const groupTitleElement = document.createElement('h3');
-        groupTitleElement.className = 'form-ui-group-title';
-        groupTitleElement.textContent = this.getSchemaTitle(propSchema, key);
-        groupHeader.appendChild(groupTitleElement);
+        const sep = document.createElement('div');
+        sep.className = 'form-ui-separator-text';
+        const label = document.createElement('div');
+        label.className = 'form-ui-separator-label';
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'form-ui-group-title';
+        titleSpan.textContent = this.getSchemaTitle(propSchema, key);
+        label.appendChild(titleSpan);
+        sep.appendChild(label);
+        groupHeader.appendChild(sep);
         groupContainer.appendChild(groupHeader);
 
         const groupContent = document.createElement('div');

@@ -1,3 +1,119 @@
+/* Inline text separator style used for group titles and array item titles */
+.form-ui-separator-text {
+  position: relative;
+  margin: 24px 0 12px;
+  height: 32px;
+}
+
+.form-ui-separator-text::before,
+.form-ui-separator-text::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 45%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--form-ui-separator-color, #ccc));
+}
+
+.form-ui-separator-text::before {
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.form-ui-separator-text::after {
+  right: 0;
+  transform: translateY(-50%) scaleX(-1);
+}
+
+.form-ui-separator-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  color: var(--form-ui-separator-text-color, #333);
+  background: var(--form-ui-separator-bg, #fff);
+  padding: 0 8px;
+  z-index: 1;
+  line-height: 20px;
+}
+
+/* Ensure array item header appears above content */
+.form-ui-array-item>.form-ui-separator-text {
+  display: block;
+  margin-top: 16px;
+}
+
+/* Header wrapper holding title and actions in one row */
+.form-ui-array-item-header {
+  position: relative;
+}
+
+.form-ui-array-item-header>.form-ui-separator-text {
+  display: block;
+  margin-top: 16px;
+}
+
+/* Array controls */
+.form-ui-array-container {
+  position: relative;
+}
+
+.form-ui-array-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 6px 10px;
+  background: var(--form-ui-btn-bg, #f6f7f9);
+  color: var(--form-ui-btn-fg, #333);
+  border: 1px solid var(--form-ui-btn-border, #d0d7de);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.form-ui-array-add:hover {
+  background: #eef1f4;
+}
+
+.form-ui-array-item {
+  position: relative;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 8px 12px;
+}
+
+.form-ui-array-item .form-ui-array-item-actions {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.form-ui-array-remove,
+.form-ui-array-remove-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--form-ui-btn-border, #d0d7de);
+  border-radius: 6px;
+  background: var(--form-ui-btn-bg, #f6f7f9);
+  color: var(--form-ui-btn-muted, #6b7280);
+  cursor: pointer;
+}
+
+.form-ui-array-remove:hover,
+.form-ui-array-remove-confirm:hover {
+  background: #eef1f4;
+}
+
 /* Form UI Styles */
 .form-ui-container {
   border: none;
@@ -184,7 +300,6 @@
 .form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state {
   background: #ef4444 !important;
   color: white !important;
-  animation: pulse-confirm 1s ease-in-out infinite;
   width: 28px;
   height: 28px;
   margin: 2px;
@@ -253,7 +368,6 @@
 .form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state {
   background: #ef4444 !important;
   color: white !important;
-  animation: pulse-confirm 1s ease-in-out infinite;
   width: 28px;
   height: 28px;
   margin: 2px;
@@ -286,8 +400,7 @@
 }
 
 .form-ui-remove {
-  color: #de350b;
-  border-color: #de350b;
+  border: none;
 }
 
 .form-ui-remove:hover {
@@ -300,7 +413,8 @@
   color: white;
   border-color: #ff5630;
   font-weight: 600;
-  animation: pulse-confirm 1s ease-in-out infinite;
+  right: 4px;
+  position: relative;
 }
 
 .form-ui-remove.confirm-state:hover {
@@ -1308,4 +1422,12 @@
 /* Smooth scroll behavior for form groups */
 .form-ui-body {
   scroll-behavior: smooth;
+}
+
+.separator-gradient {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #ccc, transparent);
+  margin: 2rem 0;
+  transition: background 0.5s;
 }
