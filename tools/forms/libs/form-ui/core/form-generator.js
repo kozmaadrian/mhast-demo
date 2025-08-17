@@ -108,6 +108,10 @@ export default class FormGenerator {
    * Handler when user activates an optional object via "+ Add" button
    */
   onActivateOptionalGroup(path, schema) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Optional group activation requested', { path, schemaType: this.normalizeSchema(schema)?.type });
+    } catch { /* noop */ }
     // Mark path as active to include it in navigation
     this.activeOptionalGroups.add(path);
     // Ensure nested path exists in current data
@@ -120,10 +124,18 @@ export default class FormGenerator {
         baseValue = [];
       }
     }
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Setting base value at path', { path, baseValue });
+    } catch { /* noop */ }
     this.setNestedValue(this.data, path, baseValue);
     // Notify listeners for data change
     this.listeners.forEach((listener) => listener(this.data));
     // Rebuild the form body to materialize the newly activated group
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Rebuilding body after activation', { path });
+    } catch { /* noop */ }
     this.rebuildBody();
   }
 
@@ -356,9 +368,13 @@ export default class FormGenerator {
       (itemSchema && (itemSchema.type === 'object' || itemSchema.properties)) || !!propSchema.items?.$ref
     );
     if (isArrayOfObjects) {
+      // Optional gating for arrays-of-objects (including nested within array items)
+      if (!isRequired && !this.isOptionalGroupActive(fullPath)) {
+        return null;
+      }
       const groupContainer = document.createElement('div');
       groupContainer.className = 'form-ui-group';
-      groupContainer.id = `form-group-${fullPath.replace(/\./g, '-')}`;
+      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
       groupContainer.dataset.groupPath = fullPath;
 
       const groupHeader = document.createElement('div');
@@ -379,6 +395,45 @@ export default class FormGenerator {
       groupContent.className = 'form-ui-group-content';
       const arrayUI = this.generateInput(fullPath, propSchema);
       if (arrayUI) groupContent.appendChild(arrayUI);
+      groupContainer.appendChild(groupContent);
+
+      groupContainer.dataset.fieldPath = fullPath;
+      return groupContainer;
+    }
+
+    // Special-case: nested object inside array items (or any object field) should render as its own inline group
+    const isObjectType = !!(propSchema && (propSchema.type === 'object' || propSchema.properties));
+    if (isObjectType && propSchema.properties) {
+      // Optional object group gating: only show when activated or required
+      if (!isRequired && !this.isOptionalGroupActive(fullPath)) return null;
+
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'form-ui-group';
+      groupContainer.id = `form-group-${fullPath.replace(/[\.\[\]]/g, '-')}`;
+      groupContainer.dataset.groupPath = fullPath;
+
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'form-ui-group-header';
+      const sep = document.createElement('div');
+      sep.className = 'form-ui-separator-text';
+      const label = document.createElement('div');
+      label.className = 'form-ui-separator-label';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'form-ui-group-title';
+      titleSpan.textContent = propSchema.title || this.formatLabel(key);
+      label.appendChild(titleSpan);
+      sep.appendChild(label);
+      groupHeader.appendChild(sep);
+      groupContainer.appendChild(groupHeader);
+
+      const groupContent = document.createElement('div');
+      groupContent.className = 'form-ui-group-content';
+      this.generateObjectFields(
+        groupContent,
+        propSchema.properties || {},
+        propSchema.required || [],
+        fullPath,
+      );
       groupContainer.appendChild(groupContent);
 
       groupContainer.dataset.fieldPath = fullPath;
@@ -477,7 +532,7 @@ export default class FormGenerator {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
         // Assign a stable ID so navigation can point to specific items
-        const itemId = `form-array-item-${fieldPath.replace(/\./g, '-')}-${index}`;
+        const itemId = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${index}`;
         itemContainer.id = itemId;
         // Header wrapper containing title separator and actions on one line
         const headerWrap = document.createElement('div');
@@ -522,7 +577,7 @@ export default class FormGenerator {
                 inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
               });
               // Update IDs to reflect new indices
-              el.id = `form-array-item-${fieldPath.replace(/\./g, '-')}-${newIdx}`;
+              el.id = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${newIdx}`;
               // Update per-item title labels to match new index
               const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
               if (lbl) lbl.textContent = `${baseTitle} #${newIdx + 1}`;
@@ -561,7 +616,18 @@ export default class FormGenerator {
         this.ensureGroupRegistry();
       };
 
-      addButton.addEventListener('click', () => {
+      addButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[GEN][ADD] Add button clicked for array', { fieldPath, currentCount: itemsContainer.children.length });
+        } catch { /* noop */ }
+        try {
+          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
+          const siblingsBefore = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
+          console.log('[GEN][ADD] Parent array direct item count before add', { parentArray, siblingsBefore });
+        } catch { /* noop */ }
         const index = itemsContainer.children.length;
         addItemAt(index);
         this.updateData();
@@ -576,8 +642,13 @@ export default class FormGenerator {
           const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
           if (lbl) lbl.textContent = `${baseTitle} #${i + 1}`;
         });
+        try {
+          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
+          const siblingsAfter = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
+          console.log('[GEN][ADD] Parent array direct item count after add', { parentArray, siblingsAfter });
+        } catch { /* noop */ }
       });
-      addButton.addEventListener('focus', (e) => this.navigation.onTreeClick?.(e));
+      addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
       container.appendChild(addButton);
 
       // Pre-populate items from existing data so rebuilds preserve entries

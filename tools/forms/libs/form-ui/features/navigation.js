@@ -14,6 +14,8 @@ export default class FormNavigation {
     this.onItemDragOver = this.onItemDragOver.bind(this);
     this.onItemDrop = this.onItemDrop.bind(this);
     this._dragData = null; // { arrayPath, fromIndex }
+    // Guard to avoid double auto-add clicks for the same array path
+    this._autoAddedOnce = new Set();
   }
 
   /**
@@ -341,6 +343,7 @@ export default class FormNavigation {
         const addItem = document.createElement('div');
         addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
         addItem.dataset.groupId = `form-optional-${nestedPath.replace(/\./g, '-')}`;
+        addItem.dataset.path = nestedPath;
         addItem.dataset.level = level + 1;
 
         const content = document.createElement('div');
@@ -382,7 +385,9 @@ export default class FormNavigation {
           `#${groupId} .form-ui-array-items`
         );
         if (arrayContainer) {
-          const itemEls = Array.from(arrayContainer.querySelectorAll('.form-ui-array-item'));
+          // Only count direct children items to avoid picking nested array items inside each item
+          const itemEls = Array.from(arrayContainer.querySelectorAll(':scope > .form-ui-array-item'));
+          try { console.log('[NAV][BUILD] Listing array items', { path: nestedPath, count: itemEls.length }); } catch {}
           itemEls.forEach((el, idx) => {
             // Each item gets a child nav node with its own anchor to the item container
             const itemNav = document.createElement('div');
@@ -409,6 +414,96 @@ export default class FormNavigation {
             itemNav.addEventListener('dragover', this.onItemDragOver);
             itemNav.addEventListener('drop', this.onItemDrop);
             items.push(itemNav);
+
+            // Inspect the item schema for nested arrays-of-objects (e.g., answerList inside questionList)
+            const itemSchema = this.formGenerator.derefNode(derefProp.items) || derefProp.items || {};
+            const itemProps = itemSchema.properties || {};
+            const itemRequired = new Set(itemSchema.required || []);
+            for (const [childKey, childOriginal] of Object.entries(itemProps)) {
+              const childProp = this.formGenerator.derefNode(childOriginal) || childOriginal;
+              const childIsArrayOfObjects = (
+                childProp && childProp.type === 'array' && (
+                  (childProp.items && (childProp.items.type === 'object' || childProp.items.properties)) || !!childProp.items?.$ref
+                )
+              );
+              const childHasRef = !!childOriginal?.$ref || !!childProp?.$ref;
+              if (!childIsArrayOfObjects && !childHasRef) continue;
+
+              const childPath = `${nestedPath}[${idx}].${childKey}`;
+              const childOptional = !itemRequired.has(childKey);
+              const childActive = !childOptional || this.formGenerator.isOptionalGroupActive(childPath);
+
+              if (!childActive) {
+                // Show an add option for the nested array under this item
+                const addChild = document.createElement('div');
+                addChild.className = 'form-ui-nav-item form-ui-nav-item-add';
+                addChild.dataset.groupId = `form-optional-${childPath.replace(/[.\[\]]/g, '-')}`;
+                addChild.dataset.path = childPath;
+                addChild.dataset.level = level + 3;
+                const addContent = document.createElement('div');
+                addContent.className = 'form-ui-nav-item-content form-ui-nav-item-add-content';
+                addContent.style.setProperty('--nav-level', level + 3);
+                const addTitle = document.createElement('span');
+                addTitle.className = 'form-ui-nav-item-title form-ui-nav-item-add-title';
+                addTitle.textContent = `+ Add ${this.formGenerator.getSchemaTitle(childProp, childKey)}`;
+                addContent.appendChild(addTitle);
+                addChild.appendChild(addContent);
+                items.push(addChild);
+                continue;
+              }
+
+              // Render the nested array group under this item
+              const childGroupId = `form-group-${childPath.replace(/[.\[\]]/g, '-')}`;
+              const childNav = document.createElement('div');
+              childNav.className = 'form-ui-nav-item';
+              childNav.dataset.groupId = childGroupId;
+              childNav.dataset.level = level + 3;
+              const childContent = document.createElement('div');
+              childContent.className = 'form-ui-nav-item-content';
+              childContent.style.setProperty('--nav-level', level + 3);
+              const childTitle = document.createElement('span');
+              childTitle.className = 'form-ui-nav-item-title';
+              childTitle.textContent = this.formGenerator.getSchemaTitle(childProp, childKey);
+              childContent.appendChild(childTitle);
+              childNav.appendChild(childContent);
+              items.push(childNav);
+
+              // Add entries for each nested array item
+              const childArrayContainer = this.formGenerator.container?.querySelector?.(
+                `[data-field="${childPath}"] .form-ui-array-items`
+              ) || this.formGenerator.container?.querySelector?.(
+                `#${childGroupId} .form-ui-array-items`
+              );
+              if (childArrayContainer) {
+                // Again, only count direct nested items
+                const childItemEls = Array.from(childArrayContainer.querySelectorAll(':scope > .form-ui-array-item'));
+                try { console.log('[NAV][BUILD] Listing nested array items', { path: childPath, count: childItemEls.length }); } catch {}
+                childItemEls.forEach((cel, cidx) => {
+                  const childItemNav = document.createElement('div');
+                  childItemNav.className = 'form-ui-nav-item';
+                  childItemNav.classList.add('form-ui-nav-item-array-child');
+                  childItemNav.dataset.groupId = cel.id || `${childGroupId}-item-${cidx}`;
+                  childItemNav.dataset.level = level + 4;
+                  childItemNav.dataset.arrayPath = childPath;
+                  childItemNav.dataset.itemIndex = String(cidx);
+                  childItemNav.draggable = true;
+
+                  const childItemContent = document.createElement('div');
+                  childItemContent.className = 'form-ui-nav-item-content';
+                  childItemContent.style.setProperty('--nav-level', level + 4);
+                  const childItemTitle = document.createElement('span');
+                  childItemTitle.className = 'form-ui-nav-item-title';
+                  childItemTitle.textContent = `${this.formGenerator.getSchemaTitle(childProp, childKey)} #${cidx + 1}`;
+                  childItemContent.appendChild(childItemTitle);
+                  childItemNav.appendChild(childItemContent);
+                  // Optional: attach drag within nested arrays (reuse handlers)
+                  childItemNav.addEventListener('dragstart', this.onItemDragStart);
+                  childItemNav.addEventListener('dragover', this.onItemDragOver);
+                  childItemNav.addEventListener('drop', this.onItemDrop);
+                  items.push(childItemNav);
+                });
+              }
+            }
           });
         }
         continue;
@@ -500,27 +595,94 @@ export default class FormNavigation {
     if (!navItem) return;
     e.preventDefault();
     e.stopPropagation();
+    try {
+      console.log('[NAV][CLICK]', {
+        classList: Array.from(navItem.classList),
+        groupId: navItem.dataset.groupId,
+        path: navItem.dataset.path,
+        targetTag: e.target.tagName,
+      });
+    } catch {}
     const { groupId } = navItem.dataset;
     if (!groupId) return;
     if (navItem.classList.contains('form-ui-nav-item-add')) {
       // Activate corresponding optional group directly from schema path
-      const path = groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
-      const parts = path.split('.');
-      let node = this.formGenerator.schema;
-      for (const part of parts) {
-        const n = this.formGenerator.normalizeSchema(node);
-        node = n?.properties?.[part];
-        if (!node) break;
-      }
+      const path = navItem.dataset.path || groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
+      try {
+        // Debug logs for activation
+        // eslint-disable-next-line no-console
+        console.log('[NAV][ADD] Clicked +Add in sidebar', { groupId, path, navItem });
+      } catch { /* noop */ }
+      const resolveSchemaByPath = (rootSchema, dottedPath) => {
+        const tokens = dottedPath.split('.');
+        let current = rootSchema;
+        for (const token of tokens) {
+          const normalized = this.formGenerator.normalizeSchema(current);
+          if (!normalized) return null;
+          const match = token.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+          const key = match ? match[1] : token;
+          // descend into property
+          current = normalized?.properties?.[key];
+          if (!current) return null;
+          // if an index is present, descend into array items schema
+          const idxPresent = match && typeof match[2] !== 'undefined';
+          if (idxPresent) {
+            const curNorm = this.formGenerator.normalizeSchema(current);
+            if (!curNorm || curNorm.type !== 'array') return null;
+            current = this.formGenerator.derefNode(curNorm.items) || curNorm.items;
+            if (!current) return null;
+          }
+        }
+        return current;
+      };
+      const node = resolveSchemaByPath(this.formGenerator.schema, path);
+      try {
+        // eslint-disable-next-line no-console
+        console.log('[NAV][ADD] Resolved schema node', { path, nodeType: this.formGenerator.normalizeSchema(node)?.type });
+      } catch { /* noop */ }
       if (node) {
         this.formGenerator.onActivateOptionalGroup(path, node);
         // If activated node is array-of-objects, immediately add the first item
         const normalized = this.formGenerator.normalizeSchema(node);
         if (normalized && normalized.type === 'array') {
+          if (this._autoAddedOnce.has(path)) {
+            try { console.log('[NAV][ADD] Skipping auto-add (already performed)', { path }); } catch {}
+          } else {
+            this._autoAddedOnce.add(path);
+            setTimeout(() => this._autoAddedOnce.delete(path), 500);
+          }
           // Find the add button for this array within the group and click it once
           requestAnimationFrame(() => {
-            const arrayAdd = this.formGenerator.container.querySelector(`#form-group-${path.replace(/\./g, '-')} .form-ui-array-add, [data-field="${path}"] .form-ui-array-add`);
-            if (arrayAdd) arrayAdd.click();
+            // Prefer exact data-field match
+            const byDataField = this.formGenerator.container.querySelector(`[data-field="${path}"] .form-ui-array-add`);
+            if (byDataField) {
+              const ctr = byDataField.closest('.form-ui-array-container');
+              if (ctr && ctr.dataset.field === path) {
+                try { console.log('[NAV][ADD] Clicking add button (data-field match)', { path }); } catch {}
+                byDataField.click();
+                return;
+              }
+            }
+            // Fallback to group id selector when no data-field container is present
+            const safeId = `form-group-${path.replace(/[.\[\]]/g, '-')}`;
+            const byGroupId = this.formGenerator.container.querySelector(`#${safeId} .form-ui-array-add`);
+            try {
+              // eslint-disable-next-line no-console
+              console.log('[NAV][ADD] Auto-add selection', { path, safeId, foundByDataField: !!byDataField, foundByGroupId: !!byGroupId });
+              const parentArray = path.includes('[') ? path.split('[')[0] : path;
+              const parentItems = this.formGenerator.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
+              // eslint-disable-next-line no-console
+              console.log('[NAV][ADD] Parent array items before add', { parentArray, count: parentItems });
+            } catch { /* noop */ }
+            if (byGroupId) {
+              const ctr = byGroupId.closest('.form-ui-array-container');
+              if (ctr && ctr.dataset.field === path) {
+                try { console.log('[NAV][ADD] Clicking add button (groupId fallback)', { path }); } catch {}
+                byGroupId.click();
+              } else {
+                try { console.warn('[NAV][ADD] Fallback add-button does not belong to path; skipping click', { path, safeId }); } catch {}
+              }
+            }
           });
         }
         const newGroupId = `form-group-${path.replace(/\./g, '-')}`;
@@ -528,6 +690,7 @@ export default class FormNavigation {
       }
       return;
     }
+    try { console.log('[NAV][GOTO]', { groupId }); } catch {}
     this.navigateToGroup(groupId);
   }
 

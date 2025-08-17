@@ -156,7 +156,9 @@ export default class InputFactory {
     addButton.className = 'form-ui-array-add';
     const baseTitle = propSchema?.title || this.formatLabel(fieldPath.split('.').pop());
     addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
-    addButton.addEventListener('click', () => {
+    addButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const itemContainer = document.createElement('div');
       itemContainer.className = 'form-ui-array-item';
       const itemIndexName = `${fieldPath}[${itemsContainer.children.length}]`;
