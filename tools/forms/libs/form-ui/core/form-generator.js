@@ -924,4 +924,52 @@ export default class FormGenerator {
     this.groupElements.clear();
     this.listeners.clear();
   }
+
+  /**
+   * Reorder an item inside an array-of-objects group and reindex inputs/ids.
+   * @param {string} arrayPath dot path to the array field (e.g., "tutorialList")
+   * @param {number} fromIndex current index of the item
+   * @param {number} toIndex desired index of the item within the same array
+   */
+  reorderArrayItem(arrayPath, fromIndex, toIndex) {
+    if (!this.container || typeof fromIndex !== 'number' || typeof toIndex !== 'number') return;
+    if (fromIndex === toIndex) return;
+
+    const hyphenPath = arrayPath.replace(/\./g, '-');
+    const groupId = `form-group-${hyphenPath}`;
+
+    const itemsContainer = this.container.querySelector(`#${groupId} .form-ui-array-items`) 
+      || this.container.querySelector(`[data-field="${arrayPath}"] .form-ui-array-items`);
+    if (!itemsContainer) return;
+
+    const items = Array.from(itemsContainer.querySelectorAll('.form-ui-array-item'));
+    if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return;
+
+    const node = items[fromIndex];
+    const reference = items[toIndex];
+    if (!node || !reference) return;
+
+    // Move DOM node to the new position
+    if (toIndex > fromIndex) {
+      itemsContainer.insertBefore(node, reference.nextSibling);
+    } else {
+      itemsContainer.insertBefore(node, reference);
+    }
+
+    // Reindex names and IDs to match new order
+    Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
+      el.id = `form-array-item-${hyphenPath}-${idx}`;
+      el.querySelectorAll('[name]').forEach((inputEl) => {
+        inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${idx}]`);
+      });
+    });
+
+    // Update internal maps/data and refresh nav/validation
+    this.updateData();
+    this.ensureGroupRegistry();
+    if (this.navigationTree) {
+      this.navigation.generateNavigationTree();
+    }
+    this.validation.validateAllFields();
+  }
 }

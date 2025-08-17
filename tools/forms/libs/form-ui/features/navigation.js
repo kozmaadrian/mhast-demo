@@ -9,6 +9,11 @@ export default class FormNavigation {
     this.formGenerator = formGenerator;
     // Single delegated handler bound once to avoid duplicate listeners
     this.onTreeClick = this.onTreeClick.bind(this);
+    // Drag & drop handlers for array item nav entries
+    this.onItemDragStart = this.onItemDragStart.bind(this);
+    this.onItemDragOver = this.onItemDragOver.bind(this);
+    this.onItemDrop = this.onItemDrop.bind(this);
+    this._dragData = null; // { arrayPath, fromIndex }
   }
 
   /**
@@ -382,8 +387,12 @@ export default class FormNavigation {
             // Each item gets a child nav node with its own anchor to the item container
             const itemNav = document.createElement('div');
             itemNav.className = 'form-ui-nav-item';
+            itemNav.classList.add('form-ui-nav-item-array-child');
             itemNav.dataset.groupId = el.id || `${groupId}-item-${idx}`;
             itemNav.dataset.level = level + 2;
+            itemNav.dataset.arrayPath = nestedPath;
+            itemNav.dataset.itemIndex = String(idx);
+            itemNav.draggable = true;
 
             const itemContent = document.createElement('div');
             itemContent.className = 'form-ui-nav-item-content';
@@ -395,6 +404,10 @@ export default class FormNavigation {
 
             itemContent.appendChild(itemTitle);
             itemNav.appendChild(itemContent);
+            // Attach drag handlers
+            itemNav.addEventListener('dragstart', this.onItemDragStart);
+            itemNav.addEventListener('dragover', this.onItemDragOver);
+            itemNav.addEventListener('drop', this.onItemDrop);
             items.push(itemNav);
           });
         }
@@ -433,6 +446,38 @@ export default class FormNavigation {
     }
 
     return items;
+  }
+
+  onItemDragStart(e) {
+    const item = e.currentTarget;
+    const { arrayPath, itemIndex } = item.dataset;
+    if (!arrayPath || itemIndex == null) return;
+    this._dragData = { arrayPath, fromIndex: Number(itemIndex) };
+    try { e.dataTransfer.effectAllowed = 'move'; } catch { /* noop */ }
+  }
+
+  onItemDragOver(e) {
+    const item = e.currentTarget;
+    const { arrayPath } = item.dataset;
+    if (!this._dragData || !arrayPath || arrayPath !== this._dragData.arrayPath) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = 'move'; } catch { /* noop */ }
+  }
+
+  onItemDrop(e) {
+    e.preventDefault();
+    const item = e.currentTarget;
+    const { arrayPath, itemIndex } = item.dataset;
+    if (!this._dragData || !arrayPath || arrayPath !== this._dragData.arrayPath) {
+      this._dragData = null;
+      return;
+    }
+    const toIndex = Number(itemIndex);
+    const { fromIndex } = this._dragData;
+    this._dragData = null;
+    if (Number.isNaN(fromIndex) || Number.isNaN(toIndex) || fromIndex === toIndex) return;
+    // Delegate to generator to reorder DOM and reindex inputs/ids, then rebuild nav
+    this.formGenerator.reorderArrayItem(arrayPath, fromIndex, toIndex);
   }
 
   /**
