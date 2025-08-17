@@ -172,14 +172,14 @@ export default class FormGenerator {
    */
   ensureGroupRegistry() {
     if (!this.container) return;
-    const groups = this.container.querySelectorAll('.form-ui-group[id]');
+    const groups = this.container.querySelectorAll('.form-ui-group[id], .form-ui-array-item[id]');
     groups.forEach((el) => {
       const id = el.id;
       if (!this.groupElements.has(id)) {
         this.groupElements.set(id, {
           element: el,
           path: el.dataset.groupPath ? el.dataset.groupPath.split(' > ') : [],
-          title: el.querySelector('.form-ui-group-title')?.textContent || '',
+          title: el.querySelector('.form-ui-group-title')?.textContent || el.querySelector('.form-ui-label')?.textContent || '',
           isSection: false,
         });
       }
@@ -468,6 +468,9 @@ export default class FormGenerator {
       const addItemAt = (index) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
+        // Assign a stable ID so navigation can point to specific items
+        const itemId = `form-array-item-${fieldPath.replace(/\./g, '-')}-${index}`;
+        itemContainer.id = itemId;
         const groupContent = document.createElement('div');
         groupContent.className = 'form-ui-group-content';
         const pathPrefix = `${fieldPath}[${index}]`;
@@ -489,17 +492,32 @@ export default class FormGenerator {
             el.querySelectorAll('[name]').forEach((inputEl) => {
               inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
             });
+            // Update IDs to reflect new indices
+            el.id = `form-array-item-${fieldPath.replace(/\./g, '-')}-${newIdx}`;
           });
           this.updateData();
+          // Refresh group registry and navigation to reflect item changes
+          this.ensureGroupRegistry();
+          if (this.navigationTree) {
+            this.navigation.generateNavigationTree();
+          }
+          // Re-validate due to potential required fields in items
+          this.validation.validateAllFields();
         });
         itemContainer.appendChild(removeButton);
         itemsContainer.appendChild(itemContainer);
+        // Ensure registry includes the new item for scroll/hover sync
+        this.ensureGroupRegistry();
       };
 
       addButton.addEventListener('click', () => {
         const index = itemsContainer.children.length;
         addItemAt(index);
         this.updateData();
+        // Refresh navigation to add a child nav item for the new array entry
+        if (this.navigationTree) {
+          this.navigation.generateNavigationTree();
+        }
         this.validation.validateAllFields();
       });
       addButton.addEventListener('focus', (e) => this.navigation.onTreeClick?.(e));
@@ -819,7 +837,7 @@ export default class FormGenerator {
    */
   highlightFormGroup(groupId) {
     // Remove existing highlights
-    this.container.querySelectorAll('.form-ui-group').forEach((group) => {
+    this.container.querySelectorAll('.form-ui-group, .form-ui-array-item[id]').forEach((group) => {
       group.classList.remove('highlighted');
     });
 

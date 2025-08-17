@@ -43,6 +43,7 @@ class FormsEditor extends LitElement {
   }
 
   async connectedCallback() {
+    console.log('FormsEditor connectedCallback');
     super.connectedCallback();
     this.shadowRoot.adoptedStyleSheets = [style];
     

@@ -152,7 +152,7 @@ export default class FormNavigation {
   enableHoverSync() {
     if (!this.formGenerator.container || !this.formGenerator.navigationTree) return;
 
-    const groups = this.formGenerator.container.querySelectorAll('.form-ui-group');
+    const groups = this.formGenerator.container.querySelectorAll('.form-ui-group, .form-ui-array-item[id]');
     const handleMouseEnter = (e) => {
       const group = e.currentTarget;
       const groupId = group.id;
@@ -371,6 +371,33 @@ export default class FormNavigation {
         content.appendChild(titleEl);
         navItem.appendChild(content);
         items.push(navItem);
+
+        // Child items: one entry per existing array item in the form
+        const arrayContainer = this.formGenerator.container?.querySelector?.(
+          `#${groupId} .form-ui-array-items`
+        );
+        if (arrayContainer) {
+          const itemEls = Array.from(arrayContainer.querySelectorAll('.form-ui-array-item'));
+          itemEls.forEach((el, idx) => {
+            // Each item gets a child nav node with its own anchor to the item container
+            const itemNav = document.createElement('div');
+            itemNav.className = 'form-ui-nav-item';
+            itemNav.dataset.groupId = el.id || `${groupId}-item-${idx}`;
+            itemNav.dataset.level = level + 2;
+
+            const itemContent = document.createElement('div');
+            itemContent.className = 'form-ui-nav-item-content';
+            itemContent.style.setProperty('--nav-level', level + 2);
+
+            const itemTitle = document.createElement('span');
+            itemTitle.className = 'form-ui-nav-item-title';
+            itemTitle.textContent = `${this.formGenerator.getSchemaTitle(derefProp, key)} #${idx + 1}`;
+
+            itemContent.appendChild(itemTitle);
+            itemNav.appendChild(itemContent);
+            items.push(itemNav);
+          });
+        }
         continue;
       }
 
