@@ -468,10 +468,11 @@ export default class FormGenerator {
       itemsContainer.className = 'form-ui-array-items';
       container.appendChild(itemsContainer);
 
+      const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
       const addButton = document.createElement('button');
       addButton.type = 'button';
       addButton.className = 'form-ui-array-add';
-      addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add Item</span>`;
+      addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
       const addItemAt = (index) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
@@ -479,7 +480,6 @@ export default class FormGenerator {
         const itemId = `form-array-item-${fieldPath.replace(/\./g, '-')}-${index}`;
         itemContainer.id = itemId;
         // Header wrapper containing title separator and actions on one line
-        const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
         const headerWrap = document.createElement('div');
         headerWrap.className = 'form-ui-array-item-header';
         const itemTitleSep = document.createElement('div');

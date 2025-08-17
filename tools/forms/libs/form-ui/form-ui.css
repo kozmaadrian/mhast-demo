@@ -1,7 +1,7 @@
 /* Inline text separator style used for group titles and array item titles */
 .form-ui-separator-text {
   position: relative;
-  margin: 24px 0 12px;
+  margin: 0 0 12px 0;
   height: 32px;
 }
 
@@ -51,36 +51,38 @@
 
 .form-ui-array-item-header>.form-ui-separator-text {
   display: block;
-  margin-top: 16px;
+  margin-top: 0px;
 }
 
 /* Array controls */
 .form-ui-array-container {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .form-ui-array-add {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin: 12px 0;
+  margin-bottom: 12px;
   padding: 6px 10px;
-  background: var(--form-ui-btn-bg, #f6f7f9);
-  color: var(--form-ui-btn-fg, #333);
-  border: 1px solid var(--form-ui-btn-border, #d0d7de);
-  border-radius: 6px;
+  background: transparent;
+  color: #374151;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
   cursor: pointer;
+  align-self: center;
 }
 
 .form-ui-array-add:hover {
-  background: #eef1f4;
+  background: transparent;
 }
 
 .form-ui-array-item {
   position: relative;
   border: none;
   border-radius: 6px;
-  padding: 12px 8px 12px;
 }
 
 .form-ui-array-item .form-ui-array-item-actions {
@@ -907,7 +909,8 @@
   border-radius: 8px;
   padding: 16px;
   background: #f9fafb;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
 }
 
 .form-ui-array-items {
@@ -929,7 +932,6 @@
   flex: 1;
 }
 
-.form-ui-array-add,
 .form-ui-array-remove {
   background: #3b82f6;
   color: white;
@@ -951,8 +953,8 @@
 }
 
 .form-ui-array-add:hover {
-  background: #2563eb;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  background: transparent;
+  box-shadow: none;
 }
 
 .form-ui-array-remove:hover {
