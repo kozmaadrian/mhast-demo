@@ -99,32 +99,12 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
 
   // Auto-float sidebar when it would be outside the viewport (keeps nav and blue marker visible)
-  let isAutoFloating = false;
-  const ensureSidebarVisibility = () => {
-    // Skip when user explicitly fixed sidebar inline
-    const rect = sideEl.getBoundingClientRect();
-    const offscreenRight = rect.left >= window.innerWidth - 8;
-    const offscreenLeft = rect.right <= 8;
-    const shouldFloat = offscreenRight || offscreenLeft;
-    if (shouldFloat && !isAutoFloating) {
-      // Switch to floating fixed panel
-      sideEl.classList.remove('form-inline-panel');
-      sideEl.classList.add('floating-panel');
-      isAutoFloating = true;
-    } else if (!shouldFloat && isAutoFloating) {
-      // Restore inline panel
-      sideEl.classList.remove('floating-panel');
-      sideEl.classList.add('form-inline-panel');
-      isAutoFloating = false;
-    }
-  };
+  // Disabled: keep sidebar inline/sticky so it does not move past form
+  const ensureSidebarVisibility = () => {};
 
   // Listen to scroll/resize to keep panel visible
-  const onScrollOrResize = () => {
-    requestAnimationFrame(ensureSidebarVisibility);
-  };
-  window.addEventListener('scroll', onScrollOrResize, { passive: true });
-  window.addEventListener('resize', onScrollOrResize, { passive: true });
+  const onScrollOrResize = () => {};
+  // Auto-floating suppressed
   // Initial check
   ensureSidebarVisibility();
 
@@ -165,41 +145,19 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
   // Reset handler
   sidebar.onResetHandler(() => {
-    const btn = sideEl.querySelector('.form-ui-reset');
-    if (!btn) return;
-    // confirm pattern like remove: toggle a confirm-state briefly
-    if (btn.classList.contains('confirm-state')) {
-      // confirmed → perform reset
-      if (btn.dataset.confirmTimeoutId) {
-        clearTimeout(Number(btn.dataset.confirmTimeoutId));
-        delete btn.dataset.confirmTimeoutId;
-      }
-      btn.classList.remove('confirm-state');
-      // Reset data to base structure depending on renderAllGroups
-      const base = generator.renderAllGroups
-        ? generator.generateBaseJSON(generator.schema)
-        : generator.model.generateBaseJSON(generator.schema);
-      generator.data = base;
-      generator.activeOptionalGroups = new Set();
-      // Rebuild everything from data/schema
-      generator.rebuildBody();
-      if (generator.navigationTree) {
-        generator.navigation.generateNavigationTree();
-      }
-      generator.validation.validateAllFields();
-      if (typeof onChange === 'function') onChange(generator.data);
-      if (isRawMode) {
-        codeEl.textContent = generator.getDataAsJSON();
-      }
-      return;
+    // Confirmation UI is handled by components/sidebar.js; this is the confirmed action
+    const base = generator.renderAllGroups
+      ? generator.generateBaseJSON(generator.schema)
+      : generator.model.generateBaseJSON(generator.schema);
+    generator.data = base;
+    generator.activeOptionalGroups = new Set();
+    generator.rebuildBody();
+    if (generator.navigationTree) {
+      generator.navigation.generateNavigationTree();
     }
-    // First click → enter confirm state
-    btn.classList.add('confirm-state');
-    const timeout = setTimeout(() => {
-      btn.classList.remove('confirm-state');
-      delete btn.dataset.confirmTimeoutId;
-    }, 3000);
-    btn.dataset.confirmTimeoutId = String(timeout);
+    generator.validation.validateAllFields();
+    if (typeof onChange === 'function') onChange(generator.data);
+    if (isRawMode) codeEl.textContent = generator.getDataAsJSON();
   });
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
@@ -260,8 +218,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   function navigateTo(groupId) { generator.navigation.navigateToGroup(groupId); }
   function getData() { return generator.data; }
   function destroy() {
-    window.removeEventListener('scroll', onScrollOrResize);
-    window.removeEventListener('resize', onScrollOrResize);
+    // listeners were not added due to disabled auto-float
     generator.destroy();
     wrapper.remove();
     sidebar.destroy();

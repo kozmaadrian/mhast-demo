@@ -98,6 +98,26 @@ export default class FormSidebar {
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         if (this.onReset) {
+          // Visual confirm state toggle similar to remove buttons
+          if (!resetBtn.classList.contains('confirm-state')) {
+            resetBtn.classList.add('confirm-state');
+            // swap icon to a check
+            resetBtn.innerHTML = '✓';
+            const timeout = setTimeout(() => {
+              resetBtn.classList.remove('confirm-state');
+              resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
+              delete resetBtn.dataset.confirmTimeoutId;
+            }, 3000);
+            resetBtn.dataset.confirmTimeoutId = String(timeout);
+            return;
+          }
+          // confirmed: execute handler
+          if (resetBtn.dataset.confirmTimeoutId) {
+            clearTimeout(Number(resetBtn.dataset.confirmTimeoutId));
+            delete resetBtn.dataset.confirmTimeoutId;
+          }
+          resetBtn.classList.remove('confirm-state');
+          resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
           this.onReset();
         }
       });
