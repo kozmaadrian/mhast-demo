@@ -39,7 +39,7 @@ flowchart LR
 
 - Core: orchestration and rendering pipeline
   - `core/form-nodeview.js`: ProseMirror integration; parses `{ schema, data }`, mounts via the factory, serializes back to the document. It no longer creates or manages the sidebar directly.
-  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API.
+  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API. Supports UI options (see Factory API).
   - `core/form-generator.js`: orchestrates schema→DOM, data updates, and hooks features.
   - `core/form-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
   - `core/input-factory.js`: creates inputs for schema types and attaches standard events.
@@ -47,7 +47,7 @@ flowchart LR
   - `core/highlight-overlay.js`: renders the blue vertical overlay for highlighted groups.
 
 - Features: pluggable behaviors with no DOM structure ownership
-  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar.
+  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs.
   - `features/validation.js`: inline field validation + sidebar error markers (JSON‑Schema style checks).
 
 - Components: reusable UI widgets
@@ -75,8 +75,8 @@ flowchart LR
    - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` at the property position.
    - `InputFactory` creates controls and wires input/change/focus/blur to update data, validate, and highlight group.
    - `FormModel` maintains data shape and nested setting logic.
-   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items.
-   - `Validation.validateAllFields()` runs once post-render so required/invalid states are visible on load.
+   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items. It includes nested object children under array items.
+   - `Validation.validateAllFields()` runs after render and nav rebuild so required/invalid states are visible on load. It also runs after optional group activation and after array‑item add.
 
 4) Sync back to ProseMirror
    - On any change, `FormGenerator` emits new `data` → `FormNodeView` replaces the code_block text with `{ schema, data }` JSON.
@@ -84,7 +84,10 @@ flowchart LR
 
 ### DOM contract (stable IDs/classes)
 
-- Group IDs: `form-group-<path.with.dots>` → hyphenated (e.g. `pricing.bulkPricing.tier1` → `form-group-pricing-bulkPricing-tier1`).
+- Group IDs: `form-group-<path>` where the path uses dot/bracket notation normalized by replacing any `[`, `]`, and `.` with `-`.
+  - Examples:
+    - Object: `pricing.bulkPricing.tier1` → `form-group-pricing-bulkPricing-tier1`
+    - Array item: `tutorialList[0].link` → `form-group-tutorialList-0--link`
 - Section IDs: `form-section-<path.with.dots>`.
 - Field container carries `data-field-path` with the dot path.
 - Sidebar nav items mirror these IDs via `data-group-id` and carry `data-level` for indentation.
@@ -112,7 +115,7 @@ flowchart LR
   - Primitive child properties are not individually listed in the nav; they belong to the parent group.
   - For each child property in order:
     - Optional inactive `$ref` or arrays-of-objects: render an in-place, indented “Add <Title>” item with `data-group-id="form-optional-…"`.
-    - Active arrays-of-objects: render a clickable group item (`data-group-id="form-group-…"`).
+    - Active arrays-of-objects: render a clickable group item (`data-group-id="form-group-…"`), then one item per existing array entry. For each array item, nested object children (e.g., `link`, `dataRef`, `questionnaire`) are included under the item.
     - Object types: if they have no primitives but have children, render a section header (`form-section-…`) at the same indentation; then recurse into children.
 - Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
 - Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
@@ -124,12 +127,25 @@ flowchart LR
 3) `FormGenerator.onActivateOptionalGroup(path, schemaNode)` is called:
    - Adds `path` to `activeOptionalGroups`.
    - Seeds `data` at the path with a base value derived from the node type:
-     - Object → `FormModel.generateBaseJSON(node)` ensures all child arrays are present as `[]`.
+     - Object → a base object tree under that path. When `renderAllGroups` is true, all nested optional objects and arrays are present; arrays are initialized as `[]`.
      - Array → `[]` (empty array); the UI will immediately add the first item if the property is an array of objects.
    - Emits the updated `data` to subscribers.
    - Calls `rebuildBody()` which clears and rebuilds the form body inline, remaps groups/fields, restores data values, revalidates, and regenerates the navigation.
 4) If the activated node is an array-of-objects, the handler emulates one click on the array’s “add item” control to pre-create the first item.
-5) Finally, navigation is regenerated and the UI scrolls to the newly created group.
+5) Finally, navigation is regenerated, validation runs on the next frame to mark required fields, and the UI scrolls to the newly created group.
+
+### Rendering strategy: renderAllGroups
+
+- The mount factory accepts `ui.renderAllGroups: boolean` to control optional group rendering and base data shaping.
+  - When `false` (default):
+    - Optional object/array groups do not render until activated via the sidebar.
+    - Base data includes required object subtrees and always includes array keys as `[]`.
+    - Validation runs after activation/array item add to flag required fields immediately.
+  - When `true`:
+    - All optional object/array groups render recursively in content by default.
+    - Base data includes all nested objects and arrays present in the schema (arrays initialized to `[]`).
+    - Required arrays-of-objects auto-add a first item in the UI.
+    - Navigation lists nested object children under array items.
 
 ### State tracking (form content and sidebar)
 
@@ -146,7 +162,7 @@ flowchart LR
 
 ### Arrays (multi-value fields)
 
-- Array fields always exist in the JSON (`[]`) even when empty.
+- Array fields always exist in the JSON (`[]`) even when empty. With `renderAllGroups: true`, optional arrays are also present as empty arrays by default.
 - Inputs inside array items are named using bracketed indices (e.g., `tutorialList[0].title`) so `updateData()` can map them back correctly.
 - Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
 - Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container.
@@ -156,7 +172,7 @@ flowchart LR
 ### Positioning and visuals (CSS)
 
 - Sidebar tabs remain a fixed vertical strip; expanding opens the content panel to the right.
-- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin technique). The factory also auto-switches the panel between inline and floating when it would be off-screen, to keep navigation and the blue marker visible.
+- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin technique). The panel’s main area limits height and enables internal scrolling for the navigation tree. The factory also auto-switches the panel between inline and floating when it would be off-screen, to keep navigation and the blue marker visible.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
 
@@ -242,6 +258,11 @@ const api = mountFormUI({
   data,         // initial data object
   onChange,     // (data) => void, called on every change
   onRemove,     // () => void, called when delete confirmed
+  ui: {
+    showRemove: true,        // hides remove button when false (also supported as legacy top-level showRemove)
+    fixedSidebar: false,     // when true, sidebar stays expanded inline (no collapse control)
+    renderAllGroups: false,  // when true, render optional object/array groups recursively and include arrays as [] in base data
+  },
 });
 
 api.updateData(next);            // replace form data

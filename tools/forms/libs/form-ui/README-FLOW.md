@@ -9,6 +9,7 @@ This document explains the runtime flows, class dependencies, responsibilities, 
 - Optional group activation (“+ Add …”)
 - Validation and error badges
 - Raw JSON mode
+- Rendering strategy: `renderAllGroups`
 
 ### Module dependencies (high level)
 
@@ -43,7 +44,7 @@ flowchart LR
 
 - FormNodeView: `schema`, `data` (source-of-truth for ProseMirror content when serializing), `isRawMode` (when no schema). Delegates UI to the mount factory.
 - mountFormUI (factory): `isRawMode` (view mode for the mounted form). Owns DOM wrapper and sidebar placement. Exposes API: `updateData`, `updateSchema`, `toggleRawMode`, `navigateTo`, `getData`, `destroy`.
-- FormGenerator: `schema`, `model` (FormModel), `data`, `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `activeOptionalGroups`, `inputFactory`, `groupBuilder`, `highlightOverlay`.
+- FormGenerator: `schema`, `model` (FormModel), `data`, `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `activeOptionalGroups`, `inputFactory`, `groupBuilder`, `highlightOverlay`, `renderAllGroups`.
 - FormModel: `schema`; data helpers only (pure): `generateBaseJSON`, `get/ setNestedValue`, `deepMerge`, `getInputValue`.
 - FormSidebar: `element`, `navigationTree`, `isCollapsed`, `currentMode`.
 - Navigation (feature): depends on `FormGenerator`; no persistent state outside event handlers.
@@ -61,7 +62,7 @@ flowchart LR
 
 2) mountFormUI
    - Creates wrapper and host elements; creates `<pre><code>` for raw view
-   - `generator = new FormGenerator(schema)` → `generateForm()` → returns container
+   - `generator = new FormGenerator(schema, { renderAllGroups })` → `generateForm()` → returns container
    - Appends code `<pre><code>` to the form container
    - Creates `sidebar = new FormSidebar()` and inserts inline under header
    - Wires mode toggle, remove, and navigation clicks to generator/navigation
@@ -73,7 +74,7 @@ flowchart LR
    - Builds header, body, footer
    - `GroupBuilder.build(root)` creates groups/sections and maps `groupElements`
    - Attaches `HighlightOverlay`
-   - After a tick: `navigation.mapFieldsToGroups()`, `ensureGroupRegistry()`, `validation.validateAllFields()`, then `updateData()` emits initial data
+   - After a tick: `navigation.mapFieldsToGroups()`, `ensureGroupRegistry()`, `navigation.generateNavigationTree()`, `validation.validateAllFields()`, then `updateData()` emits initial data
    - State: `data`, `groupElements`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `fieldErrors`
 
 Stacktrace (key calls):
@@ -86,10 +87,11 @@ Stacktrace (key calls):
 1) mountFormUI creates `FormSidebar` and inserts it inline under the header
 2) generator.navigationTree = sidebar.getNavigationTree()
 3) requestAnimationFrame → `Navigation.generateNavigationTree()`
-   - Builds items by mirroring schema order with `Navigation.generateNavigationItems()`
+   - Builds items by mirroring schema order with `Navigation.generateNavigationItems()` (includes nested object children under array items)
    - Adds section titles, Add-items for inactive optional `$ref`/array groups, and group items
    - Calls `Validation.refreshNavigationErrorMarkers()`
    - Enables hover and scroll sync
+   - The inline sidebar panel limits height and enables internal scrolling for large trees
 
 Stacktrace:
 - mountFormUI → sidebar.createElement → assign `navigationTree` → Navigation.generateNavigationTree → Navigation.generateNavigationItems → Validation.refreshNavigationErrorMarkers
@@ -148,11 +150,12 @@ State involved:
    - Derives schema path from `data-group-id="form-optional-…"`, resolves node from root schema
    - Calls `FormGenerator.onActivateOptionalGroup(path, node)`
      - Adds to `activeOptionalGroups`
-     - Seeds `data` at path (`{}` via `FormModel.generateBaseJSON` for object, or `[]` for array)
+     - Seeds `data` at path (`{}` via base generation for object — includes arrays as [] — or `[]` for array)
      - Notifies listeners
      - Calls `rebuildBody()` → clears maps, rebuilds body via `GroupBuilder.buildInline()`
-       - Re-attaches overlay, remaps fields to groups, restores data into fields, regenerates navigation, revalidates
+       - Re-attaches overlay, remaps fields to groups, restores data into fields, regenerates navigation, revalidates (post-nav)
      - If the node is an array-of-objects: emulates one click on the array’s add button to create the first item
+     - Schedules a validation pass on the next animation frame to mark required fields in the newly added UI
 
 Stacktrace:
 - Sidebar click → Navigation.onTreeClick → FormGenerator.onActivateOptionalGroup → FormGenerator.rebuildBody → GroupBuilder.buildInline → Navigation.mapFieldsToGroups → FormGenerator.ensureGroupRegistry → FormGenerator.loadData → Navigation.generateNavigationTree → Validation.validateAllFields
@@ -164,12 +167,15 @@ State involved:
 
 ## Flow: Validation and error badges
 
-1) Initial pass after render
+1) Initial pass after render & navigation
    - `Validation.validateAllFields()` iterates `fieldSchemas` and `fieldElements`, sets inline errors and populates `fieldErrors`
    - `refreshNavigationErrorMarkers()` marks nav items with `.has-error` and inserts an error triangle icon
 
 2) On every field change or blur
    - `Validation.validateField()` sets/clears inline error and updates `fieldErrors`, then refreshes nav markers (unless skipped during batch)
+
+3) After activation or array item add
+   - A validation pass is scheduled on the next animation frame so required newly created inputs are marked immediately
 
 Stacktrace:
 - After render → Validation.validateAllFields → Validation.setFieldError → Validation.refreshNavigationErrorMarkers
@@ -202,6 +208,21 @@ State involved:
 ## Notes on arrays
 
 - Arrays of primitives: created via `InputFactory.createArrayInput()`; each item is an input with add/remove controls.
-- Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group.
+- Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group. Nested object children within an array item are listed under the item in the sidebar.
+
+---
+
+## Rendering strategy: `renderAllGroups`
+
+- `renderAllGroups: false` (default)
+  - Optional object/array groups are not rendered until activated via the sidebar.
+  - Base data includes required object subtrees and always includes array keys as `[]`.
+  - After activation and after array-item add, validation runs post-nav to flag required fields.
+
+- `renderAllGroups: true`
+  - All optional object/array groups render recursively by default.
+  - Base data includes all nested objects and arrays present in the schema (arrays initialized to `[]`).
+  - Required arrays-of-objects auto-add a first item.
+  - The sidebar includes nested object children under array items.
 
 
