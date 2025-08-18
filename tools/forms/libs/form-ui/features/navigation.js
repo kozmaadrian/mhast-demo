@@ -153,41 +153,43 @@ export default class FormNavigation {
     // (handled by delegated onTreeClick using data-group-id)
   }
 
-  /**
+    /**
    * When hovering a form group in content, move the sidebar indicator to that item.
    */
-  enableHoverSync() {
-    if (!this.formGenerator.container || !this.formGenerator.navigationTree) return;
-
-    const groups = this.formGenerator.container.querySelectorAll('.form-ui-group, .form-ui-array-item[id]');
-    const handleMouseEnter = (e) => {
-      const group = e.currentTarget;
-      const groupId = group.id;
-      if (!groupId) return;
-      // Update nav indicator to hovered group without changing persistent active state
-      this.updateNavigationActiveState(groupId);
-    };
-
-    groups.forEach((g) => {
-      g.removeEventListener('mouseenter', handleMouseEnter);
-      g.addEventListener('mouseenter', handleMouseEnter);
-    });
-
-    // Clicking anywhere in a group should also activate its nav item
-    const handleGroupClick = (e) => {
-      const group = e.currentTarget;
-      const groupId = group.id;
-      if (!groupId) return;
-      // Highlight the form group and set as active
-      this.formGenerator.highlightFormGroup(groupId);
-      this.updateActiveGroup(groupId);
-    };
-
-    groups.forEach((g) => {
-      g.removeEventListener('click', handleGroupClick);
-      g.addEventListener('click', handleGroupClick);
-    });
-  }
+    enableHoverSync() {
+      if (!this.formGenerator.container || !this.formGenerator.navigationTree) return;
+  
+      const groups = this.formGenerator.container.querySelectorAll('.form-ui-group, .form-ui-array-item[id]');
+      const handleMouseEnter = (e) => {
+        const group = e.currentTarget;
+        const groupId = group.id;
+        if (!groupId) return;
+        // Update nav indicator to hovered group without changing persistent active state
+        this.updateNavigationActiveState(groupId);
+      };
+  
+      groups.forEach((g) => {
+        g.removeEventListener('mouseenter', handleMouseEnter);
+        g.addEventListener('mouseenter', handleMouseEnter);
+      });
+  
+      // Delegated click handler on the form body to avoid bubbling through ancestor groups
+      const bodyEl = this.formGenerator.container.querySelector('.form-ui-body') || this.formGenerator.container;
+  
+      if (this._onContentClick) {
+        bodyEl.removeEventListener('click', this._onContentClick);
+      }
+      this._onContentClick = (e) => {
+        const clickedGroup = e.target.closest('.form-ui-group, .form-ui-array-item[id]');
+        if (!clickedGroup) return;
+        const groupId = clickedGroup.id;
+        if (!groupId) return;
+        // Highlight the innermost clicked group and set as active
+        this.formGenerator.highlightFormGroup(groupId);
+        this.updateActiveGroup(groupId);
+      };
+      bodyEl.addEventListener('click', this._onContentClick);
+    }
 
   /**
    * Keep sidebar indicator in sync with scroll position (scrollspy)
