@@ -60,21 +60,21 @@ export default class FormGenerator {
       derefNode: this.derefNode.bind(this),
       getArrayValue: (path) => this.model.getNestedValue(this.data, path),
       onArrayAdd: (path, propSchema) => {
-        // Data-first add for primitive arrays
-        this.updateData();
+        // Use centralized command for primitive arrays
         const itemSchema = this.derefNode(propSchema.items) || propSchema.items || { type: 'string' };
+        // Determine default by type
         let defaultValue = '';
-        if (itemSchema.type === 'number' || itemSchema.type === 'integer') defaultValue = 0;
-        if (itemSchema.type === 'boolean') defaultValue = false;
+        const type = Array.isArray(itemSchema.type) ? (itemSchema.type.find((t) => t !== 'null') || itemSchema.type[0]) : itemSchema.type;
+        if (type === 'number' || type === 'integer') defaultValue = 0;
+        if (type === 'boolean') defaultValue = false;
+        this.updateData();
         this.model.pushArrayItem(this.data, path, defaultValue);
         this.rebuildBody();
         requestAnimationFrame(() => this.validation.validateAllFields());
       },
-      onArrayRemove: (path, index, propSchema) => {
-        // Data-first remove for primitive arrays
-        this.updateData();
-        this.model.removeArrayItem(this.data, path, index);
-        this.rebuildBody();
+      onArrayRemove: (path, index) => {
+        // Use centralized command for primitive arrays
+        this.commandRemoveArrayItem(path, index);
         requestAnimationFrame(() => this.validation.validateAllFields());
       },
     });
@@ -837,6 +837,20 @@ export default class FormGenerator {
   commandRemoveArrayItem(arrayPath, index) {
     this.updateData();
     this.model.removeArrayItem(this.data, arrayPath, index);
+    this.rebuildBody();
+    this.validation.validateAllFields();
+  }
+
+  commandReorderArrayItem(arrayPath, fromIndex, toIndex) {
+    this.reorderArrayItem(arrayPath, fromIndex, toIndex);
+  }
+
+  commandResetAll() {
+    const base = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
+    this.data = base;
+    this.activeOptionalGroups = new Set();
     this.rebuildBody();
     this.validation.validateAllFields();
   }
