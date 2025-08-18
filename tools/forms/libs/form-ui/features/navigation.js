@@ -619,74 +619,26 @@ export default class FormNavigation {
     if (navItem.classList.contains('form-ui-nav-item-add')) {
       // Activate corresponding optional group directly from schema path
       const path = navItem.dataset.path || groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
-      // Persist any in-progress edits before mutating data
-      this.formGenerator.updateData();
       try {
         // Debug logs for activation
         // eslint-disable-next-line no-console
         console.log('[NAV][ADD] Clicked +Add in sidebar', { groupId, path, navItem });
       } catch { /* noop */ }
-      const resolveSchemaByPath = (rootSchema, dottedPath) => {
-        const tokens = dottedPath.split('.');
-        let current = rootSchema;
-        for (const token of tokens) {
-          const normalized = this.formGenerator.normalizeSchema(current);
-          if (!normalized) return null;
-          const match = token.match(/^([^\[]+)(?:\[(\d+)\])?$/);
-          const key = match ? match[1] : token;
-          // descend into property
-          current = normalized?.properties?.[key];
-          if (!current) return null;
-          // if an index is present, descend into array items schema
-          const idxPresent = match && typeof match[2] !== 'undefined';
-          if (idxPresent) {
-            const curNorm = this.formGenerator.normalizeSchema(current);
-            if (!curNorm || curNorm.type !== 'array') return null;
-            current = this.formGenerator.derefNode(curNorm.items) || curNorm.items;
-            if (!current) return null;
-          }
+      // Use centralized command to activate; it will auto-add first array item if empty
+      this.formGenerator.commandActivateOptional(path);
+      // After activation, navigate accordingly
+      requestAnimationFrame(() => {
+        const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
+        if (Array.isArray(value) && value.length > 0) {
+          const id = this.formGenerator.arrayItemId(path, 0);
+          const el = this.formGenerator.container?.querySelector?.(`#${id}`);
+          if (el && el.id) this.navigateToGroup(el.id);
+        } else {
+          const gid = this.formGenerator.pathToGroupId(path);
+          this.navigateToGroup(gid);
         }
-        return current;
-      };
-      const node = resolveSchemaByPath(this.formGenerator.schema, path);
-      try {
-        // eslint-disable-next-line no-console
-        console.log('[NAV][ADD] Resolved schema node', { path, nodeType: this.formGenerator.normalizeSchema(node)?.type });
-      } catch { /* noop */ }
-      if (node) {
-        this.formGenerator.onActivateOptionalGroup(path, node);
-        const normalized = this.formGenerator.normalizeSchema(node);
-        if (normalized && normalized.type === 'array') {
-          // Auto-add first item on activation if empty (data-first)
-          const itemsSchema = this.formGenerator.derefNode(normalized.items) || normalized.items || {};
-          // Persist any in-progress edits
-          this.formGenerator.updateData();
-          let arr = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
-          if (!Array.isArray(arr)) arr = [];
-          if (arr.length === 0) {
-            const baseItem = this.formGenerator.createDefaultObjectFromSchema(itemsSchema);
-            this.formGenerator.model.pushArrayItem(this.formGenerator.data, path, baseItem);
-            this.formGenerator.rebuildBody();
-            requestAnimationFrame(() => {
-              const itemId = this.formGenerator.arrayItemId(path, 0);
-              const el = this.formGenerator.container?.querySelector?.(`#${itemId}`);
-              if (el && el.id) this.navigateToGroup(el.id);
-              this.formGenerator.validation.validateAllFields();
-            });
-            return;
-          }
-          // If not empty, just navigate to the array group
-          const newGroupId = this.formGenerator.pathToGroupId(path);
-          requestAnimationFrame(() => {
-            this.navigateToGroup(newGroupId);
-            this.formGenerator.validation.validateAllFields();
-          });
-          return;
-        }
-        // Non-array activation: rebuild already happened in onActivateOptionalGroup
-        const newGroupId = this.formGenerator.pathToGroupId(path);
-        requestAnimationFrame(() => this.navigateToGroup(newGroupId));
-      }
+        this.formGenerator.validation.validateAllFields();
+      });
       return;
     }
     try { console.log('[NAV][GOTO]', { groupId }); } catch {}
