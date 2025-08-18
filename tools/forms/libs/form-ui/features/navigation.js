@@ -440,8 +440,9 @@ export default class FormNavigation {
 
               const childPath = `${nestedPath}[${idx}].${childKey}`;
               const childOptional = !itemRequired.has(childKey);
-              const childActive = this.formGenerator.renderAllGroups
-                || !childOptional
+              // Inside array items, do NOT auto-activate optional objects based on renderAllGroups.
+              // Only show when required or explicitly active (data present or toggled).
+              const childActive = (!childOptional)
                 || this.formGenerator.isOptionalGroupActive(childPath);
 
               if (!childActive) {
