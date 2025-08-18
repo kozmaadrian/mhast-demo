@@ -638,10 +638,8 @@ export default class FormGenerator {
               clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
               delete removeButton.dataset.confirmTimeoutId;
             }
-            // Data-first removal and full rebuild
-            this.updateData();
-            this.model.removeArrayItem(this.data, fieldPath, index);
-            this.rebuildBody();
+            // Use centralized command and rebuild
+            this.commandRemoveArrayItem(fieldPath, index);
             requestAnimationFrame(() => this.validation.validateAllFields());
           } else {
             const originalHTML = removeButton.innerHTML;
@@ -672,23 +670,16 @@ export default class FormGenerator {
       addButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        // Data-first add: mutate data and rebuild
-        this.updateData();
-        const newItem = this.createDefaultObjectFromSchema(normItemsSchema);
-        this.model.pushArrayItem(this.data, fieldPath, newItem);
-        const newIndex = (this.model.getNestedValue(this.data, fieldPath) || []).length - 1;
-        this.rebuildBody();
-        // Refresh navigation and validate
-        if (this.navigationTree) {
-          this.navigation.generateNavigationTree();
-        }
-        requestAnimationFrame(() => this.validation.validateAllFields());
-        // Navigate to the newly added item
+        // Centralized add
+        this.commandAddArrayItem(fieldPath);
+        // Navigate to the newly added item after rebuild
         requestAnimationFrame(() => {
-          const hyphen = fieldPath.replace(/[.\[\]]/g, '-');
-          const targetId = `form-array-item-${hyphen}-${newIndex}`;
+          const arr = this.model.getNestedValue(this.data, fieldPath) || [];
+          const newIndex = Math.max(0, arr.length - 1);
+          const targetId = this.arrayItemId(fieldPath, newIndex);
           const el = this.container?.querySelector?.(`#${targetId}`);
           if (el && el.id) this.navigation.navigateToGroup(el.id);
+          this.validation.validateAllFields();
         });
       });
       addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
