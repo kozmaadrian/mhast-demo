@@ -124,10 +124,7 @@ export default class FormGenerator {
    * Handler when user activates an optional object via "+ Add" button
    */
   onActivateOptionalGroup(path, schema) {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[GEN][ACTIVATE] Optional group activation requested', { path, schemaType: this.normalizeSchema(schema)?.type });
-    } catch { /* noop */ }
+    
     // Mark path as active to include it in navigation
     this.activeOptionalGroups.add(path);
     // Ensure nested path exists in current data
@@ -142,18 +139,12 @@ export default class FormGenerator {
         baseValue = [];
       }
     }
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[GEN][ACTIVATE] Setting base value at path', { path, baseValue });
-    } catch { /* noop */ }
+    
     this.setNestedValue(this.data, path, baseValue);
     // Notify listeners for data change
     this.listeners.forEach((listener) => listener(this.data));
     // Rebuild the form body to materialize the newly activated group
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[GEN][ACTIVATE] Rebuilding body after activation', { path });
-    } catch { /* noop */ }
+    
     this.rebuildBody();
   }
 

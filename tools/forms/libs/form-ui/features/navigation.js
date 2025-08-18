@@ -395,7 +395,7 @@ export default class FormNavigation {
         // Child items: one entry per existing array item in the form
         const dataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, nestedPath) || [];
         if (Array.isArray(dataArray)) {
-          try { console.log('[NAV][BUILD] Listing array items (data-driven)', { path: nestedPath, count: dataArray.length }); } catch {}
+          
           dataArray.forEach((_, idx) => {
             // Each item gets a child nav node with its own anchor to the item container
             const itemNav = document.createElement('div');
@@ -488,7 +488,7 @@ export default class FormNavigation {
               // Add entries for each nested array item (data-driven)
               const childDataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, childPath) || [];
               if (Array.isArray(childDataArray)) {
-                try { console.log('[NAV][BUILD] Listing nested array items (data-driven)', { path: childPath, count: childDataArray.length }); } catch {}
+                
                 childDataArray.forEach((_, cidx) => {
                   const childItemNav = document.createElement('div');
                   childItemNav.className = 'form-ui-nav-item';
@@ -606,24 +606,13 @@ export default class FormNavigation {
     if (!navItem) return;
     e.preventDefault();
     e.stopPropagation();
-    try {
-      console.log('[NAV][CLICK]', {
-        classList: Array.from(navItem.classList),
-        groupId: navItem.dataset.groupId,
-        path: navItem.dataset.path,
-        targetTag: e.target.tagName,
-      });
-    } catch {}
+    
     const { groupId } = navItem.dataset;
     if (!groupId) return;
     if (navItem.classList.contains('form-ui-nav-item-add')) {
       // Activate corresponding optional group directly from schema path
       const path = navItem.dataset.path || groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
-      try {
-        // Debug logs for activation
-        // eslint-disable-next-line no-console
-        console.log('[NAV][ADD] Clicked +Add in sidebar', { groupId, path, navItem });
-      } catch { /* noop */ }
+      
       // Use centralized command to activate; it will auto-add first array item if empty
       this.formGenerator.commandActivateOptional(path);
       // After activation, navigate accordingly
@@ -641,7 +630,7 @@ export default class FormNavigation {
       });
       return;
     }
-    try { console.log('[NAV][GOTO]', { groupId }); } catch {}
+    
     this.navigateToGroup(groupId);
   }
 
