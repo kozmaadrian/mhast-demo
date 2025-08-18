@@ -174,7 +174,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   requestAnimationFrame(() => generator.navigation.generateNavigationTree());
 
   // Initial data
-  if (data) generator.loadData(data);
+  if (data) {
+    generator.loadData(data);
+    // Rebuild so optional groups present in incoming data are materialized
+    generator.rebuildBody();
+  }
   // Ensure initial badge text
   updateModeBadge();
 
