@@ -39,7 +39,7 @@ flowchart LR
 
 - Core: orchestration and rendering pipeline
   - `core/form-nodeview.js`: ProseMirror integration; parses `{ schema, data }`, mounts via the factory, serializes back to the document. It no longer creates or manages the sidebar directly.
-  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API.
+  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API. Supports UI options (see Factory API).
   - `core/form-generator.js`: orchestrates schema→DOM, data updates, and hooks features.
   - `core/form-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
   - `core/input-factory.js`: creates inputs for schema types and attaches standard events.
@@ -47,7 +47,7 @@ flowchart LR
   - `core/highlight-overlay.js`: renders the blue vertical overlay for highlighted groups.
 
 - Features: pluggable behaviors with no DOM structure ownership
-  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar.
+  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs.
   - `features/validation.js`: inline field validation + sidebar error markers (JSON‑Schema style checks).
 
 - Components: reusable UI widgets
@@ -66,32 +66,113 @@ flowchart LR
 
 2) Create UI
    - `FormNodeView` calls the factory `mountFormUI({ mount, schema, data, onChange, onRemove })`.
-   - The factory builds `FormGenerator` and `FormSidebar`, inserts the panel inline under the header, wires nav/tabs, and manages raw JSON mode.
+   - The factory builds `FormGenerator` and `FormSidebar`, inserts the panel inline under the header, wires nav/tabs, and manages raw/form mode.
    - The `<pre><code>` raw JSON node lives inside the container and is toggled by the factory.
 
 3) Generate DOM from schema in `FormGenerator`
-   - `GroupBuilder` splits objects into groups (primitives) and sections (containers without primitives).
+   - Initial render: `generateForm()` uses `GroupBuilder.build()` to create groups (with primitive fields) and sections (containers without primitives).
+   - Dynamic updates: `rebuildBody()` uses `GroupBuilder.buildInline()` to rebuild the body in-place (e.g., after activating optional `$ref`/array groups), preserving schema order.
+   - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` at the property position.
    - `InputFactory` creates controls and wires input/change/focus/blur to update data, validate, and highlight group.
    - `FormModel` maintains data shape and nested setting logic.
-   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar.
-   - `Validation.validateAllFields()` runs once post-render so required/invalid states are visible on load.
+   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items. It includes nested object children under array items.
+   - `Validation.validateAllFields()` runs after render and nav rebuild so required/invalid states are visible on load. It also runs after optional group activation and after array‑item add.
 
 4) Sync back to ProseMirror
    - On any change, `FormGenerator` emits new `data` → `FormNodeView` replaces the code_block text with `{ schema, data }` JSON.
-   - Raw JSON mode is toggled by the factory; on switch back it parses JSON and updates the form.
+   - Raw JSON mode is toggled by the factory and is inspect‑only; switching back does not parse JSON into the form.
 
 ### DOM contract (stable IDs/classes)
 
-- Group IDs: `form-group-<path.with.dots>` → hyphenated (e.g. `pricing.bulkPricing.tier1` → `form-group-pricing-bulkPricing-tier1`).
+- Group IDs: `form-group-<path>` where the path uses dot/bracket notation normalized by replacing any `[`, `]`, and `.` with `-`.
+  - Examples:
+    - Object: `pricing.bulkPricing.tier1` → `form-group-pricing-bulkPricing-tier1`
+    - Array item: `tutorialList[0].link` → `form-group-tutorialList-0--link`
 - Section IDs: `form-section-<path.with.dots>`.
 - Field container carries `data-field-path` with the dot path.
 - Sidebar nav items mirror these IDs via `data-group-id` and carry `data-level` for indentation.
 - All CSS in `form-ui.css` relies on the above; the implementation maintains exact markup/class names.
 
+### `$ref`/`$defs` resolution (on-demand)
+
+- The generator performs shallow, on-demand dereferencing via `FormGenerator.derefNode(node)`.
+- Only local `$ref` paths (e.g. `#/$defs/...`) are resolved when the node is accessed. The full schema is not pre-expanded to avoid deep recursion and stack overflows.
+- `normalizeSchema()` is used wherever node access occurs to ensure unions and `$ref` are dereferenced just enough for rendering/typing decisions.
+
+### How content is built (inline, ordered)
+
+- `GroupBuilder.buildInline(container, schema, breadcrumbPath, schemaPath)` renders children in the exact order of `schema.properties`.
+- For each property:
+  - Primitive types render as fields inside the current group container.
+  - Object types render as nested groups inline. If the object has no primitives at that level, a section header is added and children are rendered beneath it.
+  - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` inline at the property position.
+  - Optional `$ref` objects and arrays-of-objects are skipped in content until activated; required ones always render.
+
+### How the sidebar is built (ordered, in-place Add)
+
+- `Navigation.generateNavigationItems(schema, path, level)` iterates `properties` in declaration order and mirrors the structure:
+  - If the current level contains primitive fields, it adds a nav item for the current group (`form-group-…`).
+  - Primitive child properties are not individually listed in the nav; they belong to the parent group.
+  - For each child property in order:
+    - Optional inactive `$ref` or arrays-of-objects: render an in-place, indented “Add <Title>” item with `data-group-id="form-optional-…"`.
+    - Active arrays-of-objects: render a clickable group item (`data-group-id="form-group-…"`), then one item per existing array entry. For each array item, nested object children (e.g., `link`, `dataRef`, `questionnaire`) are included under the item.
+    - Object types: if they have no primitives but have children, render a section header (`form-section-…`) at the same indentation; then recurse into children.
+- Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
+- Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
+
+### What happens when clicking “+ Add …” in the sidebar
+
+1) Delegated click handler in `features/navigation.js` catches clicks on `.form-ui-nav-item.form-ui-nav-item-add`.
+2) It derives the schema path from `data-group-id` (`form-optional-…`) and resolves the corresponding node from the root schema.
+3) `FormGenerator.onActivateOptionalGroup(path, schemaNode)` is called:
+   - Adds `path` to `activeOptionalGroups`.
+   - Seeds `data` at the path with a base value derived from the node type:
+     - Object → a base object tree under that path. When `renderAllGroups` is true, all nested optional objects and arrays are present; arrays are initialized as `[]`.
+     - Array → `[]` (empty array); the UI will immediately add the first item if the property is an array of objects.
+   - Emits the updated `data` to subscribers.
+   - Calls `rebuildBody()` which clears and rebuilds the form body inline, remaps groups/fields, restores data values, revalidates, and regenerates the navigation.
+4) If the activated node is an array-of-objects, the handler emulates one click on the array’s “add item” control to pre-create the first item.
+5) Finally, navigation is regenerated, validation runs on the next frame to mark required fields, and the UI scrolls to the newly created group.
+
+### Rendering strategy: renderAllGroups
+
+- The mount factory accepts `ui.renderAllGroups: boolean` to control optional group rendering and base data shaping.
+  - When `false` (default):
+    - Optional object/array groups do not render until activated via the sidebar.
+    - Base data includes required object subtrees and always includes array keys as `[]`.
+    - Validation runs after activation/array item add to flag required fields immediately.
+  - When `true`:
+    - All optional object/array groups render recursively in content by default.
+    - Base data includes all nested objects and arrays present in the schema (arrays initialized to `[]`).
+    - Required arrays-of-objects auto-add a first item in the UI.
+    - Navigation lists nested object children under array items.
+
+### State tracking (form content and sidebar)
+
+- `activeOptionalGroups: Set<string>` (FormGenerator): activated optional groups (object or array). Inactive optional groups remain hidden in content and appear as “Add …” in the sidebar.
+- `data: object` (FormGenerator): current JSON payload. Updated via `updateData()` and via `onActivateOptionalGroup()` when seeding new groups.
+- `FormModel.generateBaseJSON(schema)`: initial data tree for any object node. Arrays always exist as `[]`; optional objects are created only when required or activated.
+- `FormModel.setNestedValue(obj, path, value)`: supports dot and bracket notation (e.g., `array[0].prop`). Creates objects/arrays as needed.
+- `FormModel.deepMerge(base, incoming)`: preserves keys present in `incoming` while merging into existing state to avoid losing dynamically added optional branches.
+- `groupElements: Map<groupId, { element, path, title, isSection }>` (FormGenerator): rebuilt on each render and used by navigation, hover/scroll sync, validation, and scrollspy.
+- `fieldSchemas`, `fieldElements`, `fieldErrors` (FormGenerator): typing and validation state per field.
+- `fieldToGroup: Map<fieldPath, groupId>` (FormGenerator): links fields to their group container for navigation and error mapping.
+- `isCollapsed`, `currentMode` (FormSidebar): panel UI state.
+- `isRawMode` (mount factory): current visual mode for the form container; raw is inspect‑only.
+
+### Arrays (multi-value fields)
+
+- Array fields always exist in the JSON (`[]`) even when empty. With `renderAllGroups: true`, optional arrays are also present as empty arrays by default.
+- Inputs inside array items are named using bracketed indices (e.g., `tutorialList[0].title`) so `updateData()` can map them back correctly.
+- Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
+- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container.
+- Arrays of primitives render via `InputFactory.createArrayInput()` as a compact repeatable input list.
+
+
 ### Positioning and visuals (CSS)
 
 - Sidebar tabs remain a fixed vertical strip; expanding opens the content panel to the right.
-- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin technique).
+- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin technique). The panel’s main area limits height and enables internal scrolling for the navigation tree. The factory also auto-switches the panel between inline and floating when it would be off-screen, to keep navigation and the blue marker visible.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
 
@@ -110,14 +191,12 @@ These are considered part of the internal contract that `features/navigation.js`
 ### Code documentation
 
 - All core, features, and component classes are documented with JSDoc at class level and for their primary methods. Highlights:
-  - `core/form-nodeview.js`
-    - `createSidePanel()` explains how the sidebar component is instantiated and events are wired.
-    - `createFormTab()` documents how the floating panel is moved inline under the header.
-  - `core/form-generator.js` documents the data/model/generation lifecycle and the responsibilities of each helper.
-  - `core/input-factory.js`, `core/group-builder.js`, `core/highlight-overlay.js`, `core/form-model.js` describe their single responsibilities and return types.
-  - `features/navigation.js` and `features/validation.js` document their public APIs.
-  - `components/sidebar.js` documents the component API (`onModeToggleHandler`, `onRemoveHandler`, `onNavigationClickHandler`, `setCollapsed`, `setMode`).
-  - `core/form-mount.js` documents the factory API and its responsibilities.
+  - `core/form-nodeview.js`: parsing `{ schema, data }`, mounting via the factory, serializing back to the document. Sidebar creation lives in the factory.
+  - `core/form-generator.js`: data/model/generation lifecycle and the responsibilities of each helper.
+  - `core/input-factory.js`, `core/group-builder.js`, `core/highlight-overlay.js`, `core/form-model.js`: single responsibilities and return types.
+  - `features/navigation.js` and `features/validation.js`: public APIs.
+  - `components/sidebar.js`: component API (`onModeToggleHandler`, `onRemoveHandler`, `onNavigationClickHandler`, `setCollapsed`, `setMode`).
+  - `core/form-mount.js`: factory API and responsibilities.
 
 You can generate API documentation with any JSDoc tooling if desired; the code comments are written to be compatible with standard JSDoc parsers.
 
@@ -139,11 +218,11 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 - Change data shaping
   - Update `core/form-model.js` (base JSON, deepMerge, setNestedValue).
 
-### Raw JSON mode
+### Raw JSON mode (inspect‑only)
 
-- Clicking the mode toggle switches between form view and JSON view.
-- In JSON view, `<pre><code>` is editable and contains the current `data` with the active `schema` preserved by `FormNodeView` when serializing.
-- Switching back parses JSON and repopulates fields via `setDataFromJSON()`.
+- Clicking the mode toggle switches between form view and raw JSON view.
+- In raw view, `<pre><code>` shows the current `data` as JSON (with the active `schema` preserved by `FormNodeView` when serializing), and is not editable.
+- Switching back does not parse JSON back into the form. Use `api.updateData(next)` to update programmatically or edit fields in the form.
 
 ### Error handling and markers
 
@@ -179,6 +258,11 @@ const api = mountFormUI({
   data,         // initial data object
   onChange,     // (data) => void, called on every change
   onRemove,     // () => void, called when delete confirmed
+  ui: {
+    showRemove: true,        // hides remove button when false (also supported as legacy top-level showRemove)
+    fixedSidebar: false,     // when true, sidebar stays expanded inline (no collapse control)
+    renderAllGroups: false,  // when true, render optional object/array groups recursively and include arrays as [] in base data
+  },
 });
 
 api.updateData(next);            // replace form data

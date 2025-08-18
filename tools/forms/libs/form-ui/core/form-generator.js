@@ -19,13 +19,18 @@ import InputFactory from './input-factory.js';
 import GroupBuilder from './group-builder.js';
 import HighlightOverlay from './highlight-overlay.js';
 import getControlElement from '../utils/dom-utils.js';
+import FormIcons from '../utils/icons.js';
 
 export default class FormGenerator {
-  constructor(schema) {
+  constructor(schema, options = {}) {
+    // Use schema as-is; resolve only parts on-demand to avoid deep recursion on large graphs
     this.schema = schema;
+    this.renderAllGroups = !!options.renderAllGroups;
     // Data model
-    this.model = new FormModel(schema);
-    this.data = this.model.generateBaseJSON(schema);
+    this.model = new FormModel(this.schema);
+    this.data = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
     this.listeners = new Set();
     this.groupCounter = 0;
     this.groupElements = new Map();
@@ -34,6 +39,7 @@ export default class FormGenerator {
     this.fieldSchemas = new Map();
     this.fieldElements = new Map();
     this.fieldToGroup = new Map();
+    this.activeOptionalGroups = new Set();
 
     // Initialize validation and navigation
     this.validation = new FormValidation(this);
@@ -51,6 +57,7 @@ export default class FormGenerator {
       onFocus: (_fieldPath, _schema, target) => {
         this.navigation.highlightActiveGroup(target);
       },
+      derefNode: this.derefNode.bind(this),
     });
 
     // Group builder delegates DOM structuring
@@ -59,6 +66,23 @@ export default class FormGenerator {
       formatLabel: this.formatLabel.bind(this),
       hasPrimitiveFields: this.hasPrimitiveFields.bind(this),
       generateObjectFields: this.generateObjectFields.bind(this),
+      generateInput: this.generateInput.bind(this),
+      generateField: this.generateField.bind(this),
+      isOptionalGroupActive: this.isOptionalGroupActive.bind(this),
+      onActivateOptionalGroup: this.onActivateOptionalGroup.bind(this),
+      refreshNavigation: () => {
+        // Re-map fields to groups and rebuild navigation tree after dynamic insertion
+        this.navigation.mapFieldsToGroups();
+        if (this.navigationTree) {
+          this.navigation.generateNavigationTree();
+        }
+        // Re-run validation for newly added controls
+        this.validation.validateAllFields();
+      },
+      derefNode: this.derefNode.bind(this),
+      getSchemaTitle: this.getSchemaTitle.bind(this),
+      normalizeSchema: this.normalizeSchema.bind(this),
+      renderAllGroups: this.renderAllGroups,
     });
 
     // Visual overlay
@@ -66,41 +90,217 @@ export default class FormGenerator {
   }
 
   /**
+   * Decide if an optional nested object should be immediately rendered
+   * Defaults to false unless data already has any value at that path
+   */
+  isOptionalGroupActive(path) {
+    if (this.activeOptionalGroups.has(path)) return true;
+    const keys = path.split('.');
+    let cur = this.data;
+    for (const k of keys) {
+      if (!cur || typeof cur !== 'object' || !(k in cur)) return false;
+      cur = cur[k];
+    }
+    // Consider arrays active only if they have elements
+    if (Array.isArray(cur)) return cur.length > 0;
+    // Consider existing objects active
+    if (cur && typeof cur === 'object') return true;
+    return cur != null && cur !== '';
+  }
+
+  /**
+   * Handler when user activates an optional object via "+ Add" button
+   */
+  onActivateOptionalGroup(path, schema) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Optional group activation requested', { path, schemaType: this.normalizeSchema(schema)?.type });
+    } catch { /* noop */ }
+    // Mark path as active to include it in navigation
+    this.activeOptionalGroups.add(path);
+    // Ensure nested path exists in current data
+    const schemaNode = this.normalizeSchema(schema);
+    let baseValue = {};
+    if (schemaNode) {
+      if (schemaNode.type === 'object') {
+        baseValue = this.renderAllGroups
+          ? this.generateBaseJSON(schemaNode)
+          : this.model.generateBaseJSON(schemaNode);
+      } else if (schemaNode.type === 'array') {
+        baseValue = [];
+      }
+    }
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Setting base value at path', { path, baseValue });
+    } catch { /* noop */ }
+    this.setNestedValue(this.data, path, baseValue);
+    // Notify listeners for data change
+    this.listeners.forEach((listener) => listener(this.data));
+    // Rebuild the form body to materialize the newly activated group
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[GEN][ACTIVATE] Rebuilding body after activation', { path });
+    } catch { /* noop */ }
+    this.rebuildBody();
+  }
+
+  /**
+   * Rebuild only the form body based on current activation state and data
+   */
+  rebuildBody() {
+    if (!this.container) return;
+    const body = this.container.querySelector('.form-ui-body');
+    if (!body) return;
+    // Preserve current scroll position of body
+    const previousScrollTop = body.scrollTop;
+    // Clear maps
+    this.groupElements.clear();
+    this.fieldSchemas.clear();
+    this.fieldElements.clear();
+    this.fieldToGroup.clear();
+    // Rebuild DOM
+    body.innerHTML = '';
+    const rootSchema = this.normalizeSchema(this.schema);
+    if (rootSchema?.type === 'object' && rootSchema.properties) {
+      this.groupElements = this.groupBuilder.buildInline(
+        body,
+        rootSchema,
+        [rootSchema.title || 'Form'],
+        [],
+        new Map(),
+      );
+    }
+    // Re-attach overlay anchor
+    this.highlightOverlay.attach(this.container);
+    // Remap fields and validate
+    this.navigation.mapFieldsToGroups();
+    this.ensureGroupRegistry();
+    // Restore existing data into fields
+    this.loadData(this.data);
+    // Rebuild navigation tree
+    if (this.navigationTree) {
+      this.navigation.generateNavigationTree();
+    }
+    // Run validation after nav rebuild so markers reflect current DOM
+    this.validation.validateAllFields();
+    // Restore scroll
+    body.scrollTop = previousScrollTop;
+  }
+
+  /**
+   * Ensure any groups created via generateField (arrays-of-objects) are registered in groupElements
+   */
+  ensureGroupRegistry() {
+    if (!this.container) return;
+    const groups = this.container.querySelectorAll('.form-ui-group[id], .form-ui-array-item[id]');
+    groups.forEach((el) => {
+      const id = el.id;
+      if (!this.groupElements.has(id)) {
+        this.groupElements.set(id, {
+          element: el,
+          path: el.dataset.groupPath ? el.dataset.groupPath.split(' > ') : [],
+          title: el.querySelector('.form-ui-group-title')?.textContent || el.querySelector('.form-ui-label')?.textContent || '',
+          isSection: false,
+        });
+      }
+    });
+  }
+
+  /**
+   * Resolve a single node shallowly (on-demand) for $ref using local $defs/definitions
+   */
+  derefNode(node) {
+    if (!node || typeof node !== 'object' || !node.$ref || typeof node.$ref !== 'string') return node;
+    const root = this.schema;
+    const resolvePointer = (ref) => {
+      if (!ref.startsWith('#')) return null;
+      let pointer = ref.slice(1);
+      if (pointer.startsWith('/')) pointer = pointer.slice(1);
+      if (!pointer) return root;
+      const parts = pointer.split('/').map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+      let current = root;
+      for (const part of parts) {
+        if (current && typeof current === 'object' && part in current) current = current[part];
+        else return null;
+      }
+      return current;
+    };
+    const target = resolvePointer(node.$ref);
+    if (!target) return { ...node };
+    // Merge extras over target (shallow for on-demand usage)
+    const extras = Object.fromEntries(Object.entries(node).filter(([k]) => k !== '$ref'));
+    return { ...target, ...extras };
+  }
+
+  getSchemaTitle(propSchema, fallbackKey) {
+    const src = this.derefNode(propSchema) || propSchema;
+    // Prefer explicit title on the effective schema; fallback to formatted key
+    return (src && typeof src.title === 'string' && src.title.trim().length > 0)
+      ? src.title
+      : this.formatLabel(fallbackKey);
+  }
+
+  /**
    * Generate base JSON structure from schema with default values
    */
-  generateBaseJSON(schema) {
-    if (!schema || schema.type !== 'object' || !schema.properties) {
+  generateBaseJSON(schema, seenRefs = new Set()) {
+    const normalizedRoot = this.normalizeSchema(schema) || schema;
+    if (!normalizedRoot || normalizedRoot.type !== 'object' || !normalizedRoot.properties) {
       return {};
     }
 
     const baseData = {};
 
-    Object.entries(schema.properties).forEach(([key, propSchema]) => {
-      switch (propSchema.type) {
+    Object.entries(normalizedRoot.properties).forEach(([key, originalPropSchema]) => {
+      const effective = this.normalizeSchema(originalPropSchema) || originalPropSchema;
+      const refStr = originalPropSchema && originalPropSchema.$ref ? String(originalPropSchema.$ref) : null;
+      if (refStr) {
+        if (seenRefs.has(refStr)) {
+          // Prevent cycles
+          return;
+        }
+        seenRefs.add(refStr);
+      }
+
+      const type = Array.isArray(effective?.type)
+        ? (effective.type.find((t) => t !== 'null') || effective.type[0])
+        : effective?.type;
+
+      switch (type) {
         case 'string':
-          baseData[key] = propSchema.default || '';
+          baseData[key] = effective.default || '';
           break;
         case 'number':
         case 'integer':
-          baseData[key] = propSchema.default || 0;
+          baseData[key] = effective.default || 0;
           break;
         case 'boolean':
-          baseData[key] = propSchema.default || false;
+          baseData[key] = effective.default || false;
           break;
         case 'array':
-          baseData[key] = propSchema.default || [];
+          // Always initialize arrays to [] so optional arrays serialize explicitly
+          baseData[key] = Array.isArray(effective.default) ? effective.default : [];
           break;
-        case 'object':
-          // Recursively generate base structure for nested objects
-          baseData[key] = this.generateBaseJSON(propSchema);
+        case 'object': {
+          // Recursively include all child properties
+          baseData[key] = this.generateBaseJSON(effective, seenRefs);
           break;
-        default:
-          // For unknown types or when no type is specified
-          if (propSchema.enum) {
-            baseData[key] = propSchema.default || '';
+        }
+        default: {
+          // If effective is a ref to an object without explicit type, try recursing
+          if (effective && typeof effective === 'object' && effective.properties) {
+            baseData[key] = this.generateBaseJSON(effective, seenRefs);
+          } else if (effective && effective.enum) {
+            baseData[key] = effective.default || '';
           } else {
-            baseData[key] = propSchema.default || null;
+            baseData[key] = effective && Object.prototype.hasOwnProperty.call(effective, 'default') ? effective.default : null;
           }
+        }
+      }
+
+      if (refStr) {
+        seenRefs.delete(refStr);
       }
     });
 
@@ -129,15 +329,17 @@ export default class FormGenerator {
     const body = document.createElement('div');
     body.className = 'form-ui-body';
 
-    if (this.schema.type === 'object' && this.schema.properties) {
+    const rootSchema = this.normalizeSchema(this.schema);
+    if (rootSchema.type === 'object' && rootSchema.properties) {
       // Build groups/sections via GroupBuilder to keep DOM identical
       this.groupElements = this.groupBuilder.build(
         body,
-        this.schema,
-        [this.schema.title || 'Form'],
+        rootSchema,
+        [rootSchema.title || 'Form'],
         [],
         new Map(),
       );
+      this.ensureGroupRegistry();
     }
 
     container.appendChild(body);
@@ -158,8 +360,12 @@ export default class FormGenerator {
     setTimeout(() => {
       // Map fields to groups now that DOM structure is complete
       this.navigation.mapFieldsToGroups();
+      this.ensureGroupRegistry();
       // Initial validation pass once in DOM
       this.validation.validateAllFields();
+      // Emit initial data so consumers have a complete default JSON,
+      // including empty arrays for multivalue fields
+      this.updateData();
     }, 100);
 
     // Setup form change listeners (kept for future extensions)
@@ -172,7 +378,8 @@ export default class FormGenerator {
    * Generate fields for object properties
    */
   generateObjectFields(container, properties, required = [], pathPrefix = '') {
-    Object.entries(properties).forEach(([key, propSchema]) => {
+    Object.entries(properties).forEach(([key, originalPropSchema]) => {
+      const propSchema = this.derefNode(originalPropSchema) || originalPropSchema;
       const field = this.generateField(key, propSchema, required.includes(key), pathPrefix);
       if (field) {
         container.appendChild(field);
@@ -184,6 +391,102 @@ export default class FormGenerator {
    * Generate a single form field
    */
   generateField(key, propSchema, isRequired = false, pathPrefix = '') {
+    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+
+    // Special-case: arrays of objects should render as a sub-group, not a simple field
+    const itemSchema = this.derefNode(propSchema?.items) || propSchema?.items;
+    const isArrayOfObjects = propSchema && propSchema.type === 'array' && (
+      (itemSchema && (itemSchema.type === 'object' || itemSchema.properties)) || !!propSchema.items?.$ref
+    );
+    if (isArrayOfObjects) {
+      // Optional gating for arrays-of-objects (including nested within array items)
+      if (!isRequired) {
+        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) {
+          return null;
+        }
+      }
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'form-ui-group';
+      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
+      groupContainer.dataset.groupPath = fullPath;
+      groupContainer.dataset.fieldPath = fullPath;
+      groupContainer.dataset.required = isRequired ? 'true' : 'false';
+
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'form-ui-group-header';
+      const sep = document.createElement('div');
+      sep.className = 'form-ui-separator-text';
+      const label = document.createElement('div');
+      label.className = 'form-ui-separator-label';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'form-ui-group-title';
+      titleSpan.textContent = propSchema.title || this.formatLabel(key);
+      label.appendChild(titleSpan);
+      sep.appendChild(label);
+      groupHeader.appendChild(sep);
+      groupContainer.appendChild(groupHeader);
+
+      const groupContent = document.createElement('div');
+      groupContent.className = 'form-ui-group-content';
+      const arrayUI = this.generateInput(fullPath, propSchema);
+      if (arrayUI) groupContent.appendChild(arrayUI);
+      
+      // If rendering all groups and the array is required, ensure one item is present by default
+      if (this.renderAllGroups && isRequired && arrayUI) {
+        const existing = this.model.getNestedValue(this.data, fullPath);
+        const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
+        const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
+        if (Array.isArray(existing) && existing.length === 0 && itemsContainer && itemsContainer.children.length === 0 && addBtn) {
+          try { addBtn.click(); } catch { /* noop */ }
+        }
+      }
+      groupContainer.appendChild(groupContent);
+
+      groupContainer.dataset.fieldPath = fullPath;
+      return groupContainer;
+    }
+
+    // Special-case: nested object inside array items (or any object field) should render as its own inline group
+    const isObjectType = !!(propSchema && (propSchema.type === 'object' || propSchema.properties));
+    if (isObjectType && propSchema.properties) {
+      // Optional object group gating: allow when renderAllGroups
+      if (!isRequired) {
+        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) return null;
+      }
+
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'form-ui-group';
+      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
+      groupContainer.dataset.groupPath = fullPath;
+
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'form-ui-group-header';
+      const sep = document.createElement('div');
+      sep.className = 'form-ui-separator-text';
+      const label = document.createElement('div');
+      label.className = 'form-ui-separator-label';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'form-ui-group-title';
+      titleSpan.textContent = propSchema.title || this.formatLabel(key);
+      label.appendChild(titleSpan);
+      sep.appendChild(label);
+      groupHeader.appendChild(sep);
+      groupContainer.appendChild(groupHeader);
+
+      const groupContent = document.createElement('div');
+      groupContent.className = 'form-ui-group-content';
+      this.generateObjectFields(
+        groupContent,
+        propSchema.properties || {},
+        propSchema.required || [],
+        fullPath,
+      );
+      groupContainer.appendChild(groupContent);
+
+      groupContainer.dataset.fieldPath = fullPath;
+      return groupContainer;
+    }
+
     const fieldContainer = document.createElement('div');
     fieldContainer.className = 'form-ui-field';
     fieldContainer.dataset.field = key;
@@ -199,7 +502,6 @@ export default class FormGenerator {
     fieldContainer.appendChild(label);
 
     // Field input
-    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
     const input = this.generateInput(fullPath, propSchema);
     if (input) {
       fieldContainer.appendChild(input);
@@ -250,6 +552,162 @@ export default class FormGenerator {
    * @param {object} propSchema - The JSON schema for this property
    */
   generateInput(fieldPath, propSchema) {
+    // Special handling: arrays of objects render as repeatable object groups
+    if (
+      propSchema && propSchema.type === 'array'
+      && (propSchema.items && (
+        (propSchema.items.type === 'object')
+        || (this.derefNode(propSchema.items)?.type === 'object')
+        || !!propSchema.items.$ref
+      ))
+    ) {
+      const itemsSchema = this.derefNode(propSchema.items) || propSchema.items;
+      const container = document.createElement('div');
+      container.className = 'form-ui-array-container';
+      container.dataset.field = fieldPath;
+
+      const itemsContainer = document.createElement('div');
+      itemsContainer.className = 'form-ui-array-items';
+      container.appendChild(itemsContainer);
+
+      const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'form-ui-array-add';
+      addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
+      const addItemAt = (index) => {
+        const itemContainer = document.createElement('div');
+        itemContainer.className = 'form-ui-array-item';
+        // Assign a stable ID so navigation can point to specific items
+        const itemId = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${index}`;
+        itemContainer.id = itemId;
+        // Header wrapper containing title separator and actions on one line
+        const headerWrap = document.createElement('div');
+        headerWrap.className = 'form-ui-array-item-header';
+        const itemTitleSep = document.createElement('div');
+        itemTitleSep.className = 'form-ui-separator-text';
+        const itemTitleLabel = document.createElement('div');
+        itemTitleLabel.className = 'form-ui-separator-label';
+        itemTitleLabel.textContent = `${baseTitle} #${index + 1}`;
+        itemTitleSep.appendChild(itemTitleLabel);
+        headerWrap.appendChild(itemTitleSep);
+        const groupContent = document.createElement('div');
+        groupContent.className = 'form-ui-group-content';
+        // Insert header row at the top of the content
+        groupContent.appendChild(headerWrap);
+        const pathPrefix = `${fieldPath}[${index}]`;
+        this.generateObjectFields(
+          groupContent,
+          itemsSchema.properties || {},
+          itemsSchema.required || [],
+          pathPrefix,
+        );
+        itemContainer.appendChild(groupContent);
+        // Actions container with delete + confirm flow
+        const actions = document.createElement('div');
+        actions.className = 'form-ui-array-item-actions';
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'form-ui-remove';
+        removeButton.title = 'Remove item';
+        removeButton.innerHTML = FormIcons.getIconSvg('trash');
+        removeButton.addEventListener('click', () => {
+          if (removeButton.classList.contains('confirm-state')) {
+            if (removeButton.dataset.confirmTimeoutId) {
+              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
+              delete removeButton.dataset.confirmTimeoutId;
+            }
+            itemContainer.remove();
+            // Reindex remaining items' names to keep continuous indices
+            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
+              el.querySelectorAll('[name]').forEach((inputEl) => {
+                inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
+              });
+              // Update IDs to reflect new indices
+              el.id = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${newIdx}`;
+              // Update per-item title labels to match new index
+              const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+              if (lbl) lbl.textContent = `${baseTitle} #${newIdx + 1}`;
+            });
+            this.updateData();
+            // Refresh group registry and navigation to reflect item changes
+            this.ensureGroupRegistry();
+            if (this.navigationTree) {
+              this.navigation.generateNavigationTree();
+            }
+            // Re-validate due to potential required fields in items
+            this.validation.validateAllFields();
+          } else {
+            const originalHTML = removeButton.innerHTML;
+            const originalTitle = removeButton.title;
+            const originalClass = removeButton.className;
+            removeButton.innerHTML = '✓';
+            removeButton.title = 'Click to confirm removal';
+            removeButton.classList.add('confirm-state');
+            const timeout = setTimeout(() => {
+              if (removeButton) {
+                removeButton.innerHTML = originalHTML;
+                removeButton.title = originalTitle;
+                removeButton.className = originalClass;
+                delete removeButton.dataset.confirmTimeoutId;
+              }
+            }, 3000);
+            removeButton.dataset.confirmTimeoutId = String(timeout);
+          }
+        });
+
+        actions.appendChild(removeButton);
+        headerWrap.appendChild(actions);
+        itemsContainer.appendChild(itemContainer);
+        // Ensure registry includes the new item for scroll/hover sync
+        this.ensureGroupRegistry();
+      };
+
+      addButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          // eslint-disable-next-line no-console
+          console.log('[GEN][ADD] Add button clicked for array', { fieldPath, currentCount: itemsContainer.children.length });
+        } catch { /* noop */ }
+        try {
+          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
+          const siblingsBefore = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
+          console.log('[GEN][ADD] Parent array direct item count before add', { parentArray, siblingsBefore });
+        } catch { /* noop */ }
+        const index = itemsContainer.children.length;
+        addItemAt(index);
+        this.updateData();
+        // Refresh navigation to add a child nav item for the new array entry
+        if (this.navigationTree) {
+          this.navigation.generateNavigationTree();
+        }
+        // Validate after DOM/nav is updated so newly added required fields are marked immediately
+        requestAnimationFrame(() => this.validation.validateAllFields());
+        // After add, refresh per-item labels to maintain continuous numbering
+        const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
+        Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, i) => {
+          const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+          if (lbl) lbl.textContent = `${baseTitle} #${i + 1}`;
+        });
+        try {
+          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
+          const siblingsAfter = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
+          console.log('[GEN][ADD] Parent array direct item count after add', { parentArray, siblingsAfter });
+        } catch { /* noop */ }
+      });
+      addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
+      container.appendChild(addButton);
+
+      // Pre-populate items from existing data so rebuilds preserve entries
+      const existing = this.model.getNestedValue(this.data, fieldPath);
+      if (Array.isArray(existing)) {
+        existing.forEach((_, idx) => addItemAt(idx));
+      }
+
+      return container;
+    }
+
     // Delegate to factory (events are attached there)
     const input = this.inputFactory.create(fieldPath, propSchema);
 
@@ -291,12 +749,14 @@ export default class FormGenerator {
     const { container } = this;
     if (!container) return;
 
-    // Start with base structure
-    const baseStructure = this.model.generateBaseJSON(this.schema);
-    this.data = { ...baseStructure };
+    // Start with previous data merged over base structure to keep optional branches
+    const baseStructure = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
+    this.data = this.model.deepMerge(baseStructure, this.data || {});
 
     // Collect all form inputs and organize them into nested structure
-    const inputs = container.querySelectorAll('input, select, textarea');
+    const inputs = container.querySelectorAll('input[name], select[name], textarea[name]');
 
     inputs.forEach((input) => {
       const fieldName = input.name;
@@ -311,8 +771,10 @@ export default class FormGenerator {
         value = input.value;
       }
 
+      // Ignore synthetic array helper names like field[]; normalize to plain path
+      const normalizedName = fieldName;
       // Set the value in the nested data structure
-      this.model.setNestedValue(this.data, fieldName, value);
+      this.model.setNestedValue(this.data, normalizedName, value);
     });
 
     // Notify listeners
@@ -338,7 +800,9 @@ export default class FormGenerator {
    */
   loadData(data) {
     // Merge incoming data with base structure to ensure all fields are present
-    const baseStructure = this.model.generateBaseJSON(this.schema);
+    const baseStructure = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
     this.data = this.deepMerge(baseStructure, data || {});
 
     if (!this.container) return;
@@ -400,6 +864,11 @@ export default class FormGenerator {
     try {
       const data = JSON.parse(jsonString);
       this.loadData(data);
+      // Ensure internal data is updated for listeners
+      const base = this.renderAllGroups
+        ? this.generateBaseJSON(this.schema)
+        : this.model.generateBaseJSON(this.schema);
+      this.data = this.model.deepMerge(base, data || {});
       return true;
     } catch (error) {
       // Keep behavior but avoid noisy console in lints; consumers can handle return value
@@ -524,9 +993,26 @@ export default class FormGenerator {
    * Check if a schema has primitive fields (non-object properties)
    */
   hasPrimitiveFields(schema) {
-    if (!schema.properties) return false;
+    if (!schema || !schema.properties) return false;
 
-    return Object.values(schema.properties).some((propSchema) => propSchema.type !== 'object' || !propSchema.properties);
+    return Object.values(schema.properties).some((propSchema) => {
+      const isObjectType = propSchema && (propSchema.type === 'object' || (Array.isArray(propSchema.type) && propSchema.type.includes('object')));
+      return !isObjectType || !propSchema.properties;
+    });
+  }
+
+  /**
+   * Normalize schema node: deref if needed and coerce type arrays
+   */
+  normalizeSchema(node) {
+    const s = this.derefNode(node) || node;
+    if (!s || typeof s !== 'object') return s;
+    const out = { ...s };
+    if (Array.isArray(out.type)) {
+      const primary = out.type.find((t) => t !== 'null') || out.type[0];
+      out.type = primary;
+    }
+    return out;
   }
 
   /**
@@ -534,7 +1020,7 @@ export default class FormGenerator {
    */
   highlightFormGroup(groupId) {
     // Remove existing highlights
-    this.container.querySelectorAll('.form-ui-group').forEach((group) => {
+    this.container.querySelectorAll('.form-ui-group, .form-ui-array-item[id]').forEach((group) => {
       group.classList.remove('highlighted');
     });
 
@@ -586,13 +1072,32 @@ export default class FormGenerator {
    */
   scrollToFormGroup(groupId) {
     const targetGroup = this.container.querySelector(`#${groupId}`);
-    if (targetGroup) {
-      // Use center positioning with negative scroll margin
-      targetGroup.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+    if (!targetGroup) return;
+
+    const bodyEl = this.container.querySelector('.form-ui-body');
+    const scrollPadding = 8; // small padding from the top
+
+    const isScrollable = (el) => !!el && el.scrollHeight > el.clientHeight;
+    if (isScrollable(bodyEl)) {
+      // Compute offset of the group within the scrollable body
+      const getOffsetTopWithinContainer = (element, containerEl) => {
+        let top = 0;
+        let node = element;
+        while (node && node !== containerEl) {
+          top += node.offsetTop;
+          node = node.offsetParent;
+        }
+        return top;
+      };
+      const top = Math.max(0, getOffsetTopWithinContainer(targetGroup, bodyEl) - scrollPadding);
+      bodyEl.scrollTo({ top, behavior: 'smooth' });
+      return;
     }
+
+    // Fallback to window scroll
+    const rect = targetGroup.getBoundingClientRect();
+    const absoluteTop = window.pageYOffset + rect.top - scrollPadding;
+    window.scrollTo({ top: absoluteTop, behavior: 'smooth' });
   }
 
   /**
@@ -601,5 +1106,58 @@ export default class FormGenerator {
   destroy() {
     this.groupElements.clear();
     this.listeners.clear();
+  }
+
+  /**
+   * Reorder an item inside an array-of-objects group and reindex inputs/ids.
+   * @param {string} arrayPath dot path to the array field (e.g., "tutorialList")
+   * @param {number} fromIndex current index of the item
+   * @param {number} toIndex desired index of the item within the same array
+   */
+  reorderArrayItem(arrayPath, fromIndex, toIndex) {
+    if (!this.container || typeof fromIndex !== 'number' || typeof toIndex !== 'number') return;
+    if (fromIndex === toIndex) return;
+
+    const hyphenPath = arrayPath.replace(/\./g, '-');
+    const groupId = `form-group-${hyphenPath}`;
+
+    const itemsContainer = this.container.querySelector(`#${groupId} .form-ui-array-items`) 
+      || this.container.querySelector(`[data-field="${arrayPath}"] .form-ui-array-items`);
+    if (!itemsContainer) return;
+
+    const items = Array.from(itemsContainer.querySelectorAll('.form-ui-array-item'));
+    if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return;
+
+    const node = items[fromIndex];
+    const reference = items[toIndex];
+    if (!node || !reference) return;
+
+    // Move DOM node to the new position
+    if (toIndex > fromIndex) {
+      itemsContainer.insertBefore(node, reference.nextSibling);
+    } else {
+      itemsContainer.insertBefore(node, reference);
+    }
+
+    // Reindex names and IDs to match new order
+    Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
+      el.id = `form-array-item-${hyphenPath}-${idx}`;
+      el.querySelectorAll('[name]').forEach((inputEl) => {
+        inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${idx}]`);
+      });
+      const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
+      if (lbl) {
+        const baseTitle = this.getSchemaTitle({ title: '' }, arrayPath.split('.').pop());
+        lbl.textContent = `${baseTitle} #${idx + 1}`;
+      }
+    });
+
+    // Update internal maps/data and refresh nav/validation
+    this.updateData();
+    this.ensureGroupRegistry();
+    if (this.navigationTree) {
+      this.navigation.generateNavigationTree();
+    }
+    this.validation.validateAllFields();
   }
 }

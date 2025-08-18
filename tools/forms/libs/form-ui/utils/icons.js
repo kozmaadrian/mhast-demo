@@ -26,6 +26,8 @@ export default class FormIcons {
         return `<svg viewBox="0 0 36 36" class="error-indicator" focusable="false" aria-hidden="true" role="img">
           <path fill-rule="evenodd" d="M17.127,2.579.4,32.512A1,1,0,0,0,1.272,34H34.728a1,1,0,0,0,.872-1.488L18.873,2.579A1,1,0,0,0,17.127,2.579ZM20,29.5a.5.5,0,0,1-.5.5h-3a.5.5,0,0,1-.5-.5v-3a.5.5,0,0,1,.5-.5h3a.5.5,0,0,1,.5.5Zm0-6a.5.5,0,0,1-.5.5h-3a.5.5,0,0,1-.5-.5v-12a.5.5,0,0,1,.5-.5h3a.5.5,0,0,1,.5.5Z" fill="currentColor"/>
         </svg>`;
+      case 'plus': // new plus icon
+        return `<svg ${common}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
       default:
         return '';
     }

@@ -4,6 +4,8 @@
  * Event handlers are injected to keep this module UI-agnostic.
  */
 
+import FormIcons from '../utils/icons.js';
+
 export default class InputFactory {
   constructor(handlers = {}) {
     const noop = () => {};
@@ -13,8 +15,9 @@ export default class InputFactory {
   }
 
   create(fieldPath, propSchema) {
-    const { type, format, enum: enumValues } = propSchema;
-    switch (type) {
+    const primaryType = Array.isArray(propSchema.type) ? (propSchema.type.find((t) => t !== 'null') || propSchema.type[0]) : propSchema.type;
+    const { format, enum: enumValues } = propSchema;
+    switch (primaryType) {
       case 'string':
         if (enumValues) return this.createSelectInput(fieldPath, enumValues, propSchema);
         if (format === 'textarea') return this.createTextareaInput(fieldPath, propSchema);
@@ -151,19 +154,52 @@ export default class InputFactory {
     const addButton = document.createElement('button');
     addButton.type = 'button';
     addButton.className = 'form-ui-array-add';
-    addButton.textContent = '+ Add Item';
-    addButton.addEventListener('click', () => {
+    const baseTitle = propSchema?.title || this.formatLabel(fieldPath.split('.').pop());
+    addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
+    addButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const itemContainer = document.createElement('div');
       itemContainer.className = 'form-ui-array-item';
-      const itemInput = this.create(propSchema.items ? `${fieldPath}[]` : fieldPath, propSchema.items || { type: 'string' });
+      const itemIndexName = `${fieldPath}[${itemsContainer.children.length}]`;
+      const itemInput = this.create(itemIndexName, propSchema.items || { type: 'string' });
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
-      removeButton.className = 'form-ui-array-remove';
-      removeButton.textContent = '×';
+      removeButton.className = 'form-ui-remove';
+      removeButton.title = 'Remove item';
+      removeButton.innerHTML = FormIcons.getIconSvg('trash');
       removeButton.addEventListener('click', () => {
-        itemContainer.remove();
-        // Treat removal as a change
-        this.onInputOrChange(fieldPath, propSchema, addButton);
+        if (removeButton.classList.contains('confirm-state')) {
+          if (removeButton.dataset.confirmTimeoutId) {
+            clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
+            delete removeButton.dataset.confirmTimeoutId;
+          }
+          itemContainer.remove();
+          // Reindex remaining inputs to keep continuous indices
+          Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
+            el.querySelectorAll('[name]').forEach((inputEl) => {
+              inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${idx}]`);
+            });
+          });
+          // Treat removal as a change
+          this.onInputOrChange(fieldPath, propSchema, addButton);
+        } else {
+          const originalHTML = removeButton.innerHTML;
+          const originalTitle = removeButton.title;
+          const originalClass = removeButton.className;
+          removeButton.innerHTML = '✓';
+          removeButton.title = 'Click to confirm removal';
+          removeButton.classList.add('confirm-state');
+          const timeout = setTimeout(() => {
+            if (removeButton) {
+              removeButton.innerHTML = originalHTML;
+              removeButton.title = originalTitle;
+              removeButton.className = originalClass;
+              delete removeButton.dataset.confirmTimeoutId;
+            }
+          }, 3000);
+          removeButton.dataset.confirmTimeoutId = String(timeout);
+        }
       });
       itemContainer.appendChild(itemInput);
       itemContainer.appendChild(removeButton);
@@ -175,19 +211,47 @@ export default class InputFactory {
 
     // Initialize with default items
     if (propSchema.default && Array.isArray(propSchema.default)) {
-      propSchema.default.forEach((value) => {
+      propSchema.default.forEach((value, idx) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
-        const itemInput = this.create(`${fieldPath}[]`, propSchema.items || { type: 'string' });
+        const itemInput = this.create(`${fieldPath}[${idx}]`, propSchema.items || { type: 'string' });
         const inputEl = itemInput.querySelector?.('input, select, textarea') || itemInput;
         if (inputEl) inputEl.value = value;
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'form-ui-array-remove';
-        removeButton.textContent = '×';
+        removeButton.className = 'form-ui-remove';
+        removeButton.title = 'Remove item';
+        removeButton.innerHTML = FormIcons.getIconSvg('trash');
         removeButton.addEventListener('click', () => {
-          itemContainer.remove();
-          this.onInputOrChange(fieldPath, propSchema, addButton);
+          if (removeButton.classList.contains('confirm-state')) {
+            if (removeButton.dataset.confirmTimeoutId) {
+              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
+              delete removeButton.dataset.confirmTimeoutId;
+            }
+            itemContainer.remove();
+            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
+              el.querySelectorAll('[name]').forEach((inputEl) => {
+                inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
+              });
+            });
+            this.onInputOrChange(fieldPath, propSchema, addButton);
+          } else {
+            const originalHTML = removeButton.innerHTML;
+            const originalTitle = removeButton.title;
+            const originalClass = removeButton.className;
+            removeButton.innerHTML = '✓';
+            removeButton.title = 'Click to confirm removal';
+            removeButton.classList.add('confirm-state');
+            const timeout = setTimeout(() => {
+              if (removeButton) {
+                removeButton.innerHTML = originalHTML;
+                removeButton.title = originalTitle;
+                removeButton.className = originalClass;
+                delete removeButton.dataset.confirmTimeoutId;
+              }
+            }, 3000);
+            removeButton.dataset.confirmTimeoutId = String(timeout);
+          }
         });
         itemContainer.appendChild(itemInput);
         itemContainer.appendChild(removeButton);

@@ -20,6 +20,7 @@ export default class FormModel {
     const baseData = {};
 
     Object.entries(schema.properties).forEach(([key, propSchema]) => {
+      const isRequired = Array.isArray(schema.required) && schema.required.includes(key);
       switch (propSchema.type) {
         case 'string':
           baseData[key] = propSchema.default || '';
@@ -32,10 +33,18 @@ export default class FormModel {
           baseData[key] = propSchema.default || false;
           break;
         case 'array':
-          baseData[key] = propSchema.default || [];
+          // Always include array keys so multifields serialize as [] when empty
+          baseData[key] = Array.isArray(propSchema.default) ? propSchema.default : [];
           break;
         case 'object':
-          baseData[key] = this.generateBaseJSON(propSchema);
+          if (propSchema.properties) {
+            if (isRequired) {
+              baseData[key] = this.generateBaseJSON(propSchema);
+            }
+            // If optional object: do not pre-populate to avoid noise.
+          } else {
+            baseData[key] = {};
+          }
           break;
         default:
           if (propSchema.enum) {
@@ -59,22 +68,68 @@ export default class FormModel {
   }
 
   /**
+   * Get a value from a nested object structure using dot/bracket notation
+   */
+  getNestedValue(obj, path) {
+    if (!obj || !path) return undefined;
+    const tokens = [];
+    const regex = /[^.\[\]]+|\[(\d+)\]/g;
+    let match;
+    while ((match = regex.exec(path)) !== null) {
+      if (match[1] !== undefined) tokens.push(Number(match[1]));
+      else tokens.push(match[0]);
+    }
+    let current = obj;
+    for (const key of tokens) {
+      if (current == null) return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  /**
    * Set a value in a nested object structure using dot notation
    */
   setNestedValue(obj, path, value) {
-    const keys = path.split('.');
-    let current = obj;
-
-    for (let i = 0; i < keys.length - 1; i += 1) {
-      const key = keys[i];
-      if (!(key in current) || typeof current[key] !== 'object' || current[key] === null) {
-        current[key] = {};
+    if (!path) return;
+    // Support bracket notation for array indices: field[0].sub → ['field', 0, 'sub']
+    const tokens = [];
+    const regex = /[^.\[\]]+|\[(\d+)\]/g;
+    let match;
+    while ((match = regex.exec(path)) !== null) {
+      if (match[1] !== undefined) {
+        tokens.push(Number(match[1]));
+      } else {
+        tokens.push(match[0]);
       }
-      current = current[key];
     }
 
-    const finalKey = keys[keys.length - 1];
-    current[finalKey] = value;
+    let current = obj;
+    for (let i = 0; i < tokens.length - 1; i += 1) {
+      const key = tokens[i];
+      const nextKey = tokens[i + 1];
+      if (typeof key === 'number') {
+        if (!Array.isArray(current)) {
+          // Convert current to array if not already
+          // eslint-disable-next-line no-param-reassign
+          current = [];
+        }
+        if (current[key] == null) current[key] = (typeof nextKey === 'number' ? [] : {});
+        current = current[key];
+      } else {
+        if (!(key in current) || current[key] == null || typeof current[key] !== 'object') {
+          current[key] = (typeof nextKey === 'number' ? [] : {});
+        }
+        current = current[key];
+      }
+    }
+    const finalKey = tokens[tokens.length - 1];
+    if (typeof finalKey === 'number') {
+      if (!Array.isArray(current)) current = []; // best-effort
+      current[finalKey] = value;
+    } else {
+      current[finalKey] = value;
+    }
   }
 
   /**
@@ -101,6 +156,9 @@ export default class FormModel {
         } else {
           result[key] = value;
         }
+      } else {
+        // Include keys that are not part of base structure (e.g., newly activated optional groups)
+        result[key] = value;
       }
     });
 
