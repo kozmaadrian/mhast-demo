@@ -663,6 +663,8 @@ export default class FormNavigation {
       } catch { /* noop */ }
       if (node) {
         this.formGenerator.onActivateOptionalGroup(path, node);
+        // After activation and any auto-adds, ensure validation runs against new inputs
+        requestAnimationFrame(() => this.formGenerator.validation.validateAllFields());
         // If activated node is array-of-objects, immediately add the first item
         const normalized = this.formGenerator.normalizeSchema(node);
         if (normalized && normalized.type === 'array') {

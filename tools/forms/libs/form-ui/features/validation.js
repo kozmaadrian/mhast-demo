@@ -14,10 +14,23 @@ export default class FormValidation {
    * After form render, validate all fields once so required/invalid states are visible on load
    */
   validateAllFields() {
+    // Validate visible inputs first
     this.formGenerator.fieldSchemas.forEach((schema, fieldPath) => {
       const inputEl = this.formGenerator.fieldElements.get(fieldPath) || this.formGenerator.container.querySelector(`[name="${fieldPath}"]`);
       if (inputEl) this.validateField(fieldPath, schema, inputEl, true); // Skip marker refresh during batch
     });
+
+    // When renderAllGroups is false, ensure required groups that are not active yet are also surfaced in nav
+    if (!this.formGenerator.renderAllGroups) {
+      this.formGenerator.container.querySelectorAll('.form-ui-group[data-field-path][data-required="true"]').forEach((groupEl) => {
+        const groupId = groupEl.id;
+        if (!groupId) return;
+        const hasAnyInvalid = groupEl.querySelector('.invalid');
+        if (hasAnyInvalid) {
+          this.formGenerator.fieldErrors.set(groupId, 'Group has invalid fields');
+        }
+      });
+    }
     // Update sidebar markers after all validation is complete
     this.refreshNavigationErrorMarkers();
   }

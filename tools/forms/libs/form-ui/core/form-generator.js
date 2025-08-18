@@ -182,6 +182,8 @@ export default class FormGenerator {
     if (this.navigationTree) {
       this.navigation.generateNavigationTree();
     }
+    // Run validation after nav rebuild so markers reflect current DOM
+    this.validation.validateAllFields();
     // Restore scroll
     body.scrollTop = previousScrollTop;
   }
@@ -407,6 +409,8 @@ export default class FormGenerator {
       groupContainer.className = 'form-ui-group';
       groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
       groupContainer.dataset.groupPath = fullPath;
+      groupContainer.dataset.fieldPath = fullPath;
+      groupContainer.dataset.required = isRequired ? 'true' : 'false';
 
       const groupHeader = document.createElement('div');
       groupHeader.className = 'form-ui-group-header';
@@ -678,7 +682,8 @@ export default class FormGenerator {
         if (this.navigationTree) {
           this.navigation.generateNavigationTree();
         }
-        this.validation.validateAllFields();
+        // Validate after DOM/nav is updated so newly added required fields are marked immediately
+        requestAnimationFrame(() => this.validation.validateAllFields());
         // After add, refresh per-item labels to maintain continuous numbering
         const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
         Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, i) => {
