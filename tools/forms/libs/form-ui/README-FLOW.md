@@ -91,7 +91,7 @@ Stacktrace (key calls):
    - Adds section titles, Add-items for inactive optional `$ref`/array groups, and group items
    - Calls `Validation.refreshNavigationErrorMarkers()`
    - Enables hover and scroll sync
-   - The inline sidebar panel limits height and enables internal scrolling for large trees
+   - The inline sidebar panel limits height to the viewport and enables internal scrolling for large trees. Auto-floating is disabled; the panel stays inline.
 
 Stacktrace:
 - mountFormUI → sidebar.createElement → assign `navigationTree` → Navigation.generateNavigationTree → Navigation.generateNavigationItems → Validation.refreshNavigationErrorMarkers
@@ -147,15 +147,12 @@ State involved:
 
 1) Click on “+ Add …” in the sidebar
    - Navigation.onTreeClick detects `.form-ui-nav-item.form-ui-nav-item-add`
-   - Derives schema path from `data-group-id="form-optional-…"`, resolves node from root schema
-   - Calls `FormGenerator.onActivateOptionalGroup(path, node)`
+   - Derives schema path from `data-group-id="form-optional-…"`
+   - Calls `FormGenerator.commandActivateOptional(path)` (command API)
      - Adds to `activeOptionalGroups`
-     - Seeds `data` at path (`{}` via base generation for object — includes arrays as [] — or `[]` for array)
-     - Notifies listeners
-     - Calls `rebuildBody()` → clears maps, rebuilds body via `GroupBuilder.buildInline()`
-       - Re-attaches overlay, remaps fields to groups, restores data into fields, regenerates navigation, revalidates (post-nav)
-     - If the node is an array-of-objects: emulates one click on the array’s add button to create the first item
-     - Schedules a validation pass on the next animation frame to mark required fields in the newly added UI
+     - Seeds `data` at path (`{}` for object; `[]` for array). For arrays-of-objects: if empty, auto-adds the first item (data-first) with a minimal default object (primitives, arrays, and required objects only)
+     - Rebuilds body, regenerates navigation, runs validation
+   - Navigates to the activated group or the first array item
 
 Stacktrace:
 - Sidebar click → Navigation.onTreeClick → FormGenerator.onActivateOptionalGroup → FormGenerator.rebuildBody → GroupBuilder.buildInline → Navigation.mapFieldsToGroups → FormGenerator.ensureGroupRegistry → FormGenerator.loadData → Navigation.generateNavigationTree → Validation.validateAllFields
@@ -207,8 +204,8 @@ State involved:
 
 ## Notes on arrays
 
-- Arrays of primitives: created via `InputFactory.createArrayInput()`; each item is an input with add/remove controls.
-- Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group. Nested object children within an array item are listed under the item in the sidebar.
+- Arrays of primitives: created via `InputFactory.createArrayInput()`; each item is an input. Add/remove are data-first via `FormModel` through generator wiring.
+- Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group. Nested object children within an array item are listed under the item in the sidebar. Add/remove/reorder are data-first via command API.
 
 ---
 
@@ -220,9 +217,9 @@ State involved:
   - After activation and after array-item add, validation runs post-nav to flag required fields.
 
 - `renderAllGroups: true`
-  - All optional object/array groups render recursively by default.
-  - Base data includes all nested objects and arrays present in the schema (arrays initialized to `[]`).
-  - Required arrays-of-objects auto-add a first item.
-  - The sidebar includes nested object children under array items.
+  - Optional object/array groups render recursively by default, except optional object children inside array items remain inactive until explicitly activated or data exists.
+  - Base data includes all objects/arrays; arrays initialized to `[]`.
+  - When an optional array-of-objects is activated (via sidebar), one item is auto-added if the array is empty (data-first).
+  - The sidebar lists nested object children under array items.
 
 

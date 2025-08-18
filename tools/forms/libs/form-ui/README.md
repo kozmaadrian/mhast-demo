@@ -124,15 +124,13 @@ flowchart LR
 
 1) Delegated click handler in `features/navigation.js` catches clicks on `.form-ui-nav-item.form-ui-nav-item-add`.
 2) It derives the schema path from `data-group-id` (`form-optional-…`) and resolves the corresponding node from the root schema.
-3) `FormGenerator.onActivateOptionalGroup(path, schemaNode)` is called:
+3) `FormGenerator.commandActivateOptional(path)` (central command) is used to activate and seed data:
    - Adds `path` to `activeOptionalGroups`.
-   - Seeds `data` at the path with a base value derived from the node type:
-     - Object → a base object tree under that path. When `renderAllGroups` is true, all nested optional objects and arrays are present; arrays are initialized as `[]`.
-     - Array → `[]` (empty array); the UI will immediately add the first item if the property is an array of objects.
-   - Emits the updated `data` to subscribers.
-   - Calls `rebuildBody()` which clears and rebuilds the form body inline, remaps groups/fields, restores data values, revalidates, and regenerates the navigation.
-4) If the activated node is an array-of-objects, the handler emulates one click on the array’s “add item” control to pre-create the first item.
-5) Finally, navigation is regenerated, validation runs on the next frame to mark required fields, and the UI scrolls to the newly created group.
+   - Seeds `data` at that path based on type:
+     - Object → base object tree (arrays initialized to `[]`). Optional nested objects are omitted unless required or already present in data. This applies even when `renderAllGroups` is true for children inside array items.
+     - Array → initializes `[]`. For arrays-of-objects, if the array is empty, the first item is auto-added (data-first) using a default object that includes primitives/arrays and required nested objects only.
+   - Emits updated `data`, rebuilds the form body (`rebuildBody()`), regenerates navigation, and validates.
+4) Navigation then scrolls to the activated group or the first array item.
 
 ### Rendering strategy: renderAllGroups
 
@@ -142,9 +140,9 @@ flowchart LR
     - Base data includes required object subtrees and always includes array keys as `[]`.
     - Validation runs after activation/array item add to flag required fields immediately.
   - When `true`:
-    - All optional object/array groups render recursively in content by default.
+    - Optional object/array groups render recursively by default, except optional object children inside array items which remain inactive until explicitly activated or data exists for them (prevents overwhelming newly added array items).
     - Base data includes all nested objects and arrays present in the schema (arrays initialized to `[]`).
-    - Required arrays-of-objects auto-add a first item in the UI.
+    - Arrays-of-objects may auto-add a first item when activated from the sidebar (data-first rule).
     - Navigation lists nested object children under array items.
 
 ### State tracking (form content and sidebar)
@@ -165,14 +163,30 @@ flowchart LR
 - Array fields always exist in the JSON (`[]`) even when empty. With `renderAllGroups: true`, optional arrays are also present as empty arrays by default.
 - Inputs inside array items are named using bracketed indices (e.g., `tutorialList[0].title`) so `updateData()` can map them back correctly.
 - Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
-- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container.
+- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container. Adding/removing/reordering is data-first (mutations via `FormModel`), then the UI rebuilds.
 - Arrays of primitives render via `InputFactory.createArrayInput()` as a compact repeatable input list.
 
+#### Data-first mutation API
+
+- `FormModel` exposes centralized mutations used by the generator and UI handlers:
+  - `pushArrayItem(data, arrayPath, newItem)`
+  - `removeArrayItem(data, arrayPath, index)`
+  - `reorderArray(data, arrayPath, fromIndex, toIndex)`
+  - `ensureObjectAtPath(data, path, objectSchema)`
+- `FormGenerator` exposes command wrappers:
+  - `commandActivateOptional(path)`
+  - `commandAddArrayItem(arrayPath)`
+  - `commandRemoveArrayItem(arrayPath, index)`
+  - `commandReorderArrayItem(arrayPath, fromIndex, toIndex)`
+  - `commandResetAll()`
+
+All UI actions call these commands, which: `updateData()` → mutate JSON via `FormModel` → `rebuildBody()` → validate.
 
 ### Positioning and visuals (CSS)
 
 - Sidebar tabs remain a fixed vertical strip; expanding opens the content panel to the right.
-- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin technique). The panel’s main area limits height and enables internal scrolling for the navigation tree. The factory also auto-switches the panel between inline and floating when it would be off-screen, to keep navigation and the blue marker visible.
+- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin). The panel limits height to the viewport and enables internal scrolling for the navigation tree. Auto-floating is disabled; it stays inline.
+- Reset button (optional) shows a red confirm state before performing the reset.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
 
@@ -262,6 +276,7 @@ const api = mountFormUI({
     showRemove: true,        // hides remove button when false (also supported as legacy top-level showRemove)
     fixedSidebar: false,     // when true, sidebar stays expanded inline (no collapse control)
     renderAllGroups: false,  // when true, render optional object/array groups recursively and include arrays as [] in base data
+    showReset: false,        // when true, shows a reset button (with confirm); resets data and rebuilds
   },
 });
 
