@@ -301,7 +301,7 @@ export default class FormNavigation {
     const hasPrimitivesAtThisLevel = this.formGenerator.hasPrimitiveFields(normalized);
     if (hasPrimitivesAtThisLevel) {
       const groupPath = pathPrefix || 'root';
-      const groupId = `form-group-${groupPath.replace(/[.\[\]]/g, '-')}`;
+      const groupId = this.formGenerator.pathToGroupId(groupPath);
       const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()));
 
       const navItem = document.createElement('div');
@@ -374,7 +374,7 @@ export default class FormNavigation {
 
       // Active arrays-of-objects: render as their own group item
       if (isArrayOfObjects) {
-        const groupId = `form-group-${nestedPath.replace(/[.\[\]]/g, '-')}`;
+        const groupId = this.formGenerator.pathToGroupId(nestedPath);
         const navItem = document.createElement('div');
         navItem.className = 'form-ui-nav-item';
         navItem.dataset.groupId = groupId;
@@ -401,8 +401,7 @@ export default class FormNavigation {
             const itemNav = document.createElement('div');
             itemNav.className = 'form-ui-nav-item';
             itemNav.classList.add('form-ui-nav-item-array-child');
-            const arrIdBase = nestedPath.replace(/[\.\[\]]/g, '-');
-            itemNav.dataset.groupId = `form-array-item-${arrIdBase}-${idx}`;
+            itemNav.dataset.groupId = this.formGenerator.arrayItemId(nestedPath, idx);
             itemNav.dataset.level = level + 2;
             itemNav.dataset.arrayPath = nestedPath;
             itemNav.dataset.itemIndex = String(idx);
@@ -465,7 +464,7 @@ export default class FormNavigation {
               }
 
               // Render nested object-or-array-of-objects under this item without duplicating objects
-              const childGroupId = `form-group-${childPath.replace(/[.\[\]]/g, '-')}`;
+              const childGroupId = this.formGenerator.pathToGroupId(childPath);
               if (childIsArrayOfObjects) {
                 const childNav = document.createElement('div');
                 childNav.className = 'form-ui-nav-item';
@@ -494,8 +493,7 @@ export default class FormNavigation {
                   const childItemNav = document.createElement('div');
                   childItemNav.className = 'form-ui-nav-item';
                   childItemNav.classList.add('form-ui-nav-item-array-child');
-                  const childArrIdBase = childPath.replace(/[\.\[\]]/g, '-');
-                  childItemNav.dataset.groupId = `form-array-item-${childArrIdBase}-${cidx}`;
+                  childItemNav.dataset.groupId = this.formGenerator.arrayItemId(childPath, cidx);
                   childItemNav.dataset.level = level + 4;
                   childItemNav.dataset.arrayPath = childPath;
                   childItemNav.dataset.itemIndex = String(cidx);
@@ -527,7 +525,7 @@ export default class FormNavigation {
         const hasNestedPrimitives = this.formGenerator.hasPrimitiveFields(derefProp);
         const hasChildren = Object.keys(derefProp.properties || {}).length > 0;
         if (!hasNestedPrimitives && hasChildren) {
-          const sectionId = `form-section-${nestedPath.replace(/[.\[\]]/g, '-')}`;
+          const sectionId = `form-section-${this.formGenerator.hyphenatePath(nestedPath)}`;
           const sectionTitle = this.formGenerator.getSchemaTitle(derefProp, key);
 
           const sectionItem = document.createElement('div');
@@ -659,28 +657,34 @@ export default class FormNavigation {
         this.formGenerator.onActivateOptionalGroup(path, node);
         const normalized = this.formGenerator.normalizeSchema(node);
         if (normalized && normalized.type === 'array') {
-          // Data-first: append a new item to the array in JSON, then rebuild
+          // Auto-add first item on activation if empty (data-first)
           const itemsSchema = this.formGenerator.derefNode(normalized.items) || normalized.items || {};
-          let baseItem = {};
-          if (itemsSchema && (itemsSchema.type === 'object' || itemsSchema.properties)) {
-            baseItem = this.formGenerator.generateBaseJSON(itemsSchema);
+          // Persist any in-progress edits
+          this.formGenerator.updateData();
+          let arr = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
+          if (!Array.isArray(arr)) arr = [];
+          if (arr.length === 0) {
+            const baseItem = this.formGenerator.createDefaultObjectFromSchema(itemsSchema);
+            this.formGenerator.model.pushArrayItem(this.formGenerator.data, path, baseItem);
+            this.formGenerator.rebuildBody();
+            requestAnimationFrame(() => {
+              const itemId = this.formGenerator.arrayItemId(path, 0);
+              const el = this.formGenerator.container?.querySelector?.(`#${itemId}`);
+              if (el && el.id) this.navigateToGroup(el.id);
+              this.formGenerator.validation.validateAllFields();
+            });
+            return;
           }
-          const arr = this.formGenerator.model.getNestedValue(this.formGenerator.data, path) || [];
-          const newIndex = arr.length;
-          arr.push(baseItem);
-          this.formGenerator.model.setNestedValue(this.formGenerator.data, path, arr);
-          this.formGenerator.rebuildBody();
+          // If not empty, just navigate to the array group
+          const newGroupId = this.formGenerator.pathToGroupId(path);
           requestAnimationFrame(() => {
-            const hyphen = `${path}[${newIndex}]`.replace(/[\.\[\]]/g, '-');
-            const targetId = `form-array-item-${hyphen}-${newIndex}`;
-            const el = this.formGenerator.container?.querySelector?.(`#${targetId}`);
-            if (el && el.id) this.navigateToGroup(el.id);
+            this.navigateToGroup(newGroupId);
             this.formGenerator.validation.validateAllFields();
           });
           return;
         }
         // Non-array activation: rebuild already happened in onActivateOptionalGroup
-        const newGroupId = `form-group-${path.replace(/\./g, '-')}`;
+        const newGroupId = this.formGenerator.pathToGroupId(path);
         requestAnimationFrame(() => this.navigateToGroup(newGroupId));
       }
       return;

@@ -114,15 +114,8 @@ export default class FormGenerator {
    */
   isOptionalGroupActive(path) {
     if (this.activeOptionalGroups.has(path)) return true;
-    const keys = path.split('.');
-    let cur = this.data;
-    for (const k of keys) {
-      if (!cur || typeof cur !== 'object' || !(k in cur)) return false;
-      cur = cur[k];
-    }
-    // Consider arrays active only if they have elements
+    const cur = this.model.getNestedValue(this.data, path);
     if (Array.isArray(cur)) return cur.length > 0;
-    // Consider existing objects active
     if (cur && typeof cur === 'object') return true;
     return cur != null && cur !== '';
   }
@@ -470,7 +463,15 @@ export default class FormGenerator {
     if (isObjectType && propSchema.properties) {
       // Optional object group gating: allow when renderAllGroups
       if (!isRequired) {
-        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) return null;
+        const insideArrayItem = /\[\d+\]/.test(fullPath);
+        // If renderAllGroups is true, still keep optional object children under array items inactive
+        // until explicitly activated or data exists for them
+        if (
+          (!this.renderAllGroups || insideArrayItem)
+          && !this.isOptionalGroupActive(fullPath)
+        ) {
+          return null;
+        }
       }
 
       const groupContainer = document.createElement('div');
@@ -581,6 +582,7 @@ export default class FormGenerator {
       ))
     ) {
       const itemsSchema = this.derefNode(propSchema.items) || propSchema.items;
+      const normItemsSchema = this.normalizeSchema(itemsSchema) || itemsSchema || {};
       const container = document.createElement('div');
       container.className = 'form-ui-array-container';
       container.dataset.field = fieldPath;
@@ -617,8 +619,8 @@ export default class FormGenerator {
         const pathPrefix = `${fieldPath}[${index}]`;
         this.generateObjectFields(
           groupContent,
-          itemsSchema.properties || {},
-          itemsSchema.required || [],
+          normItemsSchema.properties || {},
+          normItemsSchema.required || [],
           pathPrefix,
         );
         itemContainer.appendChild(groupContent);
@@ -672,7 +674,7 @@ export default class FormGenerator {
         event.stopPropagation();
         // Data-first add: mutate data and rebuild
         this.updateData();
-        const newItem = this.createDefaultObjectFromSchema(itemsSchema);
+        const newItem = this.createDefaultObjectFromSchema(normItemsSchema);
         this.model.pushArrayItem(this.data, fieldPath, newItem);
         const newIndex = (this.model.getNestedValue(this.data, fieldPath) || []).length - 1;
         this.rebuildBody();
@@ -729,11 +731,62 @@ export default class FormGenerator {
    * Create a default item for an array-of-objects based on its items schema
    */
   createDefaultObjectFromSchema(itemsSchema) {
-    const node = this.derefNode(itemsSchema) || itemsSchema || {};
-    if (node && (node.type === 'object' || node.properties)) {
-      return this.generateBaseJSON(this.normalizeSchema(node));
-    }
-    return {};
+    const node = this.normalizeSchema(this.derefNode(itemsSchema) || itemsSchema || {});
+    if (!node || (node.type !== 'object' && !node.properties)) return {};
+
+    const required = new Set(Array.isArray(node.required) ? node.required : []);
+    const out = {};
+    Object.entries(node.properties || {}).forEach(([key, prop]) => {
+      const eff = this.normalizeSchema(this.derefNode(prop) || prop || {});
+      const type = Array.isArray(eff.type) ? (eff.type.find((t) => t !== 'null') || eff.type[0]) : eff.type;
+      switch (type) {
+        case 'string':
+          out[key] = eff.default || '';
+          break;
+        case 'number':
+        case 'integer':
+          out[key] = eff.default ?? 0;
+          break;
+        case 'boolean':
+          out[key] = eff.default ?? false;
+          break;
+        case 'array':
+          // safe to initialize as empty; UI won’t show array items until present
+          out[key] = Array.isArray(eff.default) ? eff.default : [];
+          break;
+        case 'object':
+        default: {
+          const isObjectLike = eff && (eff.type === 'object' || eff.properties);
+          if (isObjectLike) {
+            if (required.has(key)) {
+              // Include required nested objects recursively
+              out[key] = this.createDefaultObjectFromSchema(eff);
+            } else {
+              // Skip optional nested objects so they are not auto-activated
+              // Intentionally omit key
+            }
+          } else if (eff && eff.enum) {
+            out[key] = eff.default || '';
+          } else {
+            out[key] = eff && Object.prototype.hasOwnProperty.call(eff, 'default') ? eff.default : null;
+          }
+        }
+      }
+    });
+    return out;
+  }
+
+  // -----------------------------
+  // Path/ID helpers (single source of truth)
+  // -----------------------------
+  hyphenatePath(path) {
+    return String(path || '').replace(/[.\[\]]/g, '-');
+  }
+  pathToGroupId(path) {
+    return `form-group-${this.hyphenatePath(path)}`;
+  }
+  arrayItemId(arrayPath, index) {
+    return `form-array-item-${this.hyphenatePath(arrayPath)}-${index}`;
   }
 
   /**
@@ -1155,30 +1208,11 @@ export default class FormGenerator {
     // Data-first: reorder JSON array
     this.model.reorderArray(this.data, arrayPath, fromIndex, toIndex);
 
-    // Remap activation paths that reference this array (handles deep descendants)
-    const prefixRe = new RegExp(`^${arrayPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\[(\\d+)\\]`);
-    const updated = new Set();
-    const mapIndex = (oldIdx) => {
-      if (fromIndex < toIndex) {
-        if (oldIdx === fromIndex) return toIndex;
-        if (oldIdx > fromIndex && oldIdx <= toIndex) return oldIdx - 1;
-        return oldIdx;
-      }
-      if (fromIndex > toIndex) {
-        if (oldIdx === fromIndex) return toIndex;
-        if (oldIdx >= toIndex && oldIdx < fromIndex) return oldIdx + 1;
-        return oldIdx;
-      }
-      return oldIdx;
-    };
-    this.activeOptionalGroups.forEach((p) => {
-      const m = p.match(prefixRe);
-      if (!m) { updated.add(p); return; }
-      const oldIdx = Number(m[1]);
-      const newIdx = mapIndex(oldIdx);
-      updated.add(p.replace(prefixRe, `${arrayPath}[${newIdx}]`));
-    });
-    this.activeOptionalGroups = updated;
+    // Clear stale activation paths under this array. Presence in data will drive activation.
+    const subtreePrefix = new RegExp(`^${arrayPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\[`);
+    const filtered = new Set();
+    this.activeOptionalGroups.forEach((p) => { if (!subtreePrefix.test(p)) filtered.add(p); });
+    this.activeOptionalGroups = filtered;
 
     // Rebuild from data/schema so DOM and navigation reflect the new order consistently
     const hyphenPath = arrayPath.replace(/[.\[\]]/g, '-');
