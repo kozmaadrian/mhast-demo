@@ -15,6 +15,7 @@ export default class FormSidebar {
     // Event handlers
     this.onModeToggle = null;
     this.onRemove = null;
+    this.onReset = null;
     this.onNavigationClick = null;
   }
 
@@ -41,6 +42,9 @@ export default class FormSidebar {
         </button>
         <button class="form-ui-toggle form-tab" aria-label="Switch between form and raw JSON view" title="Switch between form and raw JSON view">
           ${FormIcons.getIconSvg('code')}
+        </button>
+        <button class="form-ui-reset form-tab" aria-label="Reset form data" title="Reset form data">
+          ${FormIcons.getIconSvg('rotate-ccw')}
         </button>
         <button class="form-ui-remove form-tab" aria-label="Remove this form from the document" title="Remove this form from the document">
           ${FormIcons.getIconSvg('trash')}
@@ -85,6 +89,36 @@ export default class FormSidebar {
       removeBtn.addEventListener('click', () => {
         if (this.onRemove) {
           this.onRemove();
+        }
+      });
+    }
+
+    // Reset button
+    const resetBtn = this.element.querySelector('.form-ui-reset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (this.onReset) {
+          // Visual confirm state toggle similar to remove buttons
+          if (!resetBtn.classList.contains('confirm-state')) {
+            resetBtn.classList.add('confirm-state');
+            // swap icon to a check
+            resetBtn.innerHTML = '✓';
+            const timeout = setTimeout(() => {
+              resetBtn.classList.remove('confirm-state');
+              resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
+              delete resetBtn.dataset.confirmTimeoutId;
+            }, 3000);
+            resetBtn.dataset.confirmTimeoutId = String(timeout);
+            return;
+          }
+          // confirmed: execute handler
+          if (resetBtn.dataset.confirmTimeoutId) {
+            clearTimeout(Number(resetBtn.dataset.confirmTimeoutId));
+            delete resetBtn.dataset.confirmTimeoutId;
+          }
+          resetBtn.classList.remove('confirm-state');
+          resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
+          this.onReset();
         }
       });
     }
@@ -234,6 +268,13 @@ export default class FormSidebar {
    */
   onNavigationClickHandler(handler) {
     this.onNavigationClick = handler;
+  }
+
+  /**
+   * Set event handler for reset button
+   */
+  onResetHandler(handler) {
+    this.onReset = handler;
   }
 
   /**

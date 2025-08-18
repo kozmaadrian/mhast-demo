@@ -26,6 +26,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   const effectiveShowRemove = typeof controls.showRemove === 'boolean'
     ? controls.showRemove
     : (typeof legacyShowRemove === 'boolean' ? legacyShowRemove : true);
+  const showReset = typeof controls.showReset === 'boolean' ? controls.showReset : false;
 
   // Wrapper
   const wrapper = document.createElement('div');
@@ -63,6 +64,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     const removeBtn = sideEl.querySelector('.form-ui-remove');
     if (removeBtn) removeBtn.remove();
   }
+  // Optionally hide reset button
+  if (!showReset) {
+    const resetBtn = sideEl.querySelector('.form-ui-reset');
+    if (resetBtn) resetBtn.remove();
+  }
 
   // Optionally make the sidebar fixed open (no collapse control)
   const fixedSidebar = !!controls.fixedSidebar;
@@ -93,32 +99,12 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
 
   // Auto-float sidebar when it would be outside the viewport (keeps nav and blue marker visible)
-  let isAutoFloating = false;
-  const ensureSidebarVisibility = () => {
-    // Skip when user explicitly fixed sidebar inline
-    const rect = sideEl.getBoundingClientRect();
-    const offscreenRight = rect.left >= window.innerWidth - 8;
-    const offscreenLeft = rect.right <= 8;
-    const shouldFloat = offscreenRight || offscreenLeft;
-    if (shouldFloat && !isAutoFloating) {
-      // Switch to floating fixed panel
-      sideEl.classList.remove('form-inline-panel');
-      sideEl.classList.add('floating-panel');
-      isAutoFloating = true;
-    } else if (!shouldFloat && isAutoFloating) {
-      // Restore inline panel
-      sideEl.classList.remove('floating-panel');
-      sideEl.classList.add('form-inline-panel');
-      isAutoFloating = false;
-    }
-  };
+  // Disabled: keep sidebar inline/sticky so it does not move past form
+  const ensureSidebarVisibility = () => {};
 
   // Listen to scroll/resize to keep panel visible
-  const onScrollOrResize = () => {
-    requestAnimationFrame(ensureSidebarVisibility);
-  };
-  window.addEventListener('scroll', onScrollOrResize, { passive: true });
-  window.addEventListener('resize', onScrollOrResize, { passive: true });
+  const onScrollOrResize = () => {};
+  // Auto-floating suppressed
   // Initial check
   ensureSidebarVisibility();
 
@@ -157,6 +143,22 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
       if (typeof onRemove === 'function') onRemove();
     });
   }
+  // Reset handler
+  sidebar.onResetHandler(() => {
+    // Confirmation UI is handled by components/sidebar.js; this is the confirmed action
+    const base = generator.renderAllGroups
+      ? generator.generateBaseJSON(generator.schema)
+      : generator.model.generateBaseJSON(generator.schema);
+    generator.data = base;
+    generator.activeOptionalGroups = new Set();
+    generator.rebuildBody();
+    if (generator.navigationTree) {
+      generator.navigation.generateNavigationTree();
+    }
+    generator.validation.validateAllFields();
+    if (typeof onChange === 'function') onChange(generator.data);
+    if (isRawMode) codeEl.textContent = generator.getDataAsJSON();
+  });
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
     if (!navItem) return;
@@ -216,8 +218,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   function navigateTo(groupId) { generator.navigation.navigateToGroup(groupId); }
   function getData() { return generator.data; }
   function destroy() {
-    window.removeEventListener('scroll', onScrollOrResize);
-    window.removeEventListener('resize', onScrollOrResize);
+    // listeners were not added due to disabled auto-float
     generator.destroy();
     wrapper.remove();
     sidebar.destroy();
