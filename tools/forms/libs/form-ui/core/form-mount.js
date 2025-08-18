@@ -42,7 +42,9 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   codePre.appendChild(codeEl);
 
   // Build form
-  let generator = new FormGenerator(schema);
+  let generator = new FormGenerator(schema, {
+    renderAllGroups: !!controls.renderAllGroups,
+  });
   let formEl = generator.generateForm();
   // Keep code element inside container per existing markup
   formEl.appendChild(codePre);
@@ -184,7 +186,9 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   function updateSchema(nextSchema) {
     const dataSnapshot = generator.data;
     generator.destroy();
-    const newGen = new FormGenerator(nextSchema);
+    const newGen = new FormGenerator(nextSchema, {
+      renderAllGroups: !!controls.renderAllGroups,
+    });
     const newForm = newGen.generateForm();
     newForm.appendChild(codePre);
     // Replace current form and update references

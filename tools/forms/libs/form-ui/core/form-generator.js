@@ -22,12 +22,15 @@ import getControlElement from '../utils/dom-utils.js';
 import FormIcons from '../utils/icons.js';
 
 export default class FormGenerator {
-  constructor(schema) {
+  constructor(schema, options = {}) {
     // Use schema as-is; resolve only parts on-demand to avoid deep recursion on large graphs
     this.schema = schema;
+    this.renderAllGroups = !!options.renderAllGroups;
     // Data model
     this.model = new FormModel(this.schema);
-    this.data = this.model.generateBaseJSON(this.schema);
+    this.data = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
     this.listeners = new Set();
     this.groupCounter = 0;
     this.groupElements = new Map();
@@ -79,6 +82,7 @@ export default class FormGenerator {
       derefNode: this.derefNode.bind(this),
       getSchemaTitle: this.getSchemaTitle.bind(this),
       normalizeSchema: this.normalizeSchema.bind(this),
+      renderAllGroups: this.renderAllGroups,
     });
 
     // Visual overlay
@@ -119,7 +123,9 @@ export default class FormGenerator {
     let baseValue = {};
     if (schemaNode) {
       if (schemaNode.type === 'object') {
-        baseValue = this.model.generateBaseJSON(schemaNode);
+        baseValue = this.renderAllGroups
+          ? this.generateBaseJSON(schemaNode)
+          : this.model.generateBaseJSON(schemaNode);
       } else if (schemaNode.type === 'array') {
         baseValue = [];
       }
@@ -236,40 +242,63 @@ export default class FormGenerator {
   /**
    * Generate base JSON structure from schema with default values
    */
-  generateBaseJSON(schema) {
-    if (!schema || schema.type !== 'object' || !schema.properties) {
+  generateBaseJSON(schema, seenRefs = new Set()) {
+    const normalizedRoot = this.normalizeSchema(schema) || schema;
+    if (!normalizedRoot || normalizedRoot.type !== 'object' || !normalizedRoot.properties) {
       return {};
     }
 
     const baseData = {};
 
-    Object.entries(schema.properties).forEach(([key, propSchema]) => {
-      switch (propSchema.type) {
+    Object.entries(normalizedRoot.properties).forEach(([key, originalPropSchema]) => {
+      const effective = this.normalizeSchema(originalPropSchema) || originalPropSchema;
+      const refStr = originalPropSchema && originalPropSchema.$ref ? String(originalPropSchema.$ref) : null;
+      if (refStr) {
+        if (seenRefs.has(refStr)) {
+          // Prevent cycles
+          return;
+        }
+        seenRefs.add(refStr);
+      }
+
+      const type = Array.isArray(effective?.type)
+        ? (effective.type.find((t) => t !== 'null') || effective.type[0])
+        : effective?.type;
+
+      switch (type) {
         case 'string':
-          baseData[key] = propSchema.default || '';
+          baseData[key] = effective.default || '';
           break;
         case 'number':
         case 'integer':
-          baseData[key] = propSchema.default || 0;
+          baseData[key] = effective.default || 0;
           break;
         case 'boolean':
-          baseData[key] = propSchema.default || false;
+          baseData[key] = effective.default || false;
           break;
         case 'array':
-          // Always initialize arrays to [] even if optional; multifields should serialize as empty arrays
-          baseData[key] = Array.isArray(propSchema.default) ? propSchema.default : [];
+          // Always initialize arrays to [] so optional arrays serialize explicitly
+          baseData[key] = Array.isArray(effective.default) ? effective.default : [];
           break;
-        case 'object':
-          // Recursively generate base structure for nested objects
-          baseData[key] = this.generateBaseJSON(propSchema);
+        case 'object': {
+          // Recursively include all child properties
+          baseData[key] = this.generateBaseJSON(effective, seenRefs);
           break;
-        default:
-          // For unknown types or when no type is specified
-          if (propSchema.enum) {
-            baseData[key] = propSchema.default || '';
+        }
+        default: {
+          // If effective is a ref to an object without explicit type, try recursing
+          if (effective && typeof effective === 'object' && effective.properties) {
+            baseData[key] = this.generateBaseJSON(effective, seenRefs);
+          } else if (effective && effective.enum) {
+            baseData[key] = effective.default || '';
           } else {
-            baseData[key] = propSchema.default || null;
+            baseData[key] = effective && Object.prototype.hasOwnProperty.call(effective, 'default') ? effective.default : null;
           }
+        }
+      }
+
+      if (refStr) {
+        seenRefs.delete(refStr);
       }
     });
 
@@ -369,8 +398,10 @@ export default class FormGenerator {
     );
     if (isArrayOfObjects) {
       // Optional gating for arrays-of-objects (including nested within array items)
-      if (!isRequired && !this.isOptionalGroupActive(fullPath)) {
-        return null;
+      if (!isRequired) {
+        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) {
+          return null;
+        }
       }
       const groupContainer = document.createElement('div');
       groupContainer.className = 'form-ui-group';
@@ -395,6 +426,16 @@ export default class FormGenerator {
       groupContent.className = 'form-ui-group-content';
       const arrayUI = this.generateInput(fullPath, propSchema);
       if (arrayUI) groupContent.appendChild(arrayUI);
+      
+      // If rendering all groups and the array is required, ensure one item is present by default
+      if (this.renderAllGroups && isRequired && arrayUI) {
+        const existing = this.model.getNestedValue(this.data, fullPath);
+        const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
+        const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
+        if (Array.isArray(existing) && existing.length === 0 && itemsContainer && itemsContainer.children.length === 0 && addBtn) {
+          try { addBtn.click(); } catch { /* noop */ }
+        }
+      }
       groupContainer.appendChild(groupContent);
 
       groupContainer.dataset.fieldPath = fullPath;
@@ -404,12 +445,14 @@ export default class FormGenerator {
     // Special-case: nested object inside array items (or any object field) should render as its own inline group
     const isObjectType = !!(propSchema && (propSchema.type === 'object' || propSchema.properties));
     if (isObjectType && propSchema.properties) {
-      // Optional object group gating: only show when activated or required
-      if (!isRequired && !this.isOptionalGroupActive(fullPath)) return null;
+      // Optional object group gating: allow when renderAllGroups
+      if (!isRequired) {
+        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) return null;
+      }
 
       const groupContainer = document.createElement('div');
       groupContainer.className = 'form-ui-group';
-      groupContainer.id = `form-group-${fullPath.replace(/[\.\[\]]/g, '-')}`;
+      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
       groupContainer.dataset.groupPath = fullPath;
 
       const groupHeader = document.createElement('div');
@@ -702,7 +745,9 @@ export default class FormGenerator {
     if (!container) return;
 
     // Start with previous data merged over base structure to keep optional branches
-    const baseStructure = this.model.generateBaseJSON(this.schema);
+    const baseStructure = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
     this.data = this.model.deepMerge(baseStructure, this.data || {});
 
     // Collect all form inputs and organize them into nested structure
@@ -750,7 +795,9 @@ export default class FormGenerator {
    */
   loadData(data) {
     // Merge incoming data with base structure to ensure all fields are present
-    const baseStructure = this.model.generateBaseJSON(this.schema);
+    const baseStructure = this.renderAllGroups
+      ? this.generateBaseJSON(this.schema)
+      : this.model.generateBaseJSON(this.schema);
     this.data = this.deepMerge(baseStructure, data || {});
 
     if (!this.container) return;
@@ -813,7 +860,10 @@ export default class FormGenerator {
       const data = JSON.parse(jsonString);
       this.loadData(data);
       // Ensure internal data is updated for listeners
-      this.data = this.model.deepMerge(this.model.generateBaseJSON(this.schema), data || {});
+      const base = this.renderAllGroups
+        ? this.generateBaseJSON(this.schema)
+        : this.model.generateBaseJSON(this.schema);
+      this.data = this.model.deepMerge(base, data || {});
       return true;
     } catch (error) {
       // Keep behavior but avoid noisy console in lints; consumers can handle return value

@@ -131,6 +131,10 @@ export default class FormNavigation {
   generateNavigationTree() {
     if (!this.formGenerator.navigationTree) return;
 
+    // Preserve current scroll position to avoid jumping to top on re-render
+    const treeEl = this.formGenerator.navigationTree;
+    const prevScrollTop = treeEl.scrollTop;
+
     // Clear existing navigation
     this.formGenerator.navigationTree.innerHTML = '';
 
@@ -149,8 +153,11 @@ export default class FormNavigation {
     // Add scroll syncing: move active indicator while user scrolls the form
     this.enableScrollSync();
 
-    // Ensure clicks on array-group items work the same as object groups
-    // (handled by delegated onTreeClick using data-group-id)
+    // Restore prior scroll position after layout is updated
+    requestAnimationFrame(() => {
+      const maxTop = Math.max(0, treeEl.scrollHeight - treeEl.clientHeight);
+      treeEl.scrollTop = Math.min(prevScrollTop, maxTop);
+    });
   }
 
     /**
@@ -294,7 +301,7 @@ export default class FormNavigation {
     const hasPrimitivesAtThisLevel = this.formGenerator.hasPrimitiveFields(normalized);
     if (hasPrimitivesAtThisLevel) {
       const groupPath = pathPrefix || 'root';
-      const groupId = `form-group-${groupPath.replace(/\./g, '-')}`;
+      const groupId = `form-group-${groupPath.replace(/[.\[\]]/g, '-')}`;
       const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()));
 
       const navItem = document.createElement('div');
@@ -340,7 +347,10 @@ export default class FormNavigation {
 
       // Optional inactive refs/array-groups: show an Add item IN PLACE
       const requiresActivation = hasRef || isArrayOfObjects;
-      const isActive = !isOptional || !requiresActivation || this.formGenerator.isOptionalGroupActive(nestedPath);
+      const isActive = this.formGenerator.renderAllGroups
+        || !isOptional
+        || !requiresActivation
+        || this.formGenerator.isOptionalGroupActive(nestedPath);
       if (!isActive && requiresActivation) {
         const addItem = document.createElement('div');
         addItem.className = 'form-ui-nav-item form-ui-nav-item-add';
@@ -364,7 +374,7 @@ export default class FormNavigation {
 
       // Active arrays-of-objects: render as their own group item
       if (isArrayOfObjects) {
-        const groupId = `form-group-${nestedPath.replace(/\./g, '-')}`;
+        const groupId = `form-group-${nestedPath.replace(/[.\[\]]/g, '-')}`;
         const navItem = document.createElement('div');
         navItem.className = 'form-ui-nav-item';
         navItem.dataset.groupId = groupId;
@@ -417,7 +427,7 @@ export default class FormNavigation {
             itemNav.addEventListener('drop', this.onItemDrop);
             items.push(itemNav);
 
-            // Inspect the item schema for nested arrays-of-objects (e.g., answerList inside questionList)
+            // Inspect the item schema for nested arrays-of-objects and nested objects (e.g., link/dataRef/questionnaire)
             const itemSchema = this.formGenerator.derefNode(derefProp.items) || derefProp.items || {};
             const itemProps = itemSchema.properties || {};
             const itemRequired = new Set(itemSchema.required || []);
@@ -429,11 +439,14 @@ export default class FormNavigation {
                 )
               );
               const childHasRef = !!childOriginal?.$ref || !!childProp?.$ref;
-              if (!childIsArrayOfObjects && !childHasRef) continue;
+              const childIsObject = !!(childProp && (childProp.type === 'object' || childProp.properties));
+              if (!childIsArrayOfObjects && !childHasRef && !childIsObject) continue;
 
               const childPath = `${nestedPath}[${idx}].${childKey}`;
               const childOptional = !itemRequired.has(childKey);
-              const childActive = !childOptional || this.formGenerator.isOptionalGroupActive(childPath);
+              const childActive = this.formGenerator.renderAllGroups
+                || !childOptional
+                || this.formGenerator.isOptionalGroupActive(childPath);
 
               if (!childActive) {
                 // Show an add option for the nested array under this item
@@ -454,21 +467,27 @@ export default class FormNavigation {
                 continue;
               }
 
-              // Render the nested array group under this item
+              // Render nested object-or-array-of-objects under this item without duplicating objects
               const childGroupId = `form-group-${childPath.replace(/[.\[\]]/g, '-')}`;
-              const childNav = document.createElement('div');
-              childNav.className = 'form-ui-nav-item';
-              childNav.dataset.groupId = childGroupId;
-              childNav.dataset.level = level + 3;
-              const childContent = document.createElement('div');
-              childContent.className = 'form-ui-nav-item-content';
-              childContent.style.setProperty('--nav-level', level + 3);
-              const childTitle = document.createElement('span');
-              childTitle.className = 'form-ui-nav-item-title';
-              childTitle.textContent = this.formGenerator.getSchemaTitle(childProp, childKey);
-              childContent.appendChild(childTitle);
-              childNav.appendChild(childContent);
-              items.push(childNav);
+              if (childIsArrayOfObjects) {
+                const childNav = document.createElement('div');
+                childNav.className = 'form-ui-nav-item';
+                childNav.dataset.groupId = childGroupId;
+                childNav.dataset.level = level + 3;
+                const childContent = document.createElement('div');
+                childContent.className = 'form-ui-nav-item-content';
+                childContent.style.setProperty('--nav-level', level + 3);
+                const childTitle = document.createElement('span');
+                childTitle.className = 'form-ui-nav-item-title';
+                childTitle.textContent = this.formGenerator.getSchemaTitle(childProp, childKey);
+                childContent.appendChild(childTitle);
+                childNav.appendChild(childContent);
+                items.push(childNav);
+              } else if (childIsObject) {
+                // For nested objects, rely on recursive generation to avoid duplicate entry
+                const nestedChildItems = this.generateNavigationItems(childProp, childPath, level + 3);
+                items.push(...nestedChildItems);
+              }
 
               // Add entries for each nested array item
               const childArrayContainer = this.formGenerator.container?.querySelector?.(
@@ -516,7 +535,7 @@ export default class FormNavigation {
         const hasNestedPrimitives = this.formGenerator.hasPrimitiveFields(derefProp);
         const hasChildren = Object.keys(derefProp.properties || {}).length > 0;
         if (!hasNestedPrimitives && hasChildren) {
-          const sectionId = `form-section-${nestedPath.replace(/\./g, '-')}`;
+          const sectionId = `form-section-${nestedPath.replace(/[.\[\]]/g, '-')}`;
           const sectionTitle = this.formGenerator.getSchemaTitle(derefProp, key);
 
           const sectionItem = document.createElement('div');

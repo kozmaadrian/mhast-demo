@@ -5,7 +5,7 @@
  */
 
 export default class GroupBuilder {
-  constructor({ inputFactory, formatLabel, hasPrimitiveFields, generateObjectFields, generateInput, generateField, isOptionalGroupActive = () => true, onActivateOptionalGroup = () => {}, refreshNavigation = () => {}, derefNode = (n) => n, getSchemaTitle = (s, k) => k }) {
+  constructor({ inputFactory, formatLabel, hasPrimitiveFields, generateObjectFields, generateInput, generateField, isOptionalGroupActive = () => true, onActivateOptionalGroup = () => {}, refreshNavigation = () => {}, derefNode = (n) => n, getSchemaTitle = (s, k) => k, normalizeSchema, renderAllGroups = false }) {
     this.inputFactory = inputFactory;
     this.formatLabel = formatLabel;
     this.hasPrimitiveFields = hasPrimitiveFields;
@@ -17,10 +17,14 @@ export default class GroupBuilder {
     this.refreshNavigation = refreshNavigation;
     this.derefNode = derefNode;
     this.getSchemaTitle = getSchemaTitle;
+    this.normalizeSchema = normalizeSchema;
+    this.renderAllGroups = !!renderAllGroups;
+    this._maxDepth = 50;
   }
 
   // Inline builder that preserves property order and appends child groups/fields inline
-  buildInline(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map()) {
+  buildInline(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map(), seenRefs = new Set(), depth = 0) {
+    if (depth > this._maxDepth) return outMap;
     const schema = this.normalizeSchema ? this.normalizeSchema(rawSchema) : rawSchema;
     if (!schema || schema.type !== 'object' || !schema.properties) return outMap;
 
@@ -71,14 +75,24 @@ export default class GroupBuilder {
       const nestedPathStr = nestedSchemaPath.join('.');
       const isOptional = !requiredSet.has(key);
 
-      if ((hasRef || isObjectType || isArrayOfObjects) && isOptional && !this.isOptionalGroupActive(nestedPathStr)) {
-        // skip until activated (sidebar handles add)
-        return;
+      // Skip optional groups only when not rendering all groups by default
+      if (isOptional && !this.renderAllGroups) {
+        if ((hasRef || isObjectType || isArrayOfObjects) && !this.isOptionalGroupActive(nestedPathStr)) {
+          // skip until activated (sidebar handles add)
+          return;
+        }
       }
 
       if (isObjectType && propSchema.properties) {
+        // Prevent circular recursion via repeated $ref on current path
+        const refStr = originalPropSchema?.$ref || propSchema?.$ref || null;
+        if (refStr && seenRefs.has(refStr)) {
+          return;
+        }
+        if (refStr) seenRefs.add(refStr);
         // recurse as an inline child group
-        this.buildInline(groupContent, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
+        this.buildInline(groupContent, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap, seenRefs, depth + 1);
+        if (refStr) seenRefs.delete(refStr);
         // mark that after this inline group ends, if we continue with parent primitives, we should show a separator with parent title
         pendingParentSeparator = true;
         return;
@@ -108,7 +122,8 @@ export default class GroupBuilder {
     return outMap;
   }
 
-  build(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map()) {
+  build(container, rawSchema, breadcrumbPath = [], schemaPath = [], outMap = new Map(), seenRefs = new Set(), depth = 0) {
+    if (depth > this._maxDepth) return outMap;
     const schema = this.normalizeSchema ? this.normalizeSchema(rawSchema) : rawSchema;
     if (schema.type !== 'object' || !schema.properties) return outMap;
 
@@ -186,9 +201,11 @@ export default class GroupBuilder {
       const nestedPathStr = nestedSchemaPath.join('.');
       const isOptional = !(schema.required || []).includes(key);
 
-      // Optional nested object or array-of-objects: if inactive, do not render in content.
-      if ((isArrayGroup || hasRef) && isOptional && !this.isOptionalGroupActive(nestedPathStr)) {
-        return; // content stays clean; sidebar handles activation
+      // Optional nested object or array-of-objects: skip only when not rendering all groups by default
+      if (isOptional && !this.renderAllGroups) {
+        if ((isArrayGroup || hasRef) && !this.isOptionalGroupActive(nestedPathStr)) {
+          return; // content stays clean; sidebar handles activation
+        }
       }
 
       if (!this.hasPrimitiveFields(propSchema) && Object.keys(propSchema.properties || {}).length > 0) {
@@ -243,8 +260,24 @@ export default class GroupBuilder {
         groupContainer.dataset.fieldPath = pathPrefix;
         childrenHost.appendChild(groupContainer);
         outMap.set(groupId, { element: groupContainer, path: nestedBreadcrumbPath, title: this.getSchemaTitle(propSchema, key), isSection: false });
+
+        // If rendering all groups and the array is required, ensure one item exists by default
+        if (this.renderAllGroups && !isOptional && arrayUI) {
+          const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
+          const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
+          if (itemsContainer && itemsContainer.children.length === 0 && addBtn) {
+            try { addBtn.click(); } catch { /* noop */ }
+          }
+        }
       } else {
-        this.build(childrenHost, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap);
+        // Prevent circular recursion via repeated $ref on current path
+        const refStr = originalPropSchema?.$ref || propSchema?.$ref || null;
+        if (refStr && seenRefs.has(refStr)) {
+          return;
+        }
+        if (refStr) seenRefs.add(refStr);
+        this.build(childrenHost, propSchema, nestedBreadcrumbPath, nestedSchemaPath, outMap, seenRefs, depth + 1);
+        if (refStr) seenRefs.delete(refStr);
       }
     });
 
