@@ -523,20 +523,6 @@ export default class FormGenerator {
     // Field input
     const input = this.generateInput(fullPath, propSchema);
     if (input) {
-      // Data-first hydration for arrays of primitives: create item inputs based on existing data length
-      if (propSchema && propSchema.type === 'array') {
-        const itemSchema = this.derefNode(propSchema.items) || propSchema.items || {};
-        const isPrimitiveItem = !itemSchema || (itemSchema.type && itemSchema.type !== 'object' && !itemSchema.properties);
-        if (isPrimitiveItem) {
-          const existingArr = this.model.getNestedValue(this.data, fullPath);
-          const addBtn = input.querySelector?.('.form-ui-array-add');
-          if (Array.isArray(existingArr) && existingArr.length > 0 && addBtn) {
-            for (let i = 0; i < existingArr.length; i += 1) {
-              try { addBtn.click(); } catch { /* noop */ }
-            }
-          }
-        }
-      }
       fieldContainer.appendChild(input);
 
       // If field is required, visually indicate on the input with a red border (not the label)
@@ -650,18 +636,11 @@ export default class FormGenerator {
               clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
               delete removeButton.dataset.confirmTimeoutId;
             }
-            // Data-first remove
+            // Data-first removal and full rebuild
             this.updateData();
-            const arr = this.model.getNestedValue(this.data, fieldPath) || [];
-            // Find this element's index by ID suffix
-            const idMatch = itemContainer.id.match(/-(\d+)$/);
-            const idx = idMatch ? Number(idMatch[1]) : -1;
-            if (Array.isArray(arr) && idx >= 0 && idx < arr.length) {
-              arr.splice(idx, 1);
-              this.model.setNestedValue(this.data, fieldPath, arr);
-              this.rebuildBody();
-              requestAnimationFrame(() => this.validation.validateAllFields());
-            }
+            this.model.removeArrayItem(this.data, fieldPath, index);
+            this.rebuildBody();
+            requestAnimationFrame(() => this.validation.validateAllFields());
           } else {
             const originalHTML = removeButton.innerHTML;
             const originalTitle = removeButton.title;
@@ -691,29 +670,23 @@ export default class FormGenerator {
       addButton.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        try {
-          // eslint-disable-next-line no-console
-          console.log('[GEN][ADD] Add button clicked for array (data-first)', { fieldPath });
-        } catch { /* noop */ }
-        // Data-first add
+        // Data-first add: mutate data and rebuild
         this.updateData();
-        const arr = this.model.getNestedValue(this.data, fieldPath) || [];
-        const itemDef = this.derefNode(propSchema.items) || propSchema.items || {};
-        let baseItem = {};
-        if (itemDef && (itemDef.type === 'object' || itemDef.properties)) {
-          baseItem = this.generateBaseJSON(itemDef);
-        }
-        const newIndex = arr.length;
-        arr.push(baseItem);
-        this.model.setNestedValue(this.data, fieldPath, arr);
+        const newItem = this.createDefaultObjectFromSchema(itemsSchema);
+        this.model.pushArrayItem(this.data, fieldPath, newItem);
+        const newIndex = (this.model.getNestedValue(this.data, fieldPath) || []).length - 1;
         this.rebuildBody();
-        // Navigate and validate after rebuild
+        // Refresh navigation and validate
+        if (this.navigationTree) {
+          this.navigation.generateNavigationTree();
+        }
+        requestAnimationFrame(() => this.validation.validateAllFields());
+        // Navigate to the newly added item
         requestAnimationFrame(() => {
-          const hyphen = `${fieldPath}[${newIndex}]`.replace(/[.\[\]]/g, '-');
+          const hyphen = fieldPath.replace(/[.\[\]]/g, '-');
           const targetId = `form-array-item-${hyphen}-${newIndex}`;
           const el = this.container?.querySelector?.(`#${targetId}`);
           if (el && el.id) this.navigation.navigateToGroup(el.id);
-          this.validation.validateAllFields();
         });
       });
       addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
@@ -751,6 +724,17 @@ export default class FormGenerator {
   }
 
   // Legacy input creators were moved to InputFactory; intentionally removed to reduce duplication.
+
+  /**
+   * Create a default item for an array-of-objects based on its items schema
+   */
+  createDefaultObjectFromSchema(itemsSchema) {
+    const node = this.derefNode(itemsSchema) || itemsSchema || {};
+    if (node && (node.type === 'object' || node.properties)) {
+      return this.generateBaseJSON(this.normalizeSchema(node));
+    }
+    return {};
+  }
 
   /**
    * Format field name as label
@@ -1169,14 +1153,7 @@ export default class FormGenerator {
     this.updateData();
 
     // Data-first: reorder JSON array
-    const arr = this.model.getNestedValue(this.data, arrayPath);
-    if (!Array.isArray(arr)) return;
-    const len = arr.length;
-    if (fromIndex < 0 || fromIndex >= len || toIndex < 0 || toIndex >= len) return;
-
-    const moved = arr.splice(fromIndex, 1)[0];
-    arr.splice(toIndex, 0, moved);
-    this.model.setNestedValue(this.data, arrayPath, arr);
+    this.model.reorderArray(this.data, arrayPath, fromIndex, toIndex);
 
     // Remap activation paths that reference this array (handles deep descendants)
     const prefixRe = new RegExp(`^${arrayPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\[(\\d+)\\]`);
