@@ -393,19 +393,16 @@ export default class FormNavigation {
         items.push(navItem);
 
         // Child items: one entry per existing array item in the form
-        const arrayContainer = this.formGenerator.container?.querySelector?.(
-          `#${groupId} .form-ui-array-items`
-        );
-        if (arrayContainer) {
-          // Only count direct children items to avoid picking nested array items inside each item
-          const itemEls = Array.from(arrayContainer.querySelectorAll(':scope > .form-ui-array-item'));
-          try { console.log('[NAV][BUILD] Listing array items', { path: nestedPath, count: itemEls.length }); } catch {}
-          itemEls.forEach((el, idx) => {
+        const dataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, nestedPath) || [];
+        if (Array.isArray(dataArray)) {
+          try { console.log('[NAV][BUILD] Listing array items (data-driven)', { path: nestedPath, count: dataArray.length }); } catch {}
+          dataArray.forEach((_, idx) => {
             // Each item gets a child nav node with its own anchor to the item container
             const itemNav = document.createElement('div');
             itemNav.className = 'form-ui-nav-item';
             itemNav.classList.add('form-ui-nav-item-array-child');
-            itemNav.dataset.groupId = el.id || `${groupId}-item-${idx}`;
+            const arrIdBase = nestedPath.replace(/[\.\[\]]/g, '-');
+            itemNav.dataset.groupId = `form-array-item-${arrIdBase}-${idx}`;
             itemNav.dataset.level = level + 2;
             itemNav.dataset.arrayPath = nestedPath;
             itemNav.dataset.itemIndex = String(idx);
@@ -489,21 +486,16 @@ export default class FormNavigation {
                 items.push(...nestedChildItems);
               }
 
-              // Add entries for each nested array item
-              const childArrayContainer = this.formGenerator.container?.querySelector?.(
-                `[data-field="${childPath}"] .form-ui-array-items`
-              ) || this.formGenerator.container?.querySelector?.(
-                `#${childGroupId} .form-ui-array-items`
-              );
-              if (childArrayContainer) {
-                // Again, only count direct nested items
-                const childItemEls = Array.from(childArrayContainer.querySelectorAll(':scope > .form-ui-array-item'));
-                try { console.log('[NAV][BUILD] Listing nested array items', { path: childPath, count: childItemEls.length }); } catch {}
-                childItemEls.forEach((cel, cidx) => {
+              // Add entries for each nested array item (data-driven)
+              const childDataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, childPath) || [];
+              if (Array.isArray(childDataArray)) {
+                try { console.log('[NAV][BUILD] Listing nested array items (data-driven)', { path: childPath, count: childDataArray.length }); } catch {}
+                childDataArray.forEach((_, cidx) => {
                   const childItemNav = document.createElement('div');
                   childItemNav.className = 'form-ui-nav-item';
                   childItemNav.classList.add('form-ui-nav-item-array-child');
-                  childItemNav.dataset.groupId = cel.id || `${childGroupId}-item-${cidx}`;
+                  const childArrIdBase = childPath.replace(/[\.\[\]]/g, '-');
+                  childItemNav.dataset.groupId = `form-array-item-${childArrIdBase}-${cidx}`;
                   childItemNav.dataset.level = level + 4;
                   childItemNav.dataset.arrayPath = childPath;
                   childItemNav.dataset.itemIndex = String(cidx);
@@ -629,6 +621,8 @@ export default class FormNavigation {
     if (navItem.classList.contains('form-ui-nav-item-add')) {
       // Activate corresponding optional group directly from schema path
       const path = navItem.dataset.path || groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
+      // Persist any in-progress edits before mutating data
+      this.formGenerator.updateData();
       try {
         // Debug logs for activation
         // eslint-disable-next-line no-console
@@ -663,51 +657,29 @@ export default class FormNavigation {
       } catch { /* noop */ }
       if (node) {
         this.formGenerator.onActivateOptionalGroup(path, node);
-        // After activation and any auto-adds, ensure validation runs against new inputs
-        requestAnimationFrame(() => this.formGenerator.validation.validateAllFields());
-        // If activated node is array-of-objects, immediately add the first item
         const normalized = this.formGenerator.normalizeSchema(node);
         if (normalized && normalized.type === 'array') {
-          if (this._autoAddedOnce.has(path)) {
-            try { console.log('[NAV][ADD] Skipping auto-add (already performed)', { path }); } catch {}
-          } else {
-            this._autoAddedOnce.add(path);
-            setTimeout(() => this._autoAddedOnce.delete(path), 500);
+          // Data-first: append a new item to the array in JSON, then rebuild
+          const itemsSchema = this.formGenerator.derefNode(normalized.items) || normalized.items || {};
+          let baseItem = {};
+          if (itemsSchema && (itemsSchema.type === 'object' || itemsSchema.properties)) {
+            baseItem = this.formGenerator.generateBaseJSON(itemsSchema);
           }
-          // Find the add button for this array within the group and click it once
+          const arr = this.formGenerator.model.getNestedValue(this.formGenerator.data, path) || [];
+          const newIndex = arr.length;
+          arr.push(baseItem);
+          this.formGenerator.model.setNestedValue(this.formGenerator.data, path, arr);
+          this.formGenerator.rebuildBody();
           requestAnimationFrame(() => {
-            // Prefer exact data-field match
-            const byDataField = this.formGenerator.container.querySelector(`[data-field="${path}"] .form-ui-array-add`);
-            if (byDataField) {
-              const ctr = byDataField.closest('.form-ui-array-container');
-              if (ctr && ctr.dataset.field === path) {
-                try { console.log('[NAV][ADD] Clicking add button (data-field match)', { path }); } catch {}
-                byDataField.click();
-                return;
-              }
-            }
-            // Fallback to group id selector when no data-field container is present
-            const safeId = `form-group-${path.replace(/[.\[\]]/g, '-')}`;
-            const byGroupId = this.formGenerator.container.querySelector(`#${safeId} .form-ui-array-add`);
-            try {
-              // eslint-disable-next-line no-console
-              console.log('[NAV][ADD] Auto-add selection', { path, safeId, foundByDataField: !!byDataField, foundByGroupId: !!byGroupId });
-              const parentArray = path.includes('[') ? path.split('[')[0] : path;
-              const parentItems = this.formGenerator.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
-              // eslint-disable-next-line no-console
-              console.log('[NAV][ADD] Parent array items before add', { parentArray, count: parentItems });
-            } catch { /* noop */ }
-            if (byGroupId) {
-              const ctr = byGroupId.closest('.form-ui-array-container');
-              if (ctr && ctr.dataset.field === path) {
-                try { console.log('[NAV][ADD] Clicking add button (groupId fallback)', { path }); } catch {}
-                byGroupId.click();
-              } else {
-                try { console.warn('[NAV][ADD] Fallback add-button does not belong to path; skipping click', { path, safeId }); } catch {}
-              }
-            }
+            const hyphen = `${path}[${newIndex}]`.replace(/[\.\[\]]/g, '-');
+            const targetId = `form-array-item-${hyphen}-${newIndex}`;
+            const el = this.formGenerator.container?.querySelector?.(`#${targetId}`);
+            if (el && el.id) this.navigateToGroup(el.id);
+            this.formGenerator.validation.validateAllFields();
           });
+          return;
         }
+        // Non-array activation: rebuild already happened in onActivateOptionalGroup
         const newGroupId = `form-group-${path.replace(/\./g, '-')}`;
         requestAnimationFrame(() => this.navigateToGroup(newGroupId));
       }

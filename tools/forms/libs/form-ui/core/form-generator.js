@@ -504,6 +504,20 @@ export default class FormGenerator {
     // Field input
     const input = this.generateInput(fullPath, propSchema);
     if (input) {
+      // Data-first hydration for arrays of primitives: create item inputs based on existing data length
+      if (propSchema && propSchema.type === 'array') {
+        const itemSchema = this.derefNode(propSchema.items) || propSchema.items || {};
+        const isPrimitiveItem = !itemSchema || (itemSchema.type && itemSchema.type !== 'object' && !itemSchema.properties);
+        if (isPrimitiveItem) {
+          const existingArr = this.model.getNestedValue(this.data, fullPath);
+          const addBtn = input.querySelector?.('.form-ui-array-add');
+          if (Array.isArray(existingArr) && existingArr.length > 0 && addBtn) {
+            for (let i = 0; i < existingArr.length; i += 1) {
+              try { addBtn.click(); } catch { /* noop */ }
+            }
+          }
+        }
+      }
       fieldContainer.appendChild(input);
 
       // If field is required, visually indicate on the input with a red border (not the label)
@@ -617,26 +631,18 @@ export default class FormGenerator {
               clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
               delete removeButton.dataset.confirmTimeoutId;
             }
-            itemContainer.remove();
-            // Reindex remaining items' names to keep continuous indices
-            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, newIdx) => {
-              el.querySelectorAll('[name]').forEach((inputEl) => {
-                inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${newIdx}]`);
-              });
-              // Update IDs to reflect new indices
-              el.id = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${newIdx}`;
-              // Update per-item title labels to match new index
-              const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
-              if (lbl) lbl.textContent = `${baseTitle} #${newIdx + 1}`;
-            });
+            // Data-first remove
             this.updateData();
-            // Refresh group registry and navigation to reflect item changes
-            this.ensureGroupRegistry();
-            if (this.navigationTree) {
-              this.navigation.generateNavigationTree();
+            const arr = this.model.getNestedValue(this.data, fieldPath) || [];
+            // Find this element's index by ID suffix
+            const idMatch = itemContainer.id.match(/-(\d+)$/);
+            const idx = idMatch ? Number(idMatch[1]) : -1;
+            if (Array.isArray(arr) && idx >= 0 && idx < arr.length) {
+              arr.splice(idx, 1);
+              this.model.setNestedValue(this.data, fieldPath, arr);
+              this.rebuildBody();
+              requestAnimationFrame(() => this.validation.validateAllFields());
             }
-            // Re-validate due to potential required fields in items
-            this.validation.validateAllFields();
           } else {
             const originalHTML = removeButton.innerHTML;
             const originalTitle = removeButton.title;
@@ -668,33 +674,28 @@ export default class FormGenerator {
         event.stopPropagation();
         try {
           // eslint-disable-next-line no-console
-          console.log('[GEN][ADD] Add button clicked for array', { fieldPath, currentCount: itemsContainer.children.length });
+          console.log('[GEN][ADD] Add button clicked for array (data-first)', { fieldPath });
         } catch { /* noop */ }
-        try {
-          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
-          const siblingsBefore = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
-          console.log('[GEN][ADD] Parent array direct item count before add', { parentArray, siblingsBefore });
-        } catch { /* noop */ }
-        const index = itemsContainer.children.length;
-        addItemAt(index);
+        // Data-first add
         this.updateData();
-        // Refresh navigation to add a child nav item for the new array entry
-        if (this.navigationTree) {
-          this.navigation.generateNavigationTree();
+        const arr = this.model.getNestedValue(this.data, fieldPath) || [];
+        const itemDef = this.derefNode(propSchema.items) || propSchema.items || {};
+        let baseItem = {};
+        if (itemDef && (itemDef.type === 'object' || itemDef.properties)) {
+          baseItem = this.generateBaseJSON(itemDef);
         }
-        // Validate after DOM/nav is updated so newly added required fields are marked immediately
-        requestAnimationFrame(() => this.validation.validateAllFields());
-        // After add, refresh per-item labels to maintain continuous numbering
-        const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
-        Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, i) => {
-          const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
-          if (lbl) lbl.textContent = `${baseTitle} #${i + 1}`;
+        const newIndex = arr.length;
+        arr.push(baseItem);
+        this.model.setNestedValue(this.data, fieldPath, arr);
+        this.rebuildBody();
+        // Navigate and validate after rebuild
+        requestAnimationFrame(() => {
+          const hyphen = `${fieldPath}[${newIndex}]`.replace(/[.\[\]]/g, '-');
+          const targetId = `form-array-item-${hyphen}-${newIndex}`;
+          const el = this.container?.querySelector?.(`#${targetId}`);
+          if (el && el.id) this.navigation.navigateToGroup(el.id);
+          this.validation.validateAllFields();
         });
-        try {
-          const parentArray = fieldPath.includes('[') ? fieldPath.split('[')[0] : fieldPath;
-          const siblingsAfter = this.container.querySelectorAll(`[data-field="${parentArray}"] .form-ui-array-items > .form-ui-array-item`).length;
-          console.log('[GEN][ADD] Parent array direct item count after add', { parentArray, siblingsAfter });
-        } catch { /* noop */ }
       });
       addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
       container.appendChild(addButton);
@@ -815,22 +816,49 @@ export default class FormGenerator {
    * Recursively populate form fields
    */
   populateFormFields(data, prefix = '') {
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    if (data == null) return;
+
+    // Handle arrays of primitives/objects
+    if (Array.isArray(data)) {
+      data.forEach((item, idx) => {
+        const itemPrefix = `${prefix}[${idx}]`;
+        if (item && typeof item === 'object') {
+          this.populateFormFields(item, itemPrefix);
+        } else {
+          const field = this.container.querySelector(`[name="${itemPrefix}"]`);
+          if (field) {
+            if (field.type === 'checkbox') field.checked = Boolean(item);
+            else field.value = item || '';
+          }
+        }
+      });
       return;
     }
 
+    // Handle plain primitives bound directly to a name
+    if (typeof data !== 'object') {
+      if (prefix) {
+        const field = this.container.querySelector(`[name="${prefix}"]`);
+        if (field) {
+          if (field.type === 'checkbox') field.checked = Boolean(data);
+          else field.value = data || '';
+        }
+      }
+      return;
+    }
+
+    // Handle objects and recurse into arrays/objects
     Object.entries(data).forEach(([key, value]) => {
       const fieldName = prefix ? `${prefix}.${key}` : key;
       const field = this.container.querySelector(`[name="${fieldName}"]`);
 
-      if (field) {
-        if (field.type === 'checkbox') {
-          field.checked = Boolean(value);
-        } else {
-          field.value = value || '';
-        }
-      } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        // Recursively populate nested objects
+      if (field && (value == null || typeof value !== 'object')) {
+        if (field.type === 'checkbox') field.checked = Boolean(value);
+        else field.value = value || '';
+        return;
+      }
+
+      if (Array.isArray(value) || (value && typeof value === 'object')) {
         this.populateFormFields(value, fieldName);
       }
     });
@@ -1118,46 +1146,52 @@ export default class FormGenerator {
     if (!this.container || typeof fromIndex !== 'number' || typeof toIndex !== 'number') return;
     if (fromIndex === toIndex) return;
 
-    const hyphenPath = arrayPath.replace(/\./g, '-');
-    const groupId = `form-group-${hyphenPath}`;
-
-    const itemsContainer = this.container.querySelector(`#${groupId} .form-ui-array-items`) 
-      || this.container.querySelector(`[data-field="${arrayPath}"] .form-ui-array-items`);
-    if (!itemsContainer) return;
-
-    const items = Array.from(itemsContainer.querySelectorAll('.form-ui-array-item'));
-    if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) return;
-
-    const node = items[fromIndex];
-    const reference = items[toIndex];
-    if (!node || !reference) return;
-
-    // Move DOM node to the new position
-    if (toIndex > fromIndex) {
-      itemsContainer.insertBefore(node, reference.nextSibling);
-    } else {
-      itemsContainer.insertBefore(node, reference);
-    }
-
-    // Reindex names and IDs to match new order
-    Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
-      el.id = `form-array-item-${hyphenPath}-${idx}`;
-      el.querySelectorAll('[name]').forEach((inputEl) => {
-        inputEl.name = inputEl.name.replace(/\[[0-9]+\]/, `[${idx}]`);
-      });
-      const lbl = el.querySelector('.form-ui-separator-text .form-ui-separator-label');
-      if (lbl) {
-        const baseTitle = this.getSchemaTitle({ title: '' }, arrayPath.split('.').pop());
-        lbl.textContent = `${baseTitle} #${idx + 1}`;
-      }
-    });
-
-    // Update internal maps/data and refresh nav/validation
+    // Persist current edits first
     this.updateData();
-    this.ensureGroupRegistry();
-    if (this.navigationTree) {
-      this.navigation.generateNavigationTree();
-    }
-    this.validation.validateAllFields();
+
+    // Data-first: reorder JSON array
+    const arr = this.model.getNestedValue(this.data, arrayPath);
+    if (!Array.isArray(arr)) return;
+    const len = arr.length;
+    if (fromIndex < 0 || fromIndex >= len || toIndex < 0 || toIndex >= len) return;
+
+    const moved = arr.splice(fromIndex, 1)[0];
+    arr.splice(toIndex, 0, moved);
+    this.model.setNestedValue(this.data, arrayPath, arr);
+
+    // Remap activation paths that reference this array (handles deep descendants)
+    const prefixRe = new RegExp(`^${arrayPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\[(\\d+)\\]`);
+    const updated = new Set();
+    const mapIndex = (oldIdx) => {
+      if (fromIndex < toIndex) {
+        if (oldIdx === fromIndex) return toIndex;
+        if (oldIdx > fromIndex && oldIdx <= toIndex) return oldIdx - 1;
+        return oldIdx;
+      }
+      if (fromIndex > toIndex) {
+        if (oldIdx === fromIndex) return toIndex;
+        if (oldIdx >= toIndex && oldIdx < fromIndex) return oldIdx + 1;
+        return oldIdx;
+      }
+      return oldIdx;
+    };
+    this.activeOptionalGroups.forEach((p) => {
+      const m = p.match(prefixRe);
+      if (!m) { updated.add(p); return; }
+      const oldIdx = Number(m[1]);
+      const newIdx = mapIndex(oldIdx);
+      updated.add(p.replace(prefixRe, `${arrayPath}[${newIdx}]`));
+    });
+    this.activeOptionalGroups = updated;
+
+    // Rebuild from data/schema so DOM and navigation reflect the new order consistently
+    const hyphenPath = arrayPath.replace(/[.\[\]]/g, '-');
+    const movedItemId = `form-array-item-${hyphenPath}-${toIndex}`;
+    this.rebuildBody();
+    requestAnimationFrame(() => {
+      const el = this.container?.querySelector?.(`#${movedItemId}`);
+      if (el && el.id) this.navigation.navigateToGroup(el.id);
+      this.validation.validateAllFields();
+    });
   }
 }

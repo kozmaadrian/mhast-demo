@@ -28,6 +28,8 @@ export default class FormIcons {
         </svg>`;
       case 'plus': // new plus icon
         return `<svg ${common}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+      case 'rotate-ccw': // reset
+        return `<svg ${common}><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>`;
       default:
         return '';
     }

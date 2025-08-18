@@ -26,6 +26,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   const effectiveShowRemove = typeof controls.showRemove === 'boolean'
     ? controls.showRemove
     : (typeof legacyShowRemove === 'boolean' ? legacyShowRemove : true);
+  const showReset = typeof controls.showReset === 'boolean' ? controls.showReset : false;
 
   // Wrapper
   const wrapper = document.createElement('div');
@@ -62,6 +63,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   if (!effectiveShowRemove) {
     const removeBtn = sideEl.querySelector('.form-ui-remove');
     if (removeBtn) removeBtn.remove();
+  }
+  // Optionally hide reset button
+  if (!showReset) {
+    const resetBtn = sideEl.querySelector('.form-ui-reset');
+    if (resetBtn) resetBtn.remove();
   }
 
   // Optionally make the sidebar fixed open (no collapse control)
@@ -157,6 +163,44 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
       if (typeof onRemove === 'function') onRemove();
     });
   }
+  // Reset handler
+  sidebar.onResetHandler(() => {
+    const btn = sideEl.querySelector('.form-ui-reset');
+    if (!btn) return;
+    // confirm pattern like remove: toggle a confirm-state briefly
+    if (btn.classList.contains('confirm-state')) {
+      // confirmed → perform reset
+      if (btn.dataset.confirmTimeoutId) {
+        clearTimeout(Number(btn.dataset.confirmTimeoutId));
+        delete btn.dataset.confirmTimeoutId;
+      }
+      btn.classList.remove('confirm-state');
+      // Reset data to base structure depending on renderAllGroups
+      const base = generator.renderAllGroups
+        ? generator.generateBaseJSON(generator.schema)
+        : generator.model.generateBaseJSON(generator.schema);
+      generator.data = base;
+      generator.activeOptionalGroups = new Set();
+      // Rebuild everything from data/schema
+      generator.rebuildBody();
+      if (generator.navigationTree) {
+        generator.navigation.generateNavigationTree();
+      }
+      generator.validation.validateAllFields();
+      if (typeof onChange === 'function') onChange(generator.data);
+      if (isRawMode) {
+        codeEl.textContent = generator.getDataAsJSON();
+      }
+      return;
+    }
+    // First click → enter confirm state
+    btn.classList.add('confirm-state');
+    const timeout = setTimeout(() => {
+      btn.classList.remove('confirm-state');
+      delete btn.dataset.confirmTimeoutId;
+    }, 3000);
+    btn.dataset.confirmTimeoutId = String(timeout);
+  });
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
     if (!navItem) return;
