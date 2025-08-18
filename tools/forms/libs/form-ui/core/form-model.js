@@ -164,6 +164,50 @@ export default class FormModel {
 
     return result;
   }
+
+  // -----------------------------
+  // Centralized mutation helpers
+  // -----------------------------
+
+  /** Append an item to an array path (creates array if missing) */
+  pushArrayItem(data, arrayPath, newItem) {
+    const arr = this.getNestedValue(data, arrayPath);
+    if (Array.isArray(arr)) {
+      arr.push(newItem);
+    } else {
+      this.setNestedValue(data, arrayPath, [newItem]);
+    }
+    return data;
+  }
+
+  /** Remove an item at index from an array path */
+  removeArrayItem(data, arrayPath, index) {
+    const arr = this.getNestedValue(data, arrayPath);
+    if (!Array.isArray(arr)) return data;
+    if (index < 0 || index >= arr.length) return data;
+    arr.splice(index, 1);
+    return data;
+  }
+
+  /** Reorder an item from one index to another within an array path */
+  reorderArray(data, arrayPath, fromIndex, toIndex) {
+    const arr = this.getNestedValue(data, arrayPath);
+    if (!Array.isArray(arr)) return data;
+    if (fromIndex === toIndex) return data;
+    if (fromIndex < 0 || fromIndex >= arr.length || toIndex < 0 || toIndex >= arr.length) return data;
+    const moved = arr.splice(fromIndex, 1)[0];
+    arr.splice(toIndex, 0, moved);
+    return data;
+  }
+
+  /** Ensure an object exists at path using schema defaults */
+  ensureObjectAtPath(data, path, objectSchema) {
+    const current = this.getNestedValue(data, path);
+    if (current && typeof current === 'object' && !Array.isArray(current)) return data;
+    const base = this.generateBaseJSON(objectSchema);
+    this.setNestedValue(data, path, base);
+    return data;
+  }
 }
 
 

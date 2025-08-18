@@ -58,6 +58,25 @@ export default class FormGenerator {
         this.navigation.highlightActiveGroup(target);
       },
       derefNode: this.derefNode.bind(this),
+      getArrayValue: (path) => this.model.getNestedValue(this.data, path),
+      onArrayAdd: (path, propSchema) => {
+        // Data-first add for primitive arrays
+        this.updateData();
+        const itemSchema = this.derefNode(propSchema.items) || propSchema.items || { type: 'string' };
+        let defaultValue = '';
+        if (itemSchema.type === 'number' || itemSchema.type === 'integer') defaultValue = 0;
+        if (itemSchema.type === 'boolean') defaultValue = false;
+        this.model.pushArrayItem(this.data, path, defaultValue);
+        this.rebuildBody();
+        requestAnimationFrame(() => this.validation.validateAllFields());
+      },
+      onArrayRemove: (path, index, propSchema) => {
+        // Data-first remove for primitive arrays
+        this.updateData();
+        this.model.removeArrayItem(this.data, path, index);
+        this.rebuildBody();
+        requestAnimationFrame(() => this.validation.validateAllFields());
+      },
     });
 
     // Group builder delegates DOM structuring
