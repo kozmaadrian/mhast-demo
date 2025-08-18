@@ -222,4 +222,20 @@ State involved:
   - When an optional array-of-objects is activated (via sidebar), one item is auto-added if the array is empty (data-first).
   - The sidebar lists nested object children under array items.
 
+---
+
+## Data-first rules for all flows
+
+- Always: `updateData()` → mutate JSON via `FormModel` or command API → `rebuildBody()` → regenerate navigation → `validateAllFields()`.
+- Derive navigation items and counts from JSON (not DOM), and use path→ID helpers.
+- Keep optional nested objects under array items inactive by default (unless required or data exists).
+
+### Flow checklist when adding/changing behavior
+
+- Mutations go through command API? (activate/add/remove/reorder/reset)
+- Rebuild + validate scheduled in proper order?
+- Navigation and IDs updated using helpers?
+- Optional children remain gated appropriately?
+- README/README-FLOW updated when semantics change?
+
 

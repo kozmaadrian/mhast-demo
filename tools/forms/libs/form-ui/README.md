@@ -35,6 +35,21 @@ flowchart LR
   DOM -- input/change --> FG -- emits --> PM -- updates --> ProseMirror
 ```
 
+### Data-driven strategy (TL;DR)
+
+- **Single source of truth**: Schema (shape, labels, validation) + JSON data (mutable app state).
+- **Render from schema+data only**: Form content and sidebar/navigation must be derived from the schema and current data; avoid DOM-driven structure.
+- **Mutations go through commands**: All add/remove/reorder/activate/reset use `FormGenerator` commands which mutate JSON via `FormModel`, then rebuild and validate.
+- **Arrays-of-objects defaults are minimal**: When adding an item, include primitives, arrays, and required nested objects. Optional nested objects (e.g., `link`) are omitted until explicitly activated or data exists.
+- **`renderAllGroups` nuance**: Even when true, optional object children inside array items remain gated (to avoid overwhelming new items) unless required or present in data.
+- **Navigation is schema+data-driven**: Sidebar item counts and child listings come from data (no DOM counting). IDs use path→ID helpers.
+- **Validation runs post-rebuild**: After any structural change, validate on the next frame so required states are immediately visible.
+- **Path/ID helpers**: Use generator helpers to produce stable IDs and compare/escape paths consistently.
+
+Key APIs:
+- `FormModel`: `generateBaseJSON`, `get/setNestedValue`, `deepMerge`, `pushArrayItem`, `removeArrayItem`, `reorderArray`, `ensureObjectAtPath`.
+- `FormGenerator`: `commandActivateOptional`, `commandAddArrayItem`, `commandRemoveArrayItem`, `commandReorderArrayItem`, `commandResetAll`, plus `pathToGroupId`, `arrayItemId`.
+
 ### Directory roles
 
 - Core: orchestration and rendering pipeline
@@ -231,6 +246,23 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 
 - Change data shaping
   - Update `core/form-model.js` (base JSON, deepMerge, setNestedValue).
+
+### Developer checklist (before merging changes)
+
+- **Data-first?** Does every structural change (activate/add/remove/reorder/reset) mutate JSON through the command API and then rebuild/validate?
+- **Schema+data only?** Are new UI decisions based on schema/data (not DOM queries)?
+- **Optional children**: For array items, are optional nested objects left out by default and only rendered when required or activated?
+- **ID/path consistency**: Are IDs generated via `pathToGroupId/arrayItemId` and paths escaped consistently?
+- **Validation timing**: After structural updates, is `validateAllFields()` scheduled post-rebuild?
+- **Navigation parity**: Does the sidebar reflect the full nested structure based on data (no duplicate entries, no missing children)?
+- **Docs**: If you changed behavior (activation, defaults, renderAllGroups semantics), did you update README/README-FLOW?
+
+### Common pitfalls (avoid these)
+
+- Triggering DOM clicks to create items (causes loops); mutate data then rebuild instead.
+- Counting DOM nodes to derive array sizes; read from JSON (`FormModel.getNestedValue`).
+- Auto-including optional nested objects under array items on add; keep defaults minimal.
+- Updating IDs/paths by ad-hoc regex in multiple places; use the centralized helpers.
 
 ### Raw JSON mode (inspect‑only)
 
