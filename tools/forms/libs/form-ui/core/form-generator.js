@@ -789,6 +789,67 @@ export default class FormGenerator {
     return `form-array-item-${this.hyphenatePath(arrayPath)}-${index}`;
   }
 
+  // -----------------------------
+  // Schema resolve + command API
+  // -----------------------------
+  resolveSchemaByPath(dottedPath) {
+    const tokens = String(dottedPath || '').split('.');
+    let current = this.schema;
+    for (const token of tokens) {
+      const normalized = this.normalizeSchema(this.derefNode(current) || current);
+      if (!normalized) return null;
+      const match = token.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+      const key = match ? match[1] : token;
+      current = normalized?.properties?.[key];
+      if (!current) return null;
+      const idxPresent = match && typeof match[2] !== 'undefined';
+      if (idxPresent) {
+        const curNorm = this.normalizeSchema(this.derefNode(current) || current);
+        if (!curNorm || curNorm.type !== 'array') return null;
+        current = this.derefNode(curNorm.items) || curNorm.items;
+        if (!current) return null;
+      }
+    }
+    return current;
+  }
+
+  commandActivateOptional(path) {
+    const node = this.resolveSchemaByPath(path);
+    if (!node) return;
+    this.onActivateOptionalGroup(path, node);
+    const normalized = this.normalizeSchema(node);
+    if (normalized && normalized.type === 'array') {
+      // Auto-add first item if empty per agreed rule
+      this.updateData();
+      let arr = this.model.getNestedValue(this.data, path);
+      if (!Array.isArray(arr) || arr.length === 0) {
+        if (!Array.isArray(arr)) arr = [];
+        const baseItem = this.createDefaultObjectFromSchema(this.derefNode(normalized.items) || normalized.items || {});
+        this.model.pushArrayItem(this.data, path, baseItem);
+        this.rebuildBody();
+        this.validation.validateAllFields();
+      }
+    }
+  }
+
+  commandAddArrayItem(arrayPath) {
+    this.updateData();
+    const node = this.resolveSchemaByPath(arrayPath);
+    const normalized = this.normalizeSchema(node);
+    if (!normalized || normalized.type !== 'array') return;
+    const baseItem = this.createDefaultObjectFromSchema(this.derefNode(normalized.items) || normalized.items || {});
+    this.model.pushArrayItem(this.data, arrayPath, baseItem);
+    this.rebuildBody();
+    this.validation.validateAllFields();
+  }
+
+  commandRemoveArrayItem(arrayPath, index) {
+    this.updateData();
+    this.model.removeArrayItem(this.data, arrayPath, index);
+    this.rebuildBody();
+    this.validation.validateAllFields();
+  }
+
   /**
    * Format field name as label
    */
