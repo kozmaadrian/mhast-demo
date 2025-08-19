@@ -922,32 +922,59 @@ export default class FormGenerator {
       this.model.setNestedValue(this.data, normalizedName, value);
     });
 
-    // Post-process: prune empty placeholders from arrays of primitives (e.g., strings)
-    const primitiveArrayPaths = [];
-    const walkSchema = (node, prefix = '') => {
-      const s = this.normalizeSchema(this.derefNode(node) || node || {});
-      if (!s || s.type !== 'object' || !s.properties) return;
-      Object.entries(s.properties).forEach(([key, child]) => {
-        const eff = this.normalizeSchema(this.derefNode(child) || child || {});
-        const path = prefix ? `${prefix}.${key}` : key;
-        if (eff && eff.type === 'array') {
-          const itemEff = this.normalizeSchema(this.derefNode(eff.items) || eff.items || {});
+    // Post-process: prune empty entries from primitive arrays at any depth, including
+    // arrays nested within arrays-of-objects. This keeps JSON free of empty strings.
+    const prunePrimitiveArrays = (schemaNode, pathPrefix = '') => {
+      const s = this.normalizeSchema(this.derefNode(schemaNode) || schemaNode || {});
+      if (!s) return;
+      if (s.type === 'object' && s.properties) {
+        Object.entries(s.properties).forEach(([key, child]) => {
+          const eff = this.normalizeSchema(this.derefNode(child) || child || {});
+          const childPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+          if (!eff) return;
+          if (eff.type === 'array') {
+            const itemEff = this.normalizeSchema(this.derefNode(eff.items) || eff.items || {});
+            const dataArr = this.model.getNestedValue(this.data, childPath);
+            if (Array.isArray(dataArr)) {
+              const isObjectItems = !!(itemEff && (itemEff.type === 'object' || itemEff.properties));
+              if (isObjectItems) {
+                // Recurse for each object in array
+                for (let i = 0; i < dataArr.length; i += 1) {
+                  prunePrimitiveArrays(itemEff, `${childPath}[${i}]`);
+                }
+              } else {
+                // Primitive array: remove empty-string entries
+                const itemType = itemEff?.type || 'string';
+                if (itemType === 'string') {
+                  const filtered = dataArr.filter((v) => !(v == null || v === ''));
+                  this.model.setNestedValue(this.data, childPath, filtered);
+                }
+              }
+            }
+          } else if (eff.type === 'object' || eff.properties) {
+            prunePrimitiveArrays(eff, childPath);
+          }
+        });
+      } else if (s.type === 'array') {
+        const itemEff = this.normalizeSchema(this.derefNode(s.items) || s.items || {});
+        const dataArr = this.model.getNestedValue(this.data, pathPrefix);
+        if (Array.isArray(dataArr)) {
           const isObjectItems = !!(itemEff && (itemEff.type === 'object' || itemEff.properties));
-          if (!isObjectItems) primitiveArrayPaths.push({ path, itemType: itemEff?.type || 'string' });
-        } else if (eff && (eff.type === 'object' || eff.properties)) {
-          walkSchema(eff, path);
+          if (isObjectItems) {
+            for (let i = 0; i < dataArr.length; i += 1) {
+              prunePrimitiveArrays(itemEff, `${pathPrefix}[${i}]`);
+            }
+          } else {
+            const itemType = itemEff?.type || 'string';
+            if (itemType === 'string') {
+              const filtered = dataArr.filter((v) => !(v == null || v === ''));
+              this.model.setNestedValue(this.data, pathPrefix, filtered);
+            }
+          }
         }
-      });
-    };
-    walkSchema(this.schema);
-    primitiveArrayPaths.forEach(({ path, itemType }) => {
-      const arr = this.model.getNestedValue(this.data, path);
-      if (!Array.isArray(arr)) return;
-      if (itemType === 'string') {
-        const filtered = arr.filter((v) => typeof v === 'string' && v !== '');
-        this.model.setNestedValue(this.data, path, filtered);
       }
-    });
+    };
+    prunePrimitiveArrays(this.schema, '');
 
     // Notify listeners
     this.listeners.forEach((listener) => listener(this.data));

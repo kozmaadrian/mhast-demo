@@ -160,19 +160,86 @@ export default class InputFactory {
     addButton.className = 'form-ui-array-add';
     const baseTitle = propSchema?.title || this.formatLabel(fieldPath.split('.').pop());
     addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
+    // Determine if items are primitives (vs objects)
+    const itemsSchema = propSchema.items || {};
+    const isPrimitiveItems = !(itemsSchema && (itemsSchema.type === 'object' || (Array.isArray(itemsSchema.type) && itemsSchema.type.includes('object'))));
+
     addButton.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      // Delegate add to central command so JSON is source of truth
-      this.onArrayAdd(fieldPath, propSchema);
+      if (isPrimitiveItems) {
+        // Render one pending blank item (UI-only) and disable add until it is filled
+        const currentLength = itemsContainer.querySelectorAll('.form-ui-array-item').length;
+        const itemContainer = document.createElement('div');
+        itemContainer.className = 'form-ui-array-item';
+        const itemIndexName = `${fieldPath}[${currentLength}]`;
+        const itemInput = this.create(itemIndexName, propSchema.items || { type: 'string' });
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'form-ui-remove';
+        removeButton.title = 'Remove item';
+        removeButton.innerHTML = FormIcons.getIconSvg('trash');
+        removeButton.addEventListener('click', () => {
+          if (removeButton.classList.contains('confirm-state')) {
+            if (removeButton.dataset.confirmTimeoutId) {
+              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
+              delete removeButton.dataset.confirmTimeoutId;
+            }
+            itemContainer.remove();
+            addButton.disabled = false;
+            // Reindex names after removal of pending; keep existing stable
+            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
+              el.querySelectorAll('[name]').forEach((inputEl) => {
+                inputEl.name = inputEl.name.replace(/\[[0-9]+\]$/, `[${idx}]`);
+              });
+            });
+            this.onInputOrChange(fieldPath, propSchema, addButton);
+          } else {
+            const originalHTML = removeButton.innerHTML;
+            const originalTitle = removeButton.title;
+            const originalClass = removeButton.className;
+            removeButton.innerHTML = FormIcons.getIconSvg('check');
+            removeButton.title = 'Click to confirm removal';
+            removeButton.classList.add('confirm-state');
+            const timeout = setTimeout(() => {
+              if (removeButton) {
+                removeButton.innerHTML = originalHTML;
+                removeButton.title = originalTitle;
+                removeButton.className = originalClass;
+                delete removeButton.dataset.confirmTimeoutId;
+              }
+            }, 3000);
+            removeButton.dataset.confirmTimeoutId = String(timeout);
+          }
+        });
+        itemContainer.appendChild(itemInput);
+        itemContainer.appendChild(removeButton);
+        itemsContainer.appendChild(itemContainer);
+
+        // Disable add until value is provided
+        addButton.disabled = true;
+        const ctrl = itemContainer.querySelector('input, select, textarea');
+        const updateAddDisabled = () => {
+          let isEmpty = true;
+          if (ctrl) {
+            if (ctrl.tagName === 'SELECT') isEmpty = (ctrl.value === '' || ctrl.value == null);
+            else if (ctrl.type === 'checkbox') isEmpty = !ctrl.checked;
+            else isEmpty = (ctrl.value === '' || ctrl.value == null);
+          }
+          addButton.disabled = isEmpty;
+        };
+        if (ctrl) ['input', 'change'].forEach((evt) => ctrl.addEventListener(evt, updateAddDisabled));
+        updateAddDisabled();
+      } else {
+        // Arrays of objects: delegate to central command so JSON is source of truth
+        this.onArrayAdd(fieldPath, propSchema);
+      }
     });
 
     addButton.addEventListener('focus', (e) => this.onFocus(fieldPath, propSchema, e.target));
     container.appendChild(addButton);
 
     // Mark as primitive array when items are not objects
-    const itemSchema = propSchema.items || {};
-    const isPrimitiveItems = !(itemSchema && (itemSchema.type === 'object' || (Array.isArray(itemSchema.type) && itemSchema.type.includes('object'))));
     if (isPrimitiveItems) container.dataset.primitive = 'true';
 
     // Render existing values; when none, render one blank item input
@@ -192,6 +259,21 @@ export default class InputFactory {
         removeButton.className = 'form-ui-remove';
         removeButton.title = 'Remove item';
         removeButton.innerHTML = FormIcons.getIconSvg('trash');
+        const toggleRemoveVisibility = () => {
+          const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
+          const ctrl = itemContainer.querySelector('input, select, textarea');
+          let isBlank = true;
+          if (ctrl) {
+            if (ctrl.tagName === 'SELECT') isBlank = (ctrl.value === '' || ctrl.value == null);
+            else if (ctrl.type === 'checkbox') isBlank = !ctrl.checked;
+            else isBlank = (ctrl.value === '' || ctrl.value == null);
+          }
+          if (total <= 1 && isBlank) removeButton.style.visibility = 'hidden';
+          else removeButton.style.visibility = 'visible';
+        };
+        if (inputEl && inputEl.addEventListener) {
+          ['input', 'change'].forEach((evt) => inputEl.addEventListener(evt, toggleRemoveVisibility));
+        }
         removeButton.addEventListener('click', () => {
           if (removeButton.classList.contains('confirm-state')) {
             if (removeButton.dataset.confirmTimeoutId) {
@@ -205,7 +287,7 @@ export default class InputFactory {
             const originalHTML = removeButton.innerHTML;
             const originalTitle = removeButton.title;
             const originalClass = removeButton.className;
-            removeButton.innerHTML = '✓';
+            removeButton.innerHTML = FormIcons.getIconSvg('check');
             removeButton.title = 'Click to confirm removal';
             removeButton.classList.add('confirm-state');
             const timeout = setTimeout(() => {
@@ -222,6 +304,7 @@ export default class InputFactory {
         itemContainer.appendChild(itemInput);
         itemContainer.appendChild(removeButton);
         itemsContainer.appendChild(itemContainer);
+        toggleRemoveVisibility();
       });
     } else {
       // Render one blank input item when empty
@@ -233,6 +316,18 @@ export default class InputFactory {
       removeButton.className = 'form-ui-remove';
       removeButton.title = 'Remove item';
       removeButton.innerHTML = FormIcons.getIconSvg('trash');
+      const toggleRemoveVisibility = () => {
+        const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
+        const ctrl = itemContainer.querySelector('input, select, textarea');
+        let isBlank = true;
+        if (ctrl) {
+          if (ctrl.tagName === 'SELECT') isBlank = (ctrl.value === '' || ctrl.value == null);
+          else if (ctrl.type === 'checkbox') isBlank = !ctrl.checked;
+          else isBlank = (ctrl.value === '' || ctrl.value == null);
+        }
+        if (total <= 1 && isBlank) removeButton.style.visibility = 'hidden';
+        else removeButton.style.visibility = 'visible';
+      };
       removeButton.addEventListener('click', () => {
         // Confirm, then delegate to central remove so JSON becomes [] and UI rebuilds
         if (removeButton.classList.contains('confirm-state')) {
@@ -245,7 +340,7 @@ export default class InputFactory {
           const originalHTML = removeButton.innerHTML;
           const originalTitle = removeButton.title;
           const originalClass = removeButton.className;
-          removeButton.innerHTML = '✓';
+          removeButton.innerHTML = FormIcons.getIconSvg('check');
           removeButton.title = 'Click to confirm removal';
           removeButton.classList.add('confirm-state');
           const timeout = setTimeout(() => {
@@ -262,6 +357,11 @@ export default class InputFactory {
       itemContainer.appendChild(itemInput);
       itemContainer.appendChild(removeButton);
       itemsContainer.appendChild(itemContainer);
+      const ctrl = itemContainer.querySelector('input, select, textarea');
+      if (ctrl && ctrl.addEventListener) {
+        ['input', 'change'].forEach((evt) => ctrl.addEventListener(evt, toggleRemoveVisibility));
+      }
+      toggleRemoveVisibility();
     }
 
     return container;

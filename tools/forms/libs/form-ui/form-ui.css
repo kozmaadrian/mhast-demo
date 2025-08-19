@@ -85,6 +85,18 @@
   background: #f3f4f6;
 }
 
+/* Disabled state visuals for add button */
+.form-ui-array-add[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-ui-array-add.form-ui-placeholder-add[disabled] {
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
+
 .form-ui-array-item {
   position: relative;
   border: none;
@@ -428,7 +440,6 @@
   color: white;
   border-color: #ff5630;
   font-weight: 600;
-  right: 4px;
   position: relative;
 }
 
@@ -932,6 +943,19 @@
 
 .form-ui-array-items {
   margin-bottom: 8px;
+}
+
+/* Ensure validation error text appears below the control for primitive arrays */
+.form-ui-array-container[data-primitive="true"] .form-ui-array-item {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.form-ui-array-container[data-primitive="true"] .form-ui-array-item .form-ui-error {
+  order: 3;
+  flex-basis: 100%;
+  margin: 4px 0 0 0;
 }
 
 .form-ui-array-item {
