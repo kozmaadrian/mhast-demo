@@ -176,8 +176,17 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   // Initial data
   if (data) {
     generator.loadData(data);
+    // Ensure starting at top before any rebuild to avoid inherited scroll positions
+    const bodyEl = formEl.querySelector('.form-ui-body');
+    if (bodyEl) bodyEl.scrollTop = 0;
     // Rebuild so optional groups present in incoming data are materialized
     generator.rebuildBody();
+    // After rebuild, reset scroll to top again to prevent jump
+    requestAnimationFrame(() => {
+      const b = formEl.querySelector('.form-ui-body');
+      if (b) b.scrollTop = 0;
+      try { window.scrollTo({ top: 0 }); } catch { /* noop */ }
+    });
   }
   // Ensure initial badge text
   updateModeBadge();

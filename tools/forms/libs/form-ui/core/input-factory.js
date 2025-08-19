@@ -362,6 +362,21 @@ export default class InputFactory {
         ['input', 'change'].forEach((evt) => ctrl.addEventListener(evt, toggleRemoveVisibility));
       }
       toggleRemoveVisibility();
+
+      // Disable Add button until the initial blank is filled
+      const updateAddDisabled = () => {
+        let isEmpty = true;
+        if (ctrl) {
+          if (ctrl.tagName === 'SELECT') isEmpty = (ctrl.value === '' || ctrl.value == null);
+          else if (ctrl.type === 'checkbox') isEmpty = !ctrl.checked;
+          else isEmpty = (ctrl.value === '' || ctrl.value == null);
+        }
+        addButton.disabled = isEmpty;
+      };
+      if (ctrl && ctrl.addEventListener) {
+        ['input', 'change'].forEach((evt) => ctrl.addEventListener(evt, updateAddDisabled));
+      }
+      updateAddDisabled();
     }
 
     return container;
