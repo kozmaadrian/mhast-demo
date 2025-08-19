@@ -72,7 +72,13 @@
   border: 1px dashed #d1d5db;
   border-radius: 8px;
   cursor: pointer;
-  align-self: center;
+  align-self: flex-end;
+  /* bottom-right for primitive arrays */
+}
+
+/* For primitive arrays, align add button with the select/input right edge (account for delete icon) */
+.form-ui-array-container[data-primitive="true"] .form-ui-array-add {
+  margin-right: 40px;
 }
 
 .form-ui-array-add:hover {
@@ -1443,4 +1449,32 @@
   background: linear-gradient(to right, transparent, #ccc, transparent);
   margin: 2rem 0;
   transition: background 0.5s;
+}
+
+.form-ui-placeholder-add,
+.form-ui-array-add.form-ui-placeholder-add {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  min-height: 48px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  color: #6b7280;
+  background: transparent;
+  text-align: center;
+  cursor: pointer;
+  margin: 8px 0 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.form-ui-placeholder-add:hover,
+.form-ui-array-add.form-ui-placeholder-add:hover {
+  border-color: #93c5fd;
+  color: #374151;
+  background: #f8fafc;
 }

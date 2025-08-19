@@ -404,8 +404,19 @@ export default class FormGenerator {
     if (isArrayOfObjects) {
       // Optional gating for arrays-of-objects (including nested within array items)
       if (!isRequired) {
-        if (!this.renderAllGroups && !this.isOptionalGroupActive(fullPath)) {
-          return null;
+        const insideArrayItem = /\[\d+\]/.test(fullPath);
+        const shouldGate = (!this.renderAllGroups || insideArrayItem);
+        if (shouldGate && !this.isOptionalGroupActive(fullPath)) {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'form-ui-placeholder-add';
+          placeholder.dataset.path = fullPath;
+          const title = this.getSchemaTitle(propSchema, key);
+          placeholder.textContent = `+ Add ${title}`;
+          placeholder.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            this.commandActivateOptional(fullPath);
+          });
+          return placeholder;
         }
       }
       const groupContainer = document.createElement('div');
@@ -432,7 +443,22 @@ export default class FormGenerator {
       const groupContent = document.createElement('div');
       groupContent.className = 'form-ui-group-content';
       const arrayUI = this.generateInput(fullPath, propSchema);
-      if (arrayUI) groupContent.appendChild(arrayUI);
+      const existingArr = this.model.getNestedValue(this.data, fullPath);
+      const isEmpty = Array.isArray(existingArr) && existingArr.length === 0;
+      if (arrayUI && !isEmpty) {
+        groupContent.appendChild(arrayUI);
+      } else if (isEmpty) {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'form-ui-placeholder-add';
+        placeholder.dataset.path = fullPath;
+        const title = this.getSchemaTitle(propSchema, key);
+        placeholder.textContent = `+ Add ${title} Item`;
+        placeholder.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          this.commandAddArrayItem(fullPath);
+        });
+        groupContent.appendChild(placeholder);
+      }
       
       // If rendering all groups and the array is required, ensure one item is present by default
       if (this.renderAllGroups && isRequired && arrayUI) {
@@ -455,13 +481,18 @@ export default class FormGenerator {
       // Optional object group gating: allow when renderAllGroups
       if (!isRequired) {
         const insideArrayItem = /\[\d+\]/.test(fullPath);
-        // If renderAllGroups is true, still keep optional object children under array items inactive
-        // until explicitly activated or data exists for them
-        if (
-          (!this.renderAllGroups || insideArrayItem)
-          && !this.isOptionalGroupActive(fullPath)
-        ) {
-          return null;
+        const shouldGate = (!this.renderAllGroups || insideArrayItem);
+        if (shouldGate && !this.isOptionalGroupActive(fullPath)) {
+          const placeholder = document.createElement('div');
+          placeholder.className = 'form-ui-placeholder-add';
+          placeholder.dataset.path = fullPath;
+          const title = this.getSchemaTitle(propSchema, key);
+          placeholder.textContent = `+ Add ${title}`;
+          placeholder.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            this.commandActivateOptional(fullPath);
+          });
+          return placeholder;
         }
       }
 
@@ -585,8 +616,8 @@ export default class FormGenerator {
       const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
       const addButton = document.createElement('button');
       addButton.type = 'button';
-      addButton.className = 'form-ui-array-add';
-      addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
+      addButton.className = 'form-ui-array-add form-ui-placeholder-add';
+      addButton.innerHTML = `<span>+ Add '${baseTitle}' Item</span>`;
       const addItemAt = (index) => {
         const itemContainer = document.createElement('div');
         itemContainer.className = 'form-ui-array-item';
@@ -889,6 +920,33 @@ export default class FormGenerator {
       const normalizedName = fieldName;
       // Set the value in the nested data structure
       this.model.setNestedValue(this.data, normalizedName, value);
+    });
+
+    // Post-process: prune empty placeholders from arrays of primitives (e.g., strings)
+    const primitiveArrayPaths = [];
+    const walkSchema = (node, prefix = '') => {
+      const s = this.normalizeSchema(this.derefNode(node) || node || {});
+      if (!s || s.type !== 'object' || !s.properties) return;
+      Object.entries(s.properties).forEach(([key, child]) => {
+        const eff = this.normalizeSchema(this.derefNode(child) || child || {});
+        const path = prefix ? `${prefix}.${key}` : key;
+        if (eff && eff.type === 'array') {
+          const itemEff = this.normalizeSchema(this.derefNode(eff.items) || eff.items || {});
+          const isObjectItems = !!(itemEff && (itemEff.type === 'object' || itemEff.properties));
+          if (!isObjectItems) primitiveArrayPaths.push({ path, itemType: itemEff?.type || 'string' });
+        } else if (eff && (eff.type === 'object' || eff.properties)) {
+          walkSchema(eff, path);
+        }
+      });
+    };
+    walkSchema(this.schema);
+    primitiveArrayPaths.forEach(({ path, itemType }) => {
+      const arr = this.model.getNestedValue(this.data, path);
+      if (!Array.isArray(arr)) return;
+      if (itemType === 'string') {
+        const filtered = arr.filter((v) => typeof v === 'string' && v !== '');
+        this.model.setNestedValue(this.data, path, filtered);
+      }
     });
 
     // Notify listeners
