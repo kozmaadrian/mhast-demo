@@ -1,7 +1,7 @@
 import { LitElement, html, nothing } from "da-lit";
 import "https://da.live/nx/public/sl/components.js";
 import getStyle from "https://da.live/nx/utils/styles.js";
-import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./actions.js";
+import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./libs/backend/actions.js";
 import "./libs/form-ui/components/title/title.js";
 // Form UI library (standalone mounting API)
 // mountFormUI is lazily imported on demand to reduce initial load
@@ -46,7 +46,6 @@ class FormsEditor extends LitElement {
   }
 
   async connectedCallback() {
-    console.log('FormsEditor connectedCallback');
     super.connectedCallback();
     this.shadowRoot.adoptedStyleSheets = [style, formStyles];
 
@@ -376,9 +375,13 @@ class FormsEditor extends LitElement {
   }
 
   _emitSave() {
+    const formMeta = {
+      title: this.documentData?.title || '',
+      schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+    };
     const detail = {
       pagePath: this._pagePath,
-      schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      formMeta,
       formData: this.documentData?.formData || null,
     };
     this.dispatchEvent(new CustomEvent('editor-save', { detail }));
