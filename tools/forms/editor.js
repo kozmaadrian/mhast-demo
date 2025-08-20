@@ -414,11 +414,20 @@ class FormsEditor extends LitElement {
     location.classList.add("is-sending");
 
     if (action === "preview" || action === "publish") {
+      const formMeta = {
+        title: this.documentData?.title || '',
+        schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      };
       const detail = {
         pagePath: this._pagePath,
-        schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+        formMeta,
         formData: this.documentData?.formData || null,
       };
+      // const detail = {
+      //   pagePath: this._pagePath,
+      //   schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      //   formData: this.documentData?.formData || null,
+      // };
       const daResp = await saveDocument(detail);
       if (daResp.error) {
         this.handleError(daResp, action);
