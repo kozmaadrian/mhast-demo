@@ -115,7 +115,7 @@ class FormsEditor extends LitElement {
     } catch (e) {
       // Use defaults if DA SDK context is not available
       try {
-        schemaLoader.configure({ owner: 'kozmaadrian', repo: 'mhast-demo', ref: 'main', basePath: 'forms/' });
+        schemaLoader.configure({ owner, repo: repository, ref: 'storage', basePath: 'forms/' });
         this._schemaLoaderConfigured = true;
       } catch {}
     }
