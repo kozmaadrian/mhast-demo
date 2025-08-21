@@ -55,7 +55,7 @@ class FormsEditor extends LitElement {
     
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
-    let pagePath = window.location.hash?.replace('#/', '') || urlParams.get('page');
+    let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
     
     if (!pagePath) {
@@ -423,11 +423,6 @@ class FormsEditor extends LitElement {
         formMeta,
         formData: this.documentData?.formData || null,
       };
-      // const detail = {
-      //   pagePath: this._pagePath,
-      //   schemaId: this.documentData?.schemaId || this.selectedSchema || '',
-      //   formData: this.documentData?.formData || null,
-      // };
       const daResp = await saveDocument(detail);
       if (daResp.error) {
         this.handleError(daResp, action);

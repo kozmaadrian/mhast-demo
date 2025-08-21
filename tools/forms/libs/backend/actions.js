@@ -18,9 +18,13 @@ export async function readDocument(pagePath) {
     const response = await fetch(fullpath, opts);
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch page: ${response.status} ${response.statusText}`
-      );
+      console.warn('Failed to fetch page:', response.status, response.statusText);
+      return {
+        pagePath: pagePath,
+        title: 'Untitled Page',
+        formData: {},
+        schemaId: undefined
+      };
     }
 
     // Parse the HTML content to extract JSON and metadata
