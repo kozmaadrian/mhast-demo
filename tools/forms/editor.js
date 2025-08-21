@@ -8,7 +8,7 @@ import "./libs/form-ui/components/title/title.js";
 import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
 import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/commands/form-commands.js";
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { DA_LIVE } from "./utils.js";
+import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
 const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
