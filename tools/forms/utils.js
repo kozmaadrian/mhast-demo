@@ -1,6 +1,7 @@
 export const AEM_ORIGIN = 'https://admin.hlx.page';
 export const DA_ORIGIN = 'https://admin.da.live';
 export const DA_LIVE = 'https://da.live';
+export const MHAST_LIVE = 'https://mhast-html-to-json.adobeaem.workers.dev';
 
 /**
  * Sanitizes a string for use as class name.
