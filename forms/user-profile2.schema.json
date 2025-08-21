@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kozmaadrian/mhast-demo/refs/heads/feature/forms/forms/nested-form.schema.json",
+  "title": "Advanced Multi-Level User Profile",
+  "description": "A comprehensive user profile form demonstrating deeply nested object structures with breadcrumb navigation",
+  "type": "object",
+  "properties": {
+    "basicInfo": {
+      "type": "object",
+      "title": "Basic Information",
+      "description": "Essential user information",
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Full Name",
+          "description": "Your complete name as it appears on official documents",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email",
+          "description": "Primary email address for account communication"
+        }
+      },
+      "required": [
+        "name",
+        "email"
+      ]
+    },
+    "address": {
+      "type": "array",
+      "title": "Address Information",
+      "description": "Physical location and geographic details (multiple addresses allowed)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "street": {
+            "type": "string",
+            "title": "Street Address",
+            "description": "Street number and name",
+            "maxLength": 200
+          },
+          "city": {
+            "type": "string",
+            "title": "City",
+            "description": "City or town name",
+            "maxLength": 100
+          },
+          "location": {
+            "type": "object",
+            "title": "Geographic Location",
+            "description": "Detailed geographic positioning and timezone information",
+            "properties": {
+              "coordinates": {
+                "type": "object",
+                "title": "GPS Coordinates",
+                "description": "Precise geographic coordinates",
+                "properties": {
+                  "latitude": {
+                    "type": "number",
+                    "title": "Latitude",
+                    "description": "Latitude coordinate (-90 to 90)",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "longitude": {
+                    "type": "number",
+                    "title": "Longitude",
+                    "description": "Longitude coordinate (-180 to 180)",
+                    "minimum": -180,
+                    "maximum": 180
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "title": "User Preferences",
+      "description": "Customization and privacy settings",
+      "properties": {
+        "notifications": {
+          "type": "object",
+          "title": "Notification Settings",
+          "description": "How and when to receive notifications",
+          "properties": {
+            "channels": {
+              "type": "object",
+              "title": "Communication Channels",
+              "description": "Preferred communication methods",
+              "properties": {
+                "email": {
+                  "type": "boolean",
+                  "title": "Email notifications",
+                  "description": "Receive notifications via email",
+                  "default": true
+                },
+                "sms": {
+                  "type": "boolean",
+                  "title": "SMS notifications",
+                  "description": "Receive notifications via text message",
+                  "default": false
+                },
+                "push": {
+                  "type": "boolean",
+                  "title": "Push notifications",
+                  "description": "Receive browser/app push notifications",
+                  "default": true
+                }
+              }
+            },
+            "frequency": {
+              "type": "string",
+              "title": "Frequency",
+              "description": "How often to receive notifications",
+              "enum": [
+                "Immediate",
+                "Daily",
+                "Weekly",
+                "Monthly"
+              ],
+              "default": "Daily"
+            }
+          }
+        },
+        "privacy": {
+          "type": "object",
+          "title": "Privacy Settings",
+          "description": "Control data visibility and tracking",
+          "properties": {
+            "visibility": {
+              "type": "string",
+              "title": "Profile Visibility",
+              "description": "Who can see your profile information",
+              "enum": [
+                "Public",
+                "Friends Only",
+                "Private"
+              ],
+              "default": "Friends Only"
+            },
+            "tracking": {
+              "type": "boolean",
+              "title": "Allow Analytics Tracking",
+              "description": "Permit collection of usage analytics to improve service",
+              "default": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "basicInfo"
+  ],
+  "additionalProperties": false
+}
