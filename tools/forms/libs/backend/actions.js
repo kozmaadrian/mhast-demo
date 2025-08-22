@@ -1,5 +1,6 @@
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
-import { AEM_ORIGIN, DA_ORIGIN, readBlockConfig } from "./utils.js";
+import { AEM_ORIGIN, DA_ORIGIN, readBlockConfig } from "../../utils.js";
+import { htmlToJson, jsonToHtml } from "./storage.js";
 
 /**
  * Reads document data using the DA SDK
@@ -17,42 +18,26 @@ export async function readDocument(pagePath) {
     const response = await fetch(fullpath, opts);
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch page: ${response.status} ${response.statusText}`
-      );
+      console.warn('Failed to fetch page:', response.status, response.statusText);
+      return {
+        pagePath: pagePath,
+        title: 'Untitled Page',
+        formData: {},
+        schemaId: undefined
+      };
     }
 
     // Parse the HTML content to extract JSON and metadata
     const htmlContent = await response.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const {metadata, data} = htmlToJson(htmlContent);
 
     // Extract page metadata and content
     const pageData = {
       pagePath: pagePath,
-      title: doc.title || 'Untitled Page',
-      description:
-        doc
-          .querySelector('meta[name="description"]')
-          ?.getAttribute('content') || "",
-      content: htmlContent,
-      metadata: {
-        fetched: new Date().toISOString(),
-        contentType: response.headers.get('content-type') || 'text/html',
-        contentLength: htmlContent.length,
-        lastModified: response.headers.get('last-modified') || null,
-      },
-      // Extract any structured data or schema information
-      formData: JSON.parse(doc.querySelector('div > pre > code')?.textContent || '{}'),
+      title: metadata.title || 'Untitled Page',
+      formData: data,
+      schemaId: metadata.schemaId
     };
-
-    // extract metadata from metadata block
-    const metadataBlock = doc.querySelector('div.metadata');
-    if (metadataBlock) {
-      const metadata = readBlockConfig(metadataBlock);
-      pageData.title = metadata.title;
-      pageData.schemaId = metadata.schema;
-    }
 
     return pageData;
   } catch (error) {
@@ -64,16 +49,17 @@ export async function readDocument(pagePath) {
 export async function saveDocument(details) {
   const { context, token } = await DA_SDK;
   const { org, repo } = context;
+
+  const form = jsonToHtml(details.formMeta);
+  const data = jsonToHtml(details.formData, details.formMeta.schemaId);
+
   const body = `
   <body>
     <header></header>
     <main>
     <div>
-      <pre><code>${JSON.stringify(details.formData, null, 2)}</code></pre>
-      <div class=\"metadata\">
-        <div><div><p>title</p></div><div><p>Form</p></div></div>
-        <div><div><p>schema</p></div><div><p>${details.schemaId}</p></div></div>
-      </div>
+      ${form}
+      ${data}
     </div>
     </main>
     <footer></footer>

@@ -1,14 +1,14 @@
 import { LitElement, html, nothing } from "da-lit";
 import "https://da.live/nx/public/sl/components.js";
 import getStyle from "https://da.live/nx/utils/styles.js";
-import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./actions.js";
+import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./libs/backend/actions.js";
 import "./libs/form-ui/components/title/title.js";
 // Form UI library (standalone mounting API)
 // mountFormUI is lazily imported on demand to reduce initial load
 import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
 import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/commands/form-commands.js";
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { DA_LIVE } from "./utils.js";
+import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
 const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
@@ -46,7 +46,6 @@ class FormsEditor extends LitElement {
   }
 
   async connectedCallback() {
-    console.log('FormsEditor connectedCallback');
     super.connectedCallback();
     this.shadowRoot.adoptedStyleSheets = [style, formStyles];
 
@@ -56,7 +55,7 @@ class FormsEditor extends LitElement {
     
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
-    let pagePath = window.location.hash?.replace('#/', '') || urlParams.get('page');
+    let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
     
     if (!pagePath) {
@@ -116,7 +115,7 @@ class FormsEditor extends LitElement {
     } catch (e) {
       // Use defaults if DA SDK context is not available
       try {
-        schemaLoader.configure({ owner: 'kozmaadrian', repo: 'mhast-demo', ref: 'main', basePath: 'forms/' });
+        schemaLoader.configure({ owner, repo: repository, ref: 'storage', basePath: 'forms/' });
         this._schemaLoaderConfigured = true;
       } catch {}
     }
@@ -376,9 +375,13 @@ class FormsEditor extends LitElement {
   }
 
   _emitSave() {
+    const formMeta = {
+      title: this.documentData?.title || '',
+      schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+    };
     const detail = {
       pagePath: this._pagePath,
-      schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      formMeta,
       formData: this.documentData?.formData || null,
     };
     this.dispatchEvent(new CustomEvent('editor-save', { detail }));
@@ -411,9 +414,13 @@ class FormsEditor extends LitElement {
     location.classList.add("is-sending");
 
     if (action === "preview" || action === "publish") {
+      const formMeta = {
+        title: this.documentData?.title || '',
+        schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+      };
       const detail = {
         pagePath: this._pagePath,
-        schemaId: this.documentData?.schemaId || this.selectedSchema || '',
+        formMeta,
         formData: this.documentData?.formData || null,
       };
       const daResp = await saveDocument(detail);
@@ -437,9 +444,10 @@ class FormsEditor extends LitElement {
         saveDaVersion(aemPath);
       } 
      
-      const { url: href } = action === "publish" ? json.live : json.preview;
-      const toOpenInAem = href.replace(".hlx.", ".aem.");
-      window.open(`${toOpenInAem}?nocache=${Date.now()}`, toOpenInAem);
+      // const { url: href } = action === "publish" ? json.live : json.preview;
+      // const toOpenInAem = href.replace(".hlx.", ".aem.");
+      const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true`;
+      window.open(toOpenInAem, '_blank');
     }
     location.classList.remove("is-sending");
   }

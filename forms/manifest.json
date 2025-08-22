@@ -1,6 +1,7 @@
 {
   "schemas": [
     "user-profile",
+    "user-profile2",
     "products",
     "layout",
     "campaign"
