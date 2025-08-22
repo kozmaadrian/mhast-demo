@@ -444,9 +444,7 @@ class FormsEditor extends LitElement {
         saveDaVersion(aemPath);
       } 
      
-      // const { url: href } = action === "publish" ? json.live : json.preview;
-      // const toOpenInAem = href.replace(".hlx.", ".aem.");
-      const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true`;
+      const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true${action === "preview" ? "&preview=true" : ""}`;
       window.open(toOpenInAem, '_blank');
     }
     location.classList.remove("is-sending");
