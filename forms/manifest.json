@@ -4,7 +4,8 @@
     "user-profile2",
     "products",
     "layout",
-    "campaign"
+    "campaign",
+    "llrc"
   ],
   "description": "Example manifest file for schema discovery. This should be placed at the GitHub repository as manifest.json"
 }
