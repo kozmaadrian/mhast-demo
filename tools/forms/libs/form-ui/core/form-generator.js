@@ -359,20 +359,15 @@ export default class FormGenerator {
     // Attach overlay to the container
     this.highlightOverlay.attach(this.container);
 
-    // Setup after groups are created
-    setTimeout(() => {
-      // Map fields to groups now that DOM structure is complete
+    // Setup after groups are created using rAF for deterministic timing
+    requestAnimationFrame(() => {
       this.navigation.mapFieldsToGroups();
       this.ensureGroupRegistry();
-      // Initial validation pass once in DOM
       this.validation.validateAllFields();
-      // Emit initial data so consumers have a complete default JSON,
-      // including empty arrays for multivalue fields
       this.updateData();
-    }, 100);
+    });
 
-    // Setup form change listeners (kept for future extensions)
-    this.setupFormChangeListeners(container);
+    // Inputs attach listeners when created; no global listeners needed
 
     return container;
   }
@@ -1102,118 +1097,8 @@ export default class FormGenerator {
     }
   }
 
-  /**
-   * Generate nested groups recursively with flat layout
-   */
-  generateNestedGroups(container, schema, breadcrumbPath = [], schemaPath = []) {
-    if (schema.type !== 'object' || !schema.properties) {
-      return;
-    }
 
-    const groupTitle = schema.title || (breadcrumbPath.length > 0 ? breadcrumbPath[breadcrumbPath.length - 1] : 'Root');
-    const currentPath = [...breadcrumbPath];
-
-    // Separate object properties from primitive fields
-    const primitiveFields = {};
-    const nestedGroups = {};
-
-    Object.entries(schema.properties).forEach(([key, propSchema]) => {
-      if (propSchema.type === 'object' && propSchema.properties) {
-        nestedGroups[key] = propSchema;
-      } else {
-        primitiveFields[key] = propSchema;
-      }
-    });
-
-    // Only create a group if there are primitive fields to display
-    if (Object.keys(primitiveFields).length > 0) {
-      // Create group container
-      const groupPath = schemaPath.length > 0 ? schemaPath.join('.') : 'root';
-      const groupId = `form-group-${groupPath.replace(/\./g, '-')}`;
-      const groupContainer = document.createElement('div');
-      groupContainer.className = 'form-ui-group';
-      groupContainer.id = groupId;
-      groupContainer.dataset.groupPath = currentPath.join(' > ');
-
-      // Create group header with title
-      if (currentPath.length > 0) {
-        const groupHeader = document.createElement('div');
-        groupHeader.className = 'form-ui-group-header';
-
-        const groupTitleElement = document.createElement('h3');
-        groupTitleElement.className = 'form-ui-group-title';
-        groupTitleElement.textContent = groupTitle;
-
-        groupHeader.appendChild(groupTitleElement);
-        groupContainer.appendChild(groupHeader);
-      }
-
-      // Create group content
-      const groupContent = document.createElement('div');
-      groupContent.className = 'form-ui-group-content';
-
-      // Add primitive fields to current group
-      const pathPrefix = schemaPath.length > 0 ? schemaPath.join('.') : '';
-      this.generateObjectFields(groupContent, primitiveFields, schema.required || [], pathPrefix);
-
-      groupContainer.appendChild(groupContent);
-      container.appendChild(groupContainer);
-
-      // Store reference for navigation
-      this.groupElements.set(groupId, {
-        element: groupContainer,
-        path: currentPath,
-        title: groupTitle,
-      });
-    }
-
-    // Recursively generate nested groups as separate containers
-    Object.entries(nestedGroups).forEach(([key, propSchema]) => {
-      const nestedBreadcrumbPath = [...currentPath, propSchema.title || this.formatLabel(key)];
-      const nestedSchemaPath = [...schemaPath, key];
-
-      // If this nested group has no direct primitive fields, add a section title
-      const hasPrimitives = this.hasPrimitiveFields(propSchema);
-      const hasChildren = Object.keys(propSchema.properties || {}).length > 0;
-      if (!hasPrimitives && hasChildren) {
-        const sectionPath = nestedSchemaPath.join('.');
-        const sectionId = `form-section-${sectionPath.replace(/\./g, '-')}`;
-        const sectionContainer = document.createElement('div');
-        sectionContainer.className = 'form-ui-section';
-        sectionContainer.id = sectionId;
-        sectionContainer.dataset.sectionPath = nestedBreadcrumbPath.join(' > ');
-
-        const sectionHeader = document.createElement('div');
-        sectionHeader.className = 'form-ui-section-header';
-
-        const sectionTitle = document.createElement('h2');
-        sectionTitle.className = 'form-ui-section-title';
-        sectionTitle.textContent = propSchema.title || this.formatLabel(key);
-
-        sectionHeader.appendChild(sectionTitle);
-        sectionContainer.appendChild(sectionHeader);
-        container.appendChild(sectionContainer);
-
-        // Store reference for navigation (as a section)
-        this.groupElements.set(sectionId, {
-          element: sectionContainer,
-          path: nestedBreadcrumbPath,
-          title: propSchema.title || this.formatLabel(key),
-          isSection: true,
-        });
-      }
-
-      this.generateNestedGroups(container, propSchema, nestedBreadcrumbPath, nestedSchemaPath);
-    });
-  }
-
-  /**
-   * Setup form change listeners to update data in real-time
-   */
-  setupFormChangeListeners() {
-    // Event listeners are now added directly when inputs are created
-    // This method is kept for any additional setup needed
-  }
+  // setupFormChangeListeners removed; input listeners are attached in factories
 
   /**
    * Check if a schema has primitive fields (non-object properties)

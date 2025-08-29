@@ -52,12 +52,12 @@ class FormsEditor extends LitElement {
     // init DA SDK context
     const { context } = await DA_SDK;
     this.context = { ...context };
-    
+
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
     let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
-    
+
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
       return;
@@ -68,12 +68,12 @@ class FormsEditor extends LitElement {
     if (parts.length > 3) {
       pagePath = '/' + parts.slice(3).join('/');
     }
-    
+
     // Load document data before initial render
     await this.loadDocumentData(pagePath);
     this._pagePath = pagePath;
     schemaFromUrl = this.documentData?.schemaId || schemaFromUrl;
-    
+
     // Prepare Form UI (styles + schema loader), and discover schemas for selection
     await this.configureSchemaLoader();
     await this.discoverSchemas();
@@ -113,28 +113,14 @@ class FormsEditor extends LitElement {
       schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
       this._schemaLoaderConfigured = true;
     } catch (e) {
-      // Use defaults if DA SDK context is not available
+      // Use safe defaults if DA SDK context is not available
       try {
-        schemaLoader.configure({ owner, repo: repository, ref: 'storage', basePath: 'forms/' });
+        const owner = 'kozmaadrian';
+        const repository = 'mhast-demo';
+        const branch = 'main';
+        schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
         this._schemaLoaderConfigured = true;
       } catch {}
-    }
-  }
-
-  async initializeFormUI() {
-    try {
-      const mountEl = this.renderRoot?.querySelector('#form-root');
-      if (!mountEl) return;
-
-      // Nothing to do here until user selects a schema
-      // Optionally clear previous form instance
-      if (this._formApi) {
-        try { this._formApi.destroy(); } catch {}
-        this._formApi = null;
-        mountEl.innerHTML = '';
-      }
-    } catch (e) {
-      console.error('[editor] Failed to initialize Form UI', e);
     }
   }
 
@@ -402,9 +388,25 @@ class FormsEditor extends LitElement {
     }
   }
 
+  handleError(err, action = 'operation', location) {
+    try {
+      const message = err?.error?.message || err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('[forms-editor] ' + action + ' error:', err);
+      this.error = `Failed to ${action}: ${message}`;
+    } catch (e) {
+      // ignore
+    } finally {
+      if (location && location.classList) {
+        location.classList.remove('is-sending');
+      }
+    }
+  }
+
   async _handleSave(e) {
     const resp = await saveDocument(e.detail);
-    console.log('editor-save', resp);
+    if (!resp?.ok) {
+      this.handleError(resp, 'save');
+    }
   }
 
   async _handlePreviewPublish(e) {
@@ -425,25 +427,25 @@ class FormsEditor extends LitElement {
       };
       const daResp = await saveDocument(detail);
       if (daResp.error) {
-        this.handleError(daResp, action);
+        this.handleError(daResp, action, location);
         return;
       }
 
       const aemPath = `/${org}/${repo}${this._pagePath}`;
       let json = await saveToAem(aemPath, "preview");
       if (json.error) {
-        this.handleError(json, action, sendBtn);
+        this.handleError(json, action, location);
         return;
       }
       if (action === "publish") {
         json = await saveToAem(aemPath, "live");
         if (json.error) {
-          this.handleError(json, action, sendBtn);
+          this.handleError(json, action, location);
           return;
         }
         saveDaVersion(aemPath);
-      } 
-     
+      }
+
       const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true${action === "preview" ? "&preview=true" : ""}`;
       window.open(toOpenInAem, '_blank');
     }

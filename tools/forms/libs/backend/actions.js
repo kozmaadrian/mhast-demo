@@ -1,5 +1,5 @@
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
-import { AEM_ORIGIN, DA_ORIGIN, readBlockConfig } from "../../utils.js";
+import { AEM_ORIGIN, DA_ORIGIN } from "../../utils.js";
 import { htmlToJson, jsonToHtml } from "./storage.js";
 
 /**
@@ -38,7 +38,7 @@ export async function readDocument(pagePath) {
       formData: data,
       schemaId: metadata.schemaId
     };
-
+    console.log('pageData', pageData);
     return pageData;
   } catch (error) {
     console.error('Error fetching document:', error);
@@ -47,6 +47,7 @@ export async function readDocument(pagePath) {
 }
 
 export async function saveDocument(details) {
+  console.log('saveDocument', details);
   const { context, token } = await DA_SDK;
   const { org, repo } = context;
 
@@ -123,6 +124,6 @@ export async function saveDaVersion(path, ext = 'html') {
     await fetch(fullPath, opts);
   } catch {
     // eslint-disable-next-line no-console
-    console.log('Error creating auto version on publish.');
+    console.warn('Error creating auto version on publish.');
   }
 }

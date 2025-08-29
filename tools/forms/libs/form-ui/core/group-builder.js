@@ -1,7 +1,15 @@
 /**
  * GroupBuilder
- * Builds sections and groups recursively from a JSON Schema.
+ * Builds sections and groups from a JSON Schema.
  * Returns a Map of groupId → { element, path, title, isSection } matching previous semantics.
+ *
+ * API overview:
+ * - build(container, schema, breadcrumbPath, schemaPath, outMap):
+ *   Creates groups where a level has primitive fields, and recurses into nested objects/arrays.
+ *   Preferred for the initial full form render.
+ * - buildInline(container, schema, breadcrumbPath, schemaPath, outMap):
+ *   Appends nested child groups inline under their parent to preserve linear visual flow.
+ *   Used when rebuilding specific parts while keeping order consistent with schema declaration.
  */
 
 export default class GroupBuilder {

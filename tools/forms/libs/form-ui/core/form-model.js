@@ -125,7 +125,18 @@ export default class FormModel {
     }
     const finalKey = tokens[tokens.length - 1];
     if (typeof finalKey === 'number') {
-      if (!Array.isArray(current)) current = []; // best-effort
+      if (!Array.isArray(current)) {
+        // Convert parent to array if needed and assign back to its owner
+        // Find parent container and key
+        const parentTokens = tokens.slice(0, -1);
+        let parent = obj;
+        for (let i = 0; i < parentTokens.length - 1; i += 1) {
+          parent = parent[parentTokens[i]];
+        }
+        const parentKey = parentTokens[parentTokens.length - 1];
+        parent[parentKey] = Array.isArray(parent[parentKey]) ? parent[parentKey] : [];
+        current = parent[parentKey];
+      }
       current[finalKey] = value;
     } else {
       current[finalKey] = value;

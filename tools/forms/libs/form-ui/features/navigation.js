@@ -14,8 +14,6 @@ export default class FormNavigation {
     this.onItemDragOver = this.onItemDragOver.bind(this);
     this.onItemDrop = this.onItemDrop.bind(this);
     this._dragData = null; // { arrayPath, fromIndex }
-    // Guard to avoid double auto-add clicks for the same array path
-    this._autoAddedOnce = new Set();
   }
 
   /**
