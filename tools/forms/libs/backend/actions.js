@@ -1,13 +1,13 @@
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
 import { AEM_ORIGIN, DA_ORIGIN } from "../../utils.js";
-import { htmlToJson, jsonToHtml } from "./storage.js";
+import { parseDocument, serializeDocument } from "./storage.js";
 
 /**
  * Reads document data using the DA SDK
  * @param {string} pagePath - The page path to read document for
  * @returns {Promise<Object>} Promise that resolves to document data
  */
-export async function readDocument(pagePath) {
+export async function readDocument(pagePath, { storageVersion } = {}) {
   try {
     const { context, token } = await DA_SDK;
     const { org, repo } = context;
@@ -27,9 +27,9 @@ export async function readDocument(pagePath) {
       };
     }
 
-    // Parse the HTML content to extract JSON and metadata
+    // Parse the HTML content to extract JSON and metadata (strategy selectable)
     const htmlContent = await response.text();
-    const {metadata, data} = htmlToJson(htmlContent);
+    const { metadata, data } = parseDocument(htmlContent, { storageVersion });
 
     // Extract page metadata and content
     const pageData = {
@@ -38,7 +38,7 @@ export async function readDocument(pagePath) {
       formData: data,
       schemaId: metadata.schemaId
     };
-    console.log('pageData', pageData);
+    console.log('readDocument', {storageVersion, pageData});
     return pageData;
   } catch (error) {
     console.error('Error fetching document:', error);
@@ -46,22 +46,20 @@ export async function readDocument(pagePath) {
   }
 }
 
-export async function saveDocument(details) {
-  console.log('saveDocument', details);
+export async function saveDocument(details, { storageVersion, ext = 'html' } = {}) {
+  console.log('saveDocument', {storageVersion, details});
   const { context, token } = await DA_SDK;
   const { org, repo } = context;
 
-  const form = jsonToHtml(details.formMeta);
-  const data = jsonToHtml(details.formData, details.formMeta.schemaId);
+  const content = serializeDocument({ formMeta: details.formMeta, formData: details.formData }, { storageVersion });
 
   const body = `
   <body>
     <header></header>
     <main>
-    <div>
-      ${form}
-      ${data}
-    </div>
+      <div>
+        ${content}
+      </div>
     </main>
     <footer></footer>
   </body>
@@ -78,7 +76,7 @@ export async function saveDocument(details) {
   };
 
   const daPath = `/${org}/${repo}${details.pagePath}`;
-  const fullpath = `${DA_ORIGIN}/source${daPath}.html`;
+  const fullpath = `${DA_ORIGIN}/source${daPath}.${ext}`;
 
   try {
     const daResp = await fetch(fullpath, opts);

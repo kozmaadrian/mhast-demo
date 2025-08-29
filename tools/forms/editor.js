@@ -58,6 +58,9 @@ class FormsEditor extends LitElement {
     let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
 
+    // Get storage version from URL query parameter
+    this._storageVersion = urlParams.get('storage');
+
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
       return;
@@ -94,7 +97,7 @@ class FormsEditor extends LitElement {
   async loadDocumentData(pagePath) {
     try {
       this.loading = true;
-      this.documentData = await readDocument(pagePath);
+      this.documentData = await readDocument(pagePath, { storageVersion: this._storageVersion });
     } catch (error) {
       this.error = `Failed to load document: ${error.message}`;
       console.error('Error loading document:', error);
@@ -403,7 +406,7 @@ class FormsEditor extends LitElement {
   }
 
   async _handleSave(e) {
-    const resp = await saveDocument(e.detail);
+    const resp = await saveDocument(e.detail, { storageVersion: this._storageVersion });
     if (!resp?.ok) {
       this.handleError(resp, 'save');
     }
@@ -425,7 +428,7 @@ class FormsEditor extends LitElement {
         formMeta,
         formData: this.documentData?.formData || null,
       };
-      const daResp = await saveDocument(detail);
+      const daResp = await saveDocument(detail, { storageVersion: this._storageVersion });
       if (daResp.error) {
         this.handleError(daResp, action, location);
         return;
