@@ -9,13 +9,15 @@ import { selectAll } from "https://esm.sh/hast-util-select@6";
 import { toString } from "https://esm.sh/hast-util-to-string@3";
 import { toClassName } from "../../utils.js";
 
+const DEFAULT_ROOT_NAME = "Form";
+
 /**
  * Converts JSON data to HTML DIV table format using HAST
  * @param {Object} jsonData - The JSON object to convert
  * @param {string} rootName - The name of the root object (default: 'Product')
  * @returns {string} HTML string with DIV tables
  */
-export function jsonToHtml(jsonData, rootName = "Form") {
+export function jsonToHtml(jsonData, rootName = DEFAULT_ROOT_NAME) {
   const processedObjects = new Set();
   const objectQueue = [];
   const tables = [];
@@ -156,7 +158,7 @@ export function htmlToJson(htmlString) {
     const blockName = tableNode.properties?.className?.[0];
     const refId = tableNode.properties?.className?.[1];
 
-    if (blockName === "form") {
+    if (blockName === DEFAULT_ROOT_NAME) {
       metadata = parseRowsToBlockData(rows);
       return;
     }
