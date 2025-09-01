@@ -11,8 +11,8 @@ flowchart LR
   FG[FormGenerator core/form-generator.js]
   FM[FormModel core/form-model.js]
   IF[InputFactory core/input-factory.js]
-  GB[GroupBuilder core/group-builder.js]
-  HO[HighlightOverlay core/highlight-overlay.js]
+  GB[GroupBuilder core/form-generator/group-builder.js]
+  HO[HighlightOverlay features/highlight-overlay.js]
   NAV[Navigation features/navigation.js]
   VAL[Validation features/validation.js]
   SB[FormSidebar components/sidebar.js]
@@ -64,8 +64,7 @@ Key APIs:
   - `core/form-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
   - `core/input-factory.js`: composes input subclasses and creates inputs for schema types; attaches standard events.
   - `core/inputs/base-input.js`, `core/inputs/{text,textarea,select,number,checkbox}-input.js`: individual input implementations.
-  - `core/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
-  - `core/highlight-overlay.js`: renders the blue vertical overlay for highlighted groups.
+  - `core/form-generator/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
 
 - Features: pluggable behaviors with no DOM structure ownership
   - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs.
@@ -302,8 +301,8 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 
 ### File map
 
-- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-generator/path-utils.js`, `core/form-generator/schema-utils.js`, `core/form-generator/input-array-group.js`, `core/form-generator/placeholders.js`, `core/form-model.js`, `core/input-factory.js`, `core/inputs/*`, `core/group-builder.js`, `core/highlight-overlay.js`
-- Features: `features/navigation.js`, `features/validation.js`
+- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-generator/path-utils.js`, `core/form-generator/schema-utils.js`, `core/form-generator/input-array-group.js`, `core/form-generator/placeholders.js`, `core/form-model.js`, `core/input-factory.js`, `core/inputs/*`, `core/form-generator/group-builder.js`
+- Features: `features/navigation.js`, `features/validation.js`, `features/highlight-overlay.js`
 - Components: `components/sidebar.js`
 - Utils: `utils/schema-loader.js`, `utils/icons.js`
 - Styles: `form-ui.css`

@@ -69,8 +69,15 @@ class SchemaLoader {
 
       const schema = await response.json();
 
-      // Validate that it's a valid JSON schema
-      if (!schema.type || !schema.properties) {
+      // Validate that it's a usable JSON schema root
+      // Accept either:
+      // - object with properties
+      // - root $ref to an object definition
+      // - composition keywords present (allOf/oneOf/anyOf) which imply structure
+      const hasProps = schema && schema.type === 'object' && typeof schema.properties === 'object';
+      const hasRef = schema && typeof schema.$ref === 'string' && schema.$ref.length > 0;
+      const hasComposition = schema && (Array.isArray(schema.allOf) || Array.isArray(schema.oneOf) || Array.isArray(schema.anyOf));
+      if (!hasProps && !hasRef && !hasComposition) {
         throw new Error(`Invalid schema format for ${schemaName}`);
       }
 

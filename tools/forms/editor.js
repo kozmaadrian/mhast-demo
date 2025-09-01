@@ -168,6 +168,7 @@ class FormsEditor extends LitElement {
     const mountEl = this.renderRoot?.querySelector('#form-root');
     if (!schemaId || !mountEl) return;
     try {
+      
       const selected = this.schemas.find((s) => s.id === schemaId) || {};
       let schema;
       let initialData = {};
@@ -181,14 +182,17 @@ class FormsEditor extends LitElement {
         const loaded = await loadSchemaWithDefaults(schemaId);
         schema = loaded.schema; initialData = loaded.initialData;
       }
+      
       this._selectedSchemaName = selected.name || schema?.title || schemaId;
       // Prefer existing form data from the loaded page if present
       const dataToUse = (this.documentData && this.documentData.formData)
-        ? this.documentData.formData
+        ? this.documentData.formData  
         : initialData;
       if (!this._formApi) {
         // Lazy-load the form mount API
+        
         const { default: mountFormUI } = await import('./libs/form-ui/core/form-mount.js');
+        
         // Debounced sync function
         if (!this._onFormChangeDebounced) {
           this._onFormChangeDebounced = this._debounce((next) => {
@@ -196,6 +200,7 @@ class FormsEditor extends LitElement {
             this.documentData = updated;
           }, 200);
         }
+        
         this._formApi = mountFormUI({
           mount: mountEl,
           schema,
@@ -214,6 +219,7 @@ class FormsEditor extends LitElement {
             }
           },
         });
+        
       } else {
         this._formApi.updateSchema(schema);
         this._formApi.updateData(dataToUse);
@@ -229,6 +235,7 @@ class FormsEditor extends LitElement {
         window.history.replaceState({}, '', url);
       } catch {}
     } catch (e) {
+      console.error('[editor] loadSelectedSchema error:', e);
       this.schemaError = `Failed to load schema: ${e?.message || e}`;
     }
   }

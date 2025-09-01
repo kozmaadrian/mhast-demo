@@ -36,4 +36,14 @@ export default class FormIcons {
         return '';
     }
   }
+
+  /**
+   * Return a Node for the SVG icon to avoid using innerHTML directly
+   */
+  static renderIcon(name) {
+    const svg = this.getIconSvg(name);
+    const tpl = document.createElement('template');
+    tpl.innerHTML = svg.trim();
+    return tpl.content.firstChild ? tpl.content.firstChild.cloneNode(true) : document.createTextNode('');
+  }
 }

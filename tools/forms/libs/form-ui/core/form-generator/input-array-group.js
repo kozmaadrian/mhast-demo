@@ -47,7 +47,8 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
     removeButton.type = 'button';
     removeButton.className = 'form-ui-remove';
     removeButton.title = 'Remove item';
-    removeButton.innerHTML = FormIcons.getIconSvg('trash');
+    removeButton.textContent = '';
+    removeButton.appendChild(FormIcons.renderIcon('trash'));
     removeButton.addEventListener('click', () => {
       if (removeButton.classList.contains('confirm-state')) {
         if (removeButton.dataset.confirmTimeoutId) {

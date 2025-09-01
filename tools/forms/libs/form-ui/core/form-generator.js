@@ -1,4 +1,14 @@
 /**
+ * FormGenerator
+ * Orchestrates schema→DOM rendering, data collection/mutation, and feature hooks.
+ * Responsibilities:
+ * - Build form structure (via GroupBuilder and renderers) from JSON Schema
+ * - Create inputs (via InputFactory) and wire standard events
+ * - Maintain maps/refs (groupElements, fieldSchemas, fieldElements, fieldToGroup)
+ * - Own the current data object; expose command API for structural changes
+ * - Delegate lifecycle steps to core/form-generator/lifecycle.js
+ */
+/**
  * JSON Schema-driven Form Generator
  * Generates form UI from a JSON Schema.
  *
@@ -16,10 +26,13 @@ import FormValidation from '../features/validation.js';
 import FormNavigation from '../features/navigation.js';
 import FormModel from './form-model.js';
 import InputFactory from './input-factory.js';
-import GroupBuilder from './group-builder.js';
-import HighlightOverlay from './highlight-overlay.js';
+import GroupBuilder from './form-generator/group-builder.js';
+import HighlightOverlay from '../features/highlight-overlay.js';
 import getControlElement from '../utils/dom-utils.js';
+import { renderField } from './renderers/field-renderer.js';
 import FormIcons from '../utils/icons.js';
+import { generateForm as lifecycleGenerateForm, rebuildBody as lifecycleRebuildBody } from './form-generator/lifecycle.js';
+import createFormCommands from './commands/form-commands.js';
 import { hyphenatePath as utilHyphenatePath, pathToGroupId as utilPathToGroupId, arrayItemId as utilArrayItemId } from './form-generator/path-utils.js';
 import { derefNode as derefUtil, normalizeSchema as normalizeUtil, getSchemaTitle as getTitleUtil, generateBaseJSON as genBaseJsonUtil } from './form-generator/schema-utils.js';
 import { createAddPlaceholder } from './form-generator/placeholders.js';
@@ -27,6 +40,7 @@ import createArrayGroupUI from './form-generator/input-array-group.js';
 
 export default class FormGenerator {
   constructor(schema, options = {}) {
+    
     // Use schema as-is; resolve only parts on-demand to avoid deep recursion on large graphs
     this.schema = schema;
     this.renderAllGroups = !!options.renderAllGroups;
@@ -110,6 +124,9 @@ export default class FormGenerator {
 
     // Visual overlay
     this.highlightOverlay = new HighlightOverlay();
+
+    // Compose command API
+    this.commands = createFormCommands(this);
   }
 
   /**
@@ -156,49 +173,14 @@ export default class FormGenerator {
    * Rebuild only the form body based on current activation state and data
    */
   rebuildBody() {
-    if (!this.container) return;
-    const body = this.container.querySelector('.form-ui-body');
-    if (!body) return;
-    // Preserve current scroll position of body
-    const previousScrollTop = body.scrollTop;
-    // Clear maps
-    this.groupElements.clear();
-    this.fieldSchemas.clear();
-    this.fieldElements.clear();
-    this.fieldToGroup.clear();
-    // Rebuild DOM
-    body.innerHTML = '';
-    const rootSchema = this.normalizeSchema(this.schema);
-    if (rootSchema?.type === 'object' && rootSchema.properties) {
-      this.groupElements = this.groupBuilder.buildInline(
-        body,
-        rootSchema,
-        [rootSchema.title || 'Form'],
-        [],
-        new Map(),
-      );
-    }
-    // Re-attach overlay anchor
-    this.highlightOverlay.attach(this.container);
-    // Remap fields and validate
-    this.navigation.mapFieldsToGroups();
-    this.ensureGroupRegistry();
-    // Restore existing data into fields
-    this.loadData(this.data);
-    // Rebuild navigation tree
-    if (this.navigationTree) {
-      this.navigation.generateNavigationTree();
-    }
-    // Run validation after nav rebuild so markers reflect current DOM
-    this.validation.validateAllFields();
-    // Restore scroll
-    body.scrollTop = previousScrollTop;
+    return lifecycleRebuildBody(this);
   }
 
   /**
    * Ensure any groups created via generateField (arrays-of-objects) are registered in groupElements
    */
   ensureGroupRegistry() {
+    // Kept for backward compatibility; lifecycle uses mapping.ensureGroupRegistry
     if (!this.container) return;
     const groups = this.container.querySelectorAll('.form-ui-group[id], .form-ui-array-item[id]');
     groups.forEach((el) => {
@@ -253,62 +235,8 @@ export default class FormGenerator {
    * Generate form HTML from JSON schema
    */
   generateForm() {
-    const container = document.createElement('div');
-    container.className = 'form-ui-container';
-
-    // Add form header (simplified - controls moved to side panel)
-    const header = document.createElement('div');
-    header.className = 'form-ui-header';
-    header.innerHTML = `
-      <div class="form-ui-title-container">
-        <span class="form-ui-title">${this.schema.title || 'Form'}</span>
-        <span class="form-ui-mode">Form View</span>
-      </div>
-    `;
-    container.appendChild(header);
-
-    // Add form body with nested groups support
-    const body = document.createElement('div');
-    body.className = 'form-ui-body';
-
-    const rootSchema = this.normalizeSchema(this.schema);
-    if (rootSchema.type === 'object' && rootSchema.properties) {
-      // Build groups/sections via GroupBuilder to keep DOM identical
-      this.groupElements = this.groupBuilder.build(
-        body,
-        rootSchema,
-        [rootSchema.title || 'Form'],
-        [],
-        new Map(),
-      );
-      this.ensureGroupRegistry();
-    }
-
-    container.appendChild(body);
-
-    // Add form footer with validation
-    const footer = document.createElement('div');
-    footer.className = 'form-ui-footer';
-    footer.innerHTML = '<div class="form-ui-validation"></div>';
-    container.appendChild(footer);
-
-    // Store container reference
-    this.container = container;
-
-    // Attach overlay to the container
-    this.highlightOverlay.attach(this.container);
-
-    // Setup after groups are created using rAF for deterministic timing
-    requestAnimationFrame(() => {
-      this.navigation.mapFieldsToGroups();
-      this.ensureGroupRegistry();
-      this.validation.validateAllFields();
-      this.updateData();
-    });
-
-    // Inputs attach listeners when created; no global listeners needed
-
-    return container;
+    
+    return lifecycleGenerateForm(this);
   }
 
   /**
@@ -328,198 +256,7 @@ export default class FormGenerator {
    * Generate a single form field
    */
   generateField(key, propSchema, isRequired = false, pathPrefix = '') {
-    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-
-    // Special-case: arrays of objects should render as a sub-group, not a simple field
-    const itemSchema = this.derefNode(propSchema?.items) || propSchema?.items;
-    const isArrayOfObjects = propSchema && propSchema.type === 'array' && (
-      (itemSchema && (itemSchema.type === 'object' || itemSchema.properties)) || !!propSchema.items?.$ref
-    );
-    if (isArrayOfObjects) {
-      // Optional gating for arrays-of-objects (including nested within array items)
-      if (!isRequired) {
-        const insideArrayItem = /\[\d+\]/.test(fullPath);
-        const shouldGate = (!this.renderAllGroups || insideArrayItem);
-        if (shouldGate && !this.isOptionalGroupActive(fullPath)) {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'form-ui-placeholder-add';
-          placeholder.dataset.path = fullPath;
-          const title = this.getSchemaTitle(propSchema, key);
-          placeholder.textContent = `+ Add ${title}`;
-          placeholder.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            this.commandActivateOptional(fullPath);
-          });
-          return placeholder;
-        }
-      }
-      const groupContainer = document.createElement('div');
-      groupContainer.className = 'form-ui-group';
-      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
-      groupContainer.dataset.groupPath = fullPath;
-      groupContainer.dataset.fieldPath = fullPath;
-      groupContainer.dataset.required = isRequired ? 'true' : 'false';
-
-      const groupHeader = document.createElement('div');
-      groupHeader.className = 'form-ui-group-header';
-      const sep = document.createElement('div');
-      sep.className = 'form-ui-separator-text';
-      const label = document.createElement('div');
-      label.className = 'form-ui-separator-label';
-      const titleSpan = document.createElement('span');
-      titleSpan.className = 'form-ui-group-title';
-      titleSpan.textContent = propSchema.title || this.formatLabel(key);
-      label.appendChild(titleSpan);
-      sep.appendChild(label);
-      groupHeader.appendChild(sep);
-      groupContainer.appendChild(groupHeader);
-
-      const groupContent = document.createElement('div');
-      groupContent.className = 'form-ui-group-content';
-      const arrayUI = this.generateInput(fullPath, propSchema);
-      const existingArr = this.model.getNestedValue(this.data, fullPath);
-      const isEmpty = Array.isArray(existingArr) && existingArr.length === 0;
-      if (arrayUI && !isEmpty) {
-        groupContent.appendChild(arrayUI);
-      } else if (isEmpty) {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'form-ui-placeholder-add';
-        placeholder.dataset.path = fullPath;
-        const title = this.getSchemaTitle(propSchema, key);
-        placeholder.textContent = `+ Add ${title} Item`;
-        placeholder.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          this.commandAddArrayItem(fullPath);
-        });
-        groupContent.appendChild(placeholder);
-      }
-      
-      // If rendering all groups and the array is required, ensure one item is present by default
-      if (this.renderAllGroups && isRequired && arrayUI) {
-        const existing = this.model.getNestedValue(this.data, fullPath);
-        const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
-        const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
-        if (Array.isArray(existing) && existing.length === 0 && itemsContainer && itemsContainer.children.length === 0 && addBtn) {
-          try { addBtn.click(); } catch { /* noop */ }
-        }
-      }
-      groupContainer.appendChild(groupContent);
-
-      groupContainer.dataset.fieldPath = fullPath;
-      return groupContainer;
-    }
-
-    // Special-case: nested object inside array items (or any object field) should render as its own inline group
-    const isObjectType = !!(propSchema && (propSchema.type === 'object' || propSchema.properties));
-    if (isObjectType && propSchema.properties) {
-      // Optional object group gating: allow when renderAllGroups
-      if (!isRequired) {
-        const insideArrayItem = /\[\d+\]/.test(fullPath);
-        const shouldGate = (!this.renderAllGroups || insideArrayItem);
-        if (shouldGate && !this.isOptionalGroupActive(fullPath)) {
-          const placeholder = document.createElement('div');
-          placeholder.className = 'form-ui-placeholder-add';
-          placeholder.dataset.path = fullPath;
-          const title = this.getSchemaTitle(propSchema, key);
-          placeholder.textContent = `+ Add ${title}`;
-          placeholder.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            this.commandActivateOptional(fullPath);
-          });
-          return placeholder;
-        }
-      }
-
-      const groupContainer = document.createElement('div');
-      groupContainer.className = 'form-ui-group';
-      groupContainer.id = `form-group-${fullPath.replace(/[.\[\]]/g, '-')}`;
-      groupContainer.dataset.groupPath = fullPath;
-
-      const groupHeader = document.createElement('div');
-      groupHeader.className = 'form-ui-group-header';
-      const sep = document.createElement('div');
-      sep.className = 'form-ui-separator-text';
-      const label = document.createElement('div');
-      label.className = 'form-ui-separator-label';
-      const titleSpan = document.createElement('span');
-      titleSpan.className = 'form-ui-group-title';
-      titleSpan.textContent = propSchema.title || this.formatLabel(key);
-      label.appendChild(titleSpan);
-      sep.appendChild(label);
-      groupHeader.appendChild(sep);
-      groupContainer.appendChild(groupHeader);
-
-      const groupContent = document.createElement('div');
-      groupContent.className = 'form-ui-group-content';
-      this.generateObjectFields(
-        groupContent,
-        propSchema.properties || {},
-        propSchema.required || [],
-        fullPath,
-      );
-      groupContainer.appendChild(groupContent);
-
-      groupContainer.dataset.fieldPath = fullPath;
-      return groupContainer;
-    }
-
-    const fieldContainer = document.createElement('div');
-    fieldContainer.className = 'form-ui-field';
-    fieldContainer.dataset.field = key;
-
-    // Field label
-    const label = document.createElement('label');
-    label.className = 'form-ui-label';
-    label.textContent = propSchema.title || this.formatLabel(key);
-    if (isRequired) {
-      label.classList.add('required');
-      label.textContent += ' *';
-    }
-    fieldContainer.appendChild(label);
-
-    // Field input
-    const input = this.generateInput(fullPath, propSchema);
-    if (input) {
-      fieldContainer.appendChild(input);
-
-      // If field is required, visually indicate on the input with a red border (not the label)
-      if (isRequired) {
-        let targetControl = null;
-        // When input is a direct control element
-        if (typeof input.matches === 'function' && input.matches('input, select, textarea')) {
-          targetControl = input;
-        } else if (typeof input.querySelector === 'function') {
-          // For composed containers (e.g., checkbox/array containers)
-          targetControl = input.querySelector('input, select, textarea');
-        }
-        if (targetControl) {
-          targetControl.classList.add('required');
-        }
-      }
-
-      // Track field schema and element for initial validation on load
-      const controlEl = getControlElement(input);
-      if (controlEl) {
-        this.fieldSchemas.set(fullPath, propSchema);
-        this.fieldElements.set(fullPath, controlEl);
-      }
-
-      // Field description (after input)
-      if (propSchema.description) {
-        const description = document.createElement('div');
-        description.className = 'form-ui-description';
-        description.textContent = propSchema.description;
-        fieldContainer.appendChild(description);
-      }
-
-      // Store field path on container for mapping
-      fieldContainer.dataset.fieldPath = fullPath;
-
-      return fieldContainer;
-    }
-
-    // Return null if no input was generated (e.g., for objects handled as groups)
-    return null;
+    return renderField(this, key, propSchema, isRequired, pathPrefix);
   }
 
   /**
@@ -644,56 +381,15 @@ export default class FormGenerator {
     return current;
   }
 
-  commandActivateOptional(path) {
-    const node = this.resolveSchemaByPath(path);
-    if (!node) return;
-    this.onActivateOptionalGroup(path, node);
-    const normalized = this.normalizeSchema(node);
-    if (normalized && normalized.type === 'array') {
-      // Auto-add first item if empty per agreed rule
-      this.updateData();
-      let arr = this.model.getNestedValue(this.data, path);
-      if (!Array.isArray(arr) || arr.length === 0) {
-        if (!Array.isArray(arr)) arr = [];
-        const baseItem = this.createDefaultObjectFromSchema(this.derefNode(normalized.items) || normalized.items || {});
-        this.model.pushArrayItem(this.data, path, baseItem);
-        this.rebuildBody();
-        this.validation.validateAllFields();
-      }
-    }
-  }
+  commandActivateOptional(path) { this.commands.activateOptional(path); }
 
-  commandAddArrayItem(arrayPath) {
-    this.updateData();
-    const node = this.resolveSchemaByPath(arrayPath);
-    const normalized = this.normalizeSchema(node);
-    if (!normalized || normalized.type !== 'array') return;
-    const baseItem = this.createDefaultObjectFromSchema(this.derefNode(normalized.items) || normalized.items || {});
-    this.model.pushArrayItem(this.data, arrayPath, baseItem);
-    this.rebuildBody();
-    this.validation.validateAllFields();
-  }
+  commandAddArrayItem(arrayPath) { this.commands.addArrayItem(arrayPath); }
 
-  commandRemoveArrayItem(arrayPath, index) {
-    this.updateData();
-    this.model.removeArrayItem(this.data, arrayPath, index);
-    this.rebuildBody();
-    this.validation.validateAllFields();
-  }
+  commandRemoveArrayItem(arrayPath, index) { this.commands.removeArrayItem(arrayPath, index); }
 
-  commandReorderArrayItem(arrayPath, fromIndex, toIndex) {
-    this.reorderArrayItem(arrayPath, fromIndex, toIndex);
-  }
+  commandReorderArrayItem(arrayPath, fromIndex, toIndex) { this.commands.reorderArrayItem(arrayPath, fromIndex, toIndex); }
 
-  commandResetAll() {
-    const base = this.renderAllGroups
-      ? this.generateBaseJSON(this.schema)
-      : this.model.generateBaseJSON(this.schema);
-    this.data = base;
-    this.activeOptionalGroups = new Set();
-    this.rebuildBody();
-    this.validation.validateAllFields();
-  }
+  commandResetAll() { this.commands.resetAll(); }
 
   /**
    * Format field name as label
@@ -1031,6 +727,7 @@ export default class FormGenerator {
    * Cleanup resources
    */
   destroy() {
+    try { this.navigation?.destroy?.(); } catch { /* noop */ }
     this.groupElements.clear();
     this.listeners.clear();
   }
@@ -1058,8 +755,7 @@ export default class FormGenerator {
     this.activeOptionalGroups = filtered;
 
     // Rebuild from data/schema so DOM and navigation reflect the new order consistently
-    const hyphenPath = arrayPath.replace(/[.\[\]]/g, '-');
-    const movedItemId = `form-array-item-${hyphenPath}-${toIndex}`;
+    const movedItemId = this.arrayItemId(arrayPath, toIndex);
     this.rebuildBody();
     requestAnimationFrame(() => {
       const el = this.container?.querySelector?.(`#${movedItemId}`);

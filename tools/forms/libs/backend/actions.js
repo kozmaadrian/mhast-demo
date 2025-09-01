@@ -18,6 +18,7 @@ export async function readDocument(pagePath, { storageVersion } = {}) {
     const response = await fetch(fullpath, opts);
 
     if (!response.ok) {
+      // eslint-disable-next-line no-console
       console.warn('Failed to fetch page:', response.status, response.statusText);
       return {
         pagePath: pagePath,

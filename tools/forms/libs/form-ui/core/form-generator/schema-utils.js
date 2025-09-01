@@ -1,9 +1,14 @@
 /**
- * Schema utility helpers (pure functions)
+ * Schema utility helpers (pure functions) with simple memoization
  */
+
+const _derefCache = new WeakMap(); // WeakMap<node, any>
+const _normalizeCache = new WeakMap(); // WeakMap<node, any>
 
 function _deref(rootSchema, node) {
   if (!node || typeof node !== 'object' || !node.$ref || typeof node.$ref !== 'string') return node;
+  const cached = _derefCache.get(node);
+  if (cached) return cached;
   const resolvePointer = (ref) => {
     if (!ref.startsWith('#')) return null;
     let pointer = ref.slice(1);
@@ -18,9 +23,9 @@ function _deref(rootSchema, node) {
     return current;
   };
   const target = resolvePointer(node.$ref);
-  if (!target) return { ...node };
-  const extras = Object.fromEntries(Object.entries(node).filter(([k]) => k !== '$ref'));
-  return { ...target, ...extras };
+  const result = !target ? { ...node } : { ...target, ...Object.fromEntries(Object.entries(node).filter(([k]) => k !== '$ref')) };
+  _derefCache.set(node, result);
+  return result;
 }
 
 export function derefNode(rootSchema, node) {
@@ -28,6 +33,9 @@ export function derefNode(rootSchema, node) {
 }
 
 export function normalizeSchema(rootSchema, node) {
+  if (!node || typeof node !== 'object') return node;
+  const cached = _normalizeCache.get(node);
+  if (cached) return cached;
   const s = _deref(rootSchema, node) || node;
   if (!s || typeof s !== 'object') return s;
   const out = { ...s };
@@ -35,6 +43,7 @@ export function normalizeSchema(rootSchema, node) {
     const primary = out.type.find((t) => t !== 'null') || out.type[0];
     out.type = primary;
   }
+  _normalizeCache.set(node, out);
   return out;
 }
 

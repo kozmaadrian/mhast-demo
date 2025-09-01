@@ -50,3 +50,5 @@ export default class HighlightOverlay {
     this.overlay = overlay;
   }
 }
+
+

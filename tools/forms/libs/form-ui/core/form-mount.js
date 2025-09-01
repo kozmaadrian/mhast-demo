@@ -21,6 +21,7 @@ import FormGenerator from './form-generator.js';
 import FormSidebar from '../components/sidebar.js';
 
 export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showRemove: legacyShowRemove } = {}) {
+  
   if (!mount) throw new Error('mountFormUI: mount element is required');
   const controls = ui || {};
   const effectiveShowRemove = typeof controls.showRemove === 'boolean'
@@ -43,10 +44,20 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   codePre.appendChild(codeEl);
 
   // Build form
-  let generator = new FormGenerator(schema, {
-    renderAllGroups: !!controls.renderAllGroups,
-  });
-  let formEl = generator.generateForm();
+  let generator;
+  let formEl;
+  try {
+    
+    generator = new FormGenerator(schema, {
+      renderAllGroups: !!controls.renderAllGroups,
+    });
+    
+    formEl = generator.generateForm();
+    
+  } catch (e) {
+    console.error('[mountFormUI] failed to create/generate form:', e);
+    throw e;
+  }
   // Keep code element inside container per existing markup
   formEl.appendChild(codePre);
   host.appendChild(formEl);
@@ -78,6 +89,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   }
 
   // Insert wrapper into mount
+  
   mount.appendChild(wrapper);
 
   // Reposition sidebar inline under header
@@ -171,7 +183,10 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   // Connect navigation tree to form generator (use rAF instead of setTimeout)
   const navigationTree = sideEl.querySelector('.form-navigation-tree');
   generator.navigationTree = navigationTree;
-  requestAnimationFrame(() => generator.navigation.generateNavigationTree());
+  requestAnimationFrame(() => {
+    
+    generator.navigation.generateNavigationTree();
+  });
 
   // Initial data
   if (data) {
