@@ -52,12 +52,15 @@ class FormsEditor extends LitElement {
     // init DA SDK context
     const { context } = await DA_SDK;
     this.context = { ...context };
-    
+
     // Get page path from URL query parameter
     const urlParams = new URLSearchParams(window.location.search);
     let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
     let schemaFromUrl = urlParams.get('schema');
-    
+
+    // Get storage version from URL query parameter
+    this._storageVersion = urlParams.get('storage');
+
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
       return;
@@ -68,12 +71,12 @@ class FormsEditor extends LitElement {
     if (parts.length > 3) {
       pagePath = '/' + parts.slice(3).join('/');
     }
-    
+
     // Load document data before initial render
     await this.loadDocumentData(pagePath);
     this._pagePath = pagePath;
     schemaFromUrl = this.documentData?.schemaId || schemaFromUrl;
-    
+
     // Prepare Form UI (styles + schema loader), and discover schemas for selection
     await this.configureSchemaLoader();
     await this.discoverSchemas();
@@ -94,7 +97,7 @@ class FormsEditor extends LitElement {
   async loadDocumentData(pagePath) {
     try {
       this.loading = true;
-      this.documentData = await readDocument(pagePath);
+      this.documentData = await readDocument(pagePath, { storageVersion: this._storageVersion });
     } catch (error) {
       this.error = `Failed to load document: ${error.message}`;
       console.error('Error loading document:', error);
@@ -113,28 +116,14 @@ class FormsEditor extends LitElement {
       schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
       this._schemaLoaderConfigured = true;
     } catch (e) {
-      // Use defaults if DA SDK context is not available
+      // Use safe defaults if DA SDK context is not available
       try {
-        schemaLoader.configure({ owner, repo: repository, ref: 'storage', basePath: 'forms/' });
+        const owner = 'kozmaadrian';
+        const repository = 'mhast-demo';
+        const branch = 'main';
+        schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
         this._schemaLoaderConfigured = true;
       } catch {}
-    }
-  }
-
-  async initializeFormUI() {
-    try {
-      const mountEl = this.renderRoot?.querySelector('#form-root');
-      if (!mountEl) return;
-
-      // Nothing to do here until user selects a schema
-      // Optionally clear previous form instance
-      if (this._formApi) {
-        try { this._formApi.destroy(); } catch {}
-        this._formApi = null;
-        mountEl.innerHTML = '';
-      }
-    } catch (e) {
-      console.error('[editor] Failed to initialize Form UI', e);
     }
   }
 
@@ -179,6 +168,7 @@ class FormsEditor extends LitElement {
     const mountEl = this.renderRoot?.querySelector('#form-root');
     if (!schemaId || !mountEl) return;
     try {
+      
       const selected = this.schemas.find((s) => s.id === schemaId) || {};
       let schema;
       let initialData = {};
@@ -192,14 +182,17 @@ class FormsEditor extends LitElement {
         const loaded = await loadSchemaWithDefaults(schemaId);
         schema = loaded.schema; initialData = loaded.initialData;
       }
+      
       this._selectedSchemaName = selected.name || schema?.title || schemaId;
       // Prefer existing form data from the loaded page if present
       const dataToUse = (this.documentData && this.documentData.formData)
-        ? this.documentData.formData
+        ? this.documentData.formData  
         : initialData;
       if (!this._formApi) {
         // Lazy-load the form mount API
+        
         const { default: mountFormUI } = await import('./libs/form-ui/core/form-mount.js');
+        
         // Debounced sync function
         if (!this._onFormChangeDebounced) {
           this._onFormChangeDebounced = this._debounce((next) => {
@@ -207,6 +200,7 @@ class FormsEditor extends LitElement {
             this.documentData = updated;
           }, 200);
         }
+        
         this._formApi = mountFormUI({
           mount: mountEl,
           schema,
@@ -225,6 +219,7 @@ class FormsEditor extends LitElement {
             }
           },
         });
+        
       } else {
         this._formApi.updateSchema(schema);
         this._formApi.updateData(dataToUse);
@@ -240,6 +235,7 @@ class FormsEditor extends LitElement {
         window.history.replaceState({}, '', url);
       } catch {}
     } catch (e) {
+      console.error('[editor] loadSelectedSchema error:', e);
       this.schemaError = `Failed to load schema: ${e?.message || e}`;
     }
   }
@@ -402,9 +398,25 @@ class FormsEditor extends LitElement {
     }
   }
 
+  handleError(err, action = 'operation', location) {
+    try {
+      const message = err?.error?.message || err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
+      console.error('[forms-editor] ' + action + ' error:', err);
+      this.error = `Failed to ${action}: ${message}`;
+    } catch (e) {
+      // ignore
+    } finally {
+      if (location && location.classList) {
+        location.classList.remove('is-sending');
+      }
+    }
+  }
+
   async _handleSave(e) {
-    const resp = await saveDocument(e.detail);
-    console.log('editor-save', resp);
+    const resp = await saveDocument(e.detail, { storageVersion: this._storageVersion });
+    if (!resp?.ok) {
+      this.handleError(resp, 'save');
+    }
   }
 
   async _handlePreviewPublish(e) {
@@ -423,27 +435,27 @@ class FormsEditor extends LitElement {
         formMeta,
         formData: this.documentData?.formData || null,
       };
-      const daResp = await saveDocument(detail);
+      const daResp = await saveDocument(detail, { storageVersion: this._storageVersion });
       if (daResp.error) {
-        this.handleError(daResp, action);
+        this.handleError(daResp, action, location);
         return;
       }
 
       const aemPath = `/${org}/${repo}${this._pagePath}`;
       let json = await saveToAem(aemPath, "preview");
       if (json.error) {
-        this.handleError(json, action, sendBtn);
+        this.handleError(json, action, location);
         return;
       }
       if (action === "publish") {
         json = await saveToAem(aemPath, "live");
         if (json.error) {
-          this.handleError(json, action, sendBtn);
+          this.handleError(json, action, location);
           return;
         }
         saveDaVersion(aemPath);
-      } 
-     
+      }
+
       const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true${action === "preview" ? "&preview=true" : ""}`;
       window.open(toOpenInAem, '_blank');
     }

@@ -25,32 +25,52 @@ export default class FormSidebar {
   createElement() {
     this.element = document.createElement('div');
     this.element.className = 'form-side-panel';
-    this.element.innerHTML = `
-      <div class="form-side-panel-main">
-        <div class="form-side-panel-header">
-          <div class="form-side-panel-title-container">
-            <span class="form-side-panel-title">Form Structure</span>
-          </div>
-        </div>
-        <div class="form-side-panel-content">
-          <div class="form-navigation-tree"></div>
-        </div>
-      </div>
-      <div class="form-side-panel-tabs">
-        <button class="form-side-panel-collapse form-tab" aria-label="Collapse panel" title="Collapse panel">
-          ${FormIcons.getIconSvg('panel-right')}
-        </button>
-        <button class="form-ui-toggle form-tab" aria-label="Switch between form and raw JSON view" title="Switch between form and raw JSON view">
-          ${FormIcons.getIconSvg('code')}
-        </button>
-        <button class="form-ui-reset form-tab" aria-label="Reset form data" title="Reset form data">
-          ${FormIcons.getIconSvg('rotate-ccw')}
-        </button>
-        <button class="form-ui-remove form-tab" aria-label="Remove this form from the document" title="Remove this form from the document">
-          ${FormIcons.getIconSvg('trash')}
-        </button>
-      </div>
-    `;
+    const main = document.createElement('div');
+    main.className = 'form-side-panel-main';
+    const header = document.createElement('div');
+    header.className = 'form-side-panel-header';
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'form-side-panel-title-container';
+    const title = document.createElement('span');
+    title.className = 'form-side-panel-title';
+    title.textContent = 'Form Structure';
+    titleWrap.appendChild(title);
+    header.appendChild(titleWrap);
+    const content = document.createElement('div');
+    content.className = 'form-side-panel-content';
+    const tree = document.createElement('div');
+    tree.className = 'form-navigation-tree';
+    content.appendChild(tree);
+    main.appendChild(header);
+    main.appendChild(content);
+    const tabs = document.createElement('div');
+    tabs.className = 'form-side-panel-tabs';
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className = 'form-side-panel-collapse form-tab';
+    collapseBtn.setAttribute('aria-label', 'Collapse panel');
+    collapseBtn.title = 'Collapse panel';
+    collapseBtn.appendChild(FormIcons.renderIcon('panel-right'));
+    const modeBtn = document.createElement('button');
+    modeBtn.className = 'form-ui-toggle form-tab';
+    modeBtn.setAttribute('aria-label', 'Switch between form and raw JSON view');
+    modeBtn.title = 'Switch between form and raw JSON view';
+    modeBtn.appendChild(FormIcons.renderIcon('code'));
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'form-ui-reset form-tab';
+    resetBtn.setAttribute('aria-label', 'Reset form data');
+    resetBtn.title = 'Reset form data';
+    resetBtn.appendChild(FormIcons.renderIcon('rotate-ccw'));
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'form-ui-remove form-tab';
+    removeBtn.setAttribute('aria-label', 'Remove this form from the document');
+    removeBtn.title = 'Remove this form from the document';
+    removeBtn.appendChild(FormIcons.renderIcon('trash'));
+    tabs.appendChild(collapseBtn);
+    tabs.appendChild(modeBtn);
+    tabs.appendChild(resetBtn);
+    tabs.appendChild(removeBtn);
+    this.element.appendChild(main);
+    this.element.appendChild(tabs);
 
     this.navigationTree = this.element.querySelector('.form-navigation-tree');
     this.setupEventHandlers();
@@ -102,10 +122,12 @@ export default class FormSidebar {
           if (!resetBtn.classList.contains('confirm-state')) {
             resetBtn.classList.add('confirm-state');
             // swap icon to a check
-            resetBtn.innerHTML = '✓';
+            resetBtn.textContent = '';
+            resetBtn.appendChild(FormIcons.renderIcon('check'));
             const timeout = setTimeout(() => {
               resetBtn.classList.remove('confirm-state');
-              resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
+              resetBtn.textContent = '';
+              resetBtn.appendChild(FormIcons.renderIcon('rotate-ccw'));
               delete resetBtn.dataset.confirmTimeoutId;
             }, 3000);
             resetBtn.dataset.confirmTimeoutId = String(timeout);
@@ -117,7 +139,8 @@ export default class FormSidebar {
             delete resetBtn.dataset.confirmTimeoutId;
           }
           resetBtn.classList.remove('confirm-state');
-          resetBtn.innerHTML = FormIcons.getIconSvg('rotate-ccw');
+          resetBtn.textContent = '';
+          resetBtn.appendChild(FormIcons.renderIcon('rotate-ccw'));
           this.onReset();
         }
       });
@@ -183,10 +206,12 @@ export default class FormSidebar {
     if (!collapseBtn) return;
 
     if (this.isCollapsed) {
-      collapseBtn.innerHTML = FormIcons.getIconSvg('panel-right');
+      collapseBtn.textContent = '';
+      collapseBtn.appendChild(FormIcons.renderIcon('panel-right'));
       collapseBtn.title = 'Expand panel';
     } else {
-      collapseBtn.innerHTML = FormIcons.getIconSvg('panel-right');
+      collapseBtn.textContent = '';
+      collapseBtn.appendChild(FormIcons.renderIcon('panel-right'));
       const svg = collapseBtn.querySelector('svg');
       if (svg) {
         svg.style.transform = 'scaleX(-1)';
@@ -223,10 +248,12 @@ export default class FormSidebar {
     if (!modeToggleBtn) return;
 
     if (this.currentMode === 'raw') {
-      modeToggleBtn.innerHTML = FormIcons.getIconSvg('sliders');
+      modeToggleBtn.textContent = '';
+      modeToggleBtn.appendChild(FormIcons.renderIcon('sliders'));
       modeToggleBtn.title = 'Switch to form view';
     } else {
-      modeToggleBtn.innerHTML = FormIcons.getIconSvg('code');
+      modeToggleBtn.textContent = '';
+      modeToggleBtn.appendChild(FormIcons.renderIcon('code'));
       modeToggleBtn.title = 'Switch to raw JSON';
     }
   }

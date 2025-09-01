@@ -1,10 +1,17 @@
 /**
  * InputFactory
+ * Thin facade over input-type registry that creates controls based on schema
+ * and wires standardized form events (input/change/blur/focus) via handlers.
+ */
+/**
+ * InputFactory
  * Creates input elements based on JSON Schema property descriptors.
  * Event handlers are injected to keep this module UI-agnostic.
  */
 
 import FormIcons from '../utils/icons.js';
+import { UI_CLASS as CLASS, DATA } from './constants.js';
+import { registry as createRegistry } from './inputs/index.js';
 
 export default class InputFactory {
   constructor(handlers = {}) {
@@ -16,150 +23,44 @@ export default class InputFactory {
     this.getArrayValue = handlers.getArrayValue || (() => undefined);
     this.onArrayAdd = handlers.onArrayAdd || noop;
     this.onArrayRemove = handlers.onArrayRemove || noop;
+    this._registry = createRegistry(handlers);
   }
 
   create(fieldPath, propSchema) {
     const primaryType = Array.isArray(propSchema.type) ? (propSchema.type.find((t) => t !== 'null') || propSchema.type[0]) : propSchema.type;
     const { format, enum: enumValues } = propSchema;
-    switch (primaryType) {
-      case 'string':
-        if (enumValues) return this.createSelectInput(fieldPath, enumValues, propSchema);
-        if (format === 'textarea') return this.createTextareaInput(fieldPath, propSchema);
-        return this.createTextInput(fieldPath, propSchema, format);
-      case 'number':
-      case 'integer':
-        return this.createNumberInput(fieldPath, propSchema);
-      case 'boolean':
-        return this.createCheckboxInput(fieldPath, propSchema);
-      case 'array':
-        return this.createArrayInput(fieldPath, propSchema);
-      case 'object':
-        return null;
-      default:
-        return this.createTextInput(fieldPath, propSchema);
+    if (primaryType === 'array') return this.createArrayInput(fieldPath, propSchema);
+    if (primaryType === 'object') return null;
+    if (enumValues && primaryType === 'string') {
+      const selectCreator = this._registry.get('select');
+      return selectCreator.create(fieldPath, enumValues, propSchema);
     }
+    if (primaryType === 'string' && format === 'textarea') {
+      return this._registry.get('textarea').create(fieldPath, propSchema);
+    }
+    const creator = this._registry.get(primaryType) || this._registry.get('string');
+    return creator.create(fieldPath, propSchema, format);
   }
 
-  attachCommonEvents(el, fieldPath, schema) {
-    ['input', 'change'].forEach((evt) => {
-      el.addEventListener(evt, () => this.onInputOrChange(fieldPath, schema, el));
-    });
-    el.addEventListener('blur', () => this.onBlur(fieldPath, schema, el));
-    el.addEventListener('focus', (e) => this.onFocus(fieldPath, schema, e.target));
-  }
-
-  getInputType(format) {
-    const formatMap = {
-      email: 'email',
-      uri: 'url',
-      url: 'url',
-      date: 'date',
-      'date-time': 'datetime-local',
-      time: 'time',
-      password: 'password',
-    };
-    return formatMap[format] || 'text';
-  }
-
-  createTextInput(fieldPath, propSchema, format) {
-    const input = document.createElement('input');
-    input.type = this.getInputType(format);
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default) input.value = propSchema.default;
-    if (propSchema.placeholder) input.placeholder = propSchema.placeholder;
-    if (propSchema.pattern) input.pattern = propSchema.pattern;
-    if (propSchema.minLength) input.minLength = propSchema.minLength;
-    if (propSchema.maxLength) input.maxLength = propSchema.maxLength;
-
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return input;
-  }
-
-  createTextareaInput(fieldPath, propSchema) {
-    const textarea = document.createElement('textarea');
-    textarea.name = fieldPath;
-    textarea.className = 'form-ui-textarea';
-    textarea.rows = 3;
-    if (propSchema.default) textarea.value = propSchema.default;
-    if (propSchema.placeholder) textarea.placeholder = propSchema.placeholder;
-
-    this.attachCommonEvents(textarea, fieldPath, propSchema);
-    return textarea;
-  }
-
-  createSelectInput(fieldPath, enumValues, propSchema) {
-    const select = document.createElement('select');
-    select.name = fieldPath;
-    select.className = 'form-ui-select';
-
-    const emptyOption = document.createElement('option');
-    emptyOption.value = '';
-    emptyOption.textContent = '-- Select --';
-    select.appendChild(emptyOption);
-
-    enumValues.forEach((value) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = value;
-      if (propSchema.default === value) option.selected = true;
-      select.appendChild(option);
-    });
-
-    this.attachCommonEvents(select, fieldPath, propSchema);
-    return select;
-  }
-
-  createNumberInput(fieldPath, propSchema) {
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default !== undefined) input.value = propSchema.default;
-    if (propSchema.minimum !== undefined) input.min = propSchema.minimum;
-    if (propSchema.maximum !== undefined) input.max = propSchema.maximum;
-    if (propSchema.type === 'integer') input.step = '1';
-
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return input;
-  }
-
-  createCheckboxInput(fieldPath, propSchema) {
-    const container = document.createElement('div');
-    container.className = 'form-ui-checkbox-container';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.name = fieldPath;
-    input.className = 'form-ui-checkbox';
-    input.checked = propSchema.default || false;
-
-    const label = document.createElement('label');
-    label.appendChild(input);
-    const fieldName = fieldPath.split('.').pop();
-    label.appendChild(document.createTextNode(` ${propSchema.title || this.formatLabel(fieldName)}`));
-
-    container.appendChild(label);
-
-    // Attach to the actual input control
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return container;
-  }
 
   createArrayInput(fieldPath, propSchema) {
     const container = document.createElement('div');
-    container.className = 'form-ui-array-container';
-    container.dataset.field = fieldPath;
+    container.className = CLASS.arrayContainer;
+    container.dataset[DATA.fieldPath] = fieldPath;
 
     const itemsContainer = document.createElement('div');
-    itemsContainer.className = 'form-ui-array-items';
+    itemsContainer.className = CLASS.arrayItems;
     container.appendChild(itemsContainer);
 
     const addButton = document.createElement('button');
     addButton.type = 'button';
-    addButton.className = 'form-ui-array-add';
+    addButton.className = CLASS.arrayAdd;
     const baseTitle = propSchema?.title || this.formatLabel(fieldPath.split('.').pop());
-    addButton.innerHTML = `${FormIcons.getIconSvg('plus')}<span>Add '${baseTitle}' Item</span>`;
+    addButton.textContent = '';
+    addButton.appendChild(FormIcons.renderIcon('plus'));
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = `Add '${baseTitle}' Item`;
+    addButton.appendChild(labelSpan);
     // Determine if items are primitives (vs objects)
     const itemsSchema = propSchema.items || {};
     const isPrimitiveItems = !(itemsSchema && (itemsSchema.type === 'object' || (Array.isArray(itemsSchema.type) && itemsSchema.type.includes('object'))));
@@ -171,14 +72,15 @@ export default class InputFactory {
         // Render one pending blank item (UI-only) and disable add until it is filled
         const currentLength = itemsContainer.querySelectorAll('.form-ui-array-item').length;
         const itemContainer = document.createElement('div');
-        itemContainer.className = 'form-ui-array-item';
+        itemContainer.className = CLASS.arrayItem;
         const itemIndexName = `${fieldPath}[${currentLength}]`;
         const itemInput = this.create(itemIndexName, propSchema.items || { type: 'string' });
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'form-ui-remove';
+        removeButton.className = CLASS.remove;
         removeButton.title = 'Remove item';
-        removeButton.innerHTML = FormIcons.getIconSvg('trash');
+        removeButton.textContent = '';
+        removeButton.appendChild(FormIcons.renderIcon('trash'));
         removeButton.addEventListener('click', () => {
           if (removeButton.classList.contains('confirm-state')) {
             if (removeButton.dataset.confirmTimeoutId) {
@@ -198,7 +100,8 @@ export default class InputFactory {
             const originalHTML = removeButton.innerHTML;
             const originalTitle = removeButton.title;
             const originalClass = removeButton.className;
-            removeButton.innerHTML = FormIcons.getIconSvg('check');
+            removeButton.textContent = '';
+            removeButton.appendChild(FormIcons.renderIcon('check'));
             removeButton.title = 'Click to confirm removal';
             removeButton.classList.add('confirm-state');
             const timeout = setTimeout(() => {
@@ -247,7 +150,7 @@ export default class InputFactory {
     if (Array.isArray(arr) && arr.length > 0) {
       arr.forEach((value, idx) => {
         const itemContainer = document.createElement('div');
-        itemContainer.className = 'form-ui-array-item';
+        itemContainer.className = CLASS.arrayItem;
         const itemInput = this.create(`${fieldPath}[${idx}]`, propSchema.items || { type: 'string' });
         const inputEl = itemInput.querySelector?.('input, select, textarea') || itemInput;
         if (inputEl && typeof value !== 'undefined' && value !== null) {
@@ -256,9 +159,10 @@ export default class InputFactory {
         }
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.className = 'form-ui-remove';
+        removeButton.className = CLASS.remove;
         removeButton.title = 'Remove item';
-        removeButton.innerHTML = FormIcons.getIconSvg('trash');
+        removeButton.textContent = '';
+        removeButton.appendChild(FormIcons.renderIcon('trash'));
         const toggleRemoveVisibility = () => {
           const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
           const ctrl = itemContainer.querySelector('input, select, textarea');
@@ -287,7 +191,8 @@ export default class InputFactory {
             const originalHTML = removeButton.innerHTML;
             const originalTitle = removeButton.title;
             const originalClass = removeButton.className;
-            removeButton.innerHTML = FormIcons.getIconSvg('check');
+            removeButton.textContent = '';
+            removeButton.appendChild(FormIcons.renderIcon('check'));
             removeButton.title = 'Click to confirm removal';
             removeButton.classList.add('confirm-state');
             const timeout = setTimeout(() => {
@@ -309,13 +214,14 @@ export default class InputFactory {
     } else {
       // Render one blank input item when empty
       const itemContainer = document.createElement('div');
-      itemContainer.className = 'form-ui-array-item';
+      itemContainer.className = CLASS.arrayItem;
       const itemInput = this.create(`${fieldPath}[0]`, propSchema.items || { type: 'string' });
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
-      removeButton.className = 'form-ui-remove';
+      removeButton.className = CLASS.remove;
       removeButton.title = 'Remove item';
-      removeButton.innerHTML = FormIcons.getIconSvg('trash');
+      removeButton.textContent = '';
+      removeButton.appendChild(FormIcons.renderIcon('trash'));
       const toggleRemoveVisibility = () => {
         const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
         const ctrl = itemContainer.querySelector('input, select, textarea');
@@ -340,7 +246,8 @@ export default class InputFactory {
           const originalHTML = removeButton.innerHTML;
           const originalTitle = removeButton.title;
           const originalClass = removeButton.className;
-          removeButton.innerHTML = FormIcons.getIconSvg('check');
+          removeButton.textContent = '';
+          removeButton.appendChild(FormIcons.renderIcon('check'));
           removeButton.title = 'Click to confirm removal';
           removeButton.classList.add('confirm-state');
           const timeout = setTimeout(() => {
@@ -382,13 +289,6 @@ export default class InputFactory {
     return container;
   }
 
-  // Local label formatter to avoid coupling
-  formatLabel(name) {
-    return name
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, (str) => str.toUpperCase())
-      .replace(/_/g, ' ');
-  }
 }
 
 

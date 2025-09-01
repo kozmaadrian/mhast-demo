@@ -11,8 +11,8 @@ flowchart LR
   FG[FormGenerator core/form-generator.js]
   FM[FormModel core/form-model.js]
   IF[InputFactory core/input-factory.js]
-  GB[GroupBuilder core/group-builder.js]
-  HO[HighlightOverlay core/highlight-overlay.js]
+  GB[GroupBuilder core/form-generator/group-builder.js]
+  HO[HighlightOverlay features/highlight-overlay.js]
   NAV[Navigation features/navigation.js]
   VAL[Validation features/validation.js]
   SB[FormSidebar components/sidebar.js]
@@ -42,9 +42,10 @@ flowchart LR
 - **Mutations go through commands**: All add/remove/reorder/activate/reset use `FormGenerator` commands which mutate JSON via `FormModel`, then rebuild and validate.
 - **Arrays-of-objects defaults are minimal**: When adding an item, include primitives, arrays, and required nested objects. Optional nested objects (e.g., `link`) are omitted until explicitly activated or data exists.
 - **`renderAllGroups` nuance**: Even when true, optional object children inside array items remain gated (to avoid overwhelming new items) unless required or present in data.
-- **Navigation is schema+data-driven**: Sidebar item counts and child listings come from data (no DOM counting). IDs use path→ID helpers.
+- **Navigation is schema+data-driven**: Sidebar item counts and child listings come from data (no DOM counting). IDs use path→ID helpers. Sidebar scroll position is preserved across re-renders.
 - **Validation runs post-rebuild**: After any structural change, validate on the next frame so required states are immediately visible.
-- **Path/ID helpers**: Use generator helpers to produce stable IDs and compare/escape paths consistently.
+- **Path/ID helpers**: Centralized helpers build stable IDs and compare/escape paths consistently.
+- **Primitive arrays are pruned**: Empty strings are removed when collecting data; an empty primitive array serializes as `[]`, not `[""]`.
 
 Key APIs:
 - `FormModel`: `generateBaseJSON`, `get/setNestedValue`, `deepMerge`, `pushArrayItem`, `removeArrayItem`, `reorderArray`, `ensureObjectAtPath`.
@@ -56,10 +57,14 @@ Key APIs:
   - `core/form-nodeview.js`: ProseMirror integration; parses `{ schema, data }`, mounts via the factory, serializes back to the document. It no longer creates or manages the sidebar directly.
   - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API. Supports UI options (see Factory API).
   - `core/form-generator.js`: orchestrates schema→DOM, data updates, and hooks features.
+  - `core/form-generator/path-utils.js`: stable path→id helpers (`hyphenatePath`, `pathToGroupId`, `arrayItemId`).
+  - `core/form-generator/schema-utils.js`: schema deref/normalization/title/base JSON helpers (pure, cycle-safe).
+  - `core/form-generator/input-array-group.js`: arrays-of-objects rendering logic (factored from generator).
+  - `core/form-generator/placeholders.js`: creates unified “Add …” placeholder blocks.
   - `core/form-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
-  - `core/input-factory.js`: creates inputs for schema types and attaches standard events.
-  - `core/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
-  - `core/highlight-overlay.js`: renders the blue vertical overlay for highlighted groups.
+  - `core/input-factory.js`: composes input subclasses and creates inputs for schema types; attaches standard events.
+  - `core/inputs/base-input.js`, `core/inputs/{text,textarea,select,number,checkbox}-input.js`: individual input implementations.
+  - `core/form-generator/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
 
 - Features: pluggable behaviors with no DOM structure ownership
   - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs.
@@ -134,6 +139,7 @@ Key APIs:
     - Object types: if they have no primitives but have children, render a section header (`form-section-…`) at the same indentation; then recurse into children.
 - Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
 - Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
+- Scroll position: `Navigation.generateNavigationTree()` preserves sidebar `scrollTop` across re-renders.
 
 ### What happens when clicking “+ Add …” in the sidebar
 
@@ -180,6 +186,11 @@ Key APIs:
 - Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
 - Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container. Adding/removing/reordering is data-first (mutations via `FormModel`), then the UI rebuilds.
 - Arrays of primitives render via `InputFactory.createArrayInput()` as a compact repeatable input list.
+  - When empty, one blank input is rendered by default.
+  - The Add button is disabled until the last rendered item has a non-empty value.
+  - Removing the only blank item hides the delete button (layout preserved with `visibility: hidden`).
+  - Deletion uses a two-step confirmation (trash → check) with consistent icon sizing; after confirm, removal is delegated to the command API.
+  - Collected JSON prunes empty strings from primitive arrays; empty results serialize as `[]`.
 
 #### Data-first mutation API
 
@@ -204,6 +215,7 @@ All UI actions call these commands, which: `updateData()` → mutate JSON via `F
 - Reset button (optional) shows a red confirm state before performing the reset.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
+- Add placeholders: optional groups and array add-actions share a unified placeholder style (`.form-ui-placeholder-add`), full-width and hover-highlighted; disabled buttons show reduced opacity and not-allowed cursor.
 
 ### Public maps/refs other modules use
 
@@ -289,8 +301,8 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 
 ### File map
 
-- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-model.js`, `core/input-factory.js`, `core/group-builder.js`, `core/highlight-overlay.js`
-- Features: `features/navigation.js`, `features/validation.js`
+- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-generator/path-utils.js`, `core/form-generator/schema-utils.js`, `core/form-generator/input-array-group.js`, `core/form-generator/placeholders.js`, `core/form-model.js`, `core/input-factory.js`, `core/inputs/*`, `core/form-generator/group-builder.js`
+- Features: `features/navigation.js`, `features/validation.js`, `features/highlight-overlay.js`
 - Components: `components/sidebar.js`
 - Utils: `utils/schema-loader.js`, `utils/icons.js`
 - Styles: `form-ui.css`

@@ -204,7 +204,12 @@ State involved:
 
 ## Notes on arrays
 
-- Arrays of primitives: created via `InputFactory.createArrayInput()`; each item is an input. Add/remove are data-first via `FormModel` through generator wiring.
+- Arrays of primitives: created via `InputFactory.createArrayInput()`; each item is an input.
+  - When empty, one blank input is rendered by default.
+  - The Add button is disabled until the last rendered item has a non-empty value.
+  - Delete for the single blank item is hidden using `visibility: hidden` to keep layout stable; two‑step confirmation on other items.
+  - On data collection, empty strings are pruned; an empty array serializes as `[]`.
+  - Add/remove are data-first via `FormModel` through generator wiring.
 - Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group. Nested object children within an array item are listed under the item in the sidebar. Add/remove/reorder are data-first via command API.
 
 ---
@@ -221,6 +226,7 @@ State involved:
   - Base data includes all objects/arrays; arrays initialized to `[]`.
   - When an optional array-of-objects is activated (via sidebar), one item is auto-added if the array is empty (data-first).
   - The sidebar lists nested object children under array items.
+  - Base JSON generation is cycle-safe via a `$ref` seen-set.
 
 ---
 
