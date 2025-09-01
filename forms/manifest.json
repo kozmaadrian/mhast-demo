@@ -5,7 +5,8 @@
     "products",
     "layout",
     "campaign",
-    "llrc"
+    "llrc",
+    "get-help-section"
   ],
   "description": "Example manifest file for schema discovery. This should be placed at the GitHub repository as manifest.json"
 }
