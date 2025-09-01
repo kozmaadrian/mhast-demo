@@ -20,6 +20,10 @@ import GroupBuilder from './group-builder.js';
 import HighlightOverlay from './highlight-overlay.js';
 import getControlElement from '../utils/dom-utils.js';
 import FormIcons from '../utils/icons.js';
+import { hyphenatePath as utilHyphenatePath, pathToGroupId as utilPathToGroupId, arrayItemId as utilArrayItemId } from './form-generator/path-utils.js';
+import { derefNode as derefUtil, normalizeSchema as normalizeUtil, getSchemaTitle as getTitleUtil, generateBaseJSON as genBaseJsonUtil } from './form-generator/schema-utils.js';
+import { createAddPlaceholder } from './form-generator/placeholders.js';
+import createArrayGroupUI from './form-generator/input-array-group.js';
 
 export default class FormGenerator {
   constructor(schema, options = {}) {
@@ -237,78 +241,13 @@ export default class FormGenerator {
   }
 
   getSchemaTitle(propSchema, fallbackKey) {
-    const src = this.derefNode(propSchema) || propSchema;
-    // Prefer explicit title on the effective schema; fallback to formatted key
-    return (src && typeof src.title === 'string' && src.title.trim().length > 0)
-      ? src.title
-      : this.formatLabel(fallbackKey);
+    return getTitleUtil(this.schema, propSchema, fallbackKey || '');
   }
 
   /**
    * Generate base JSON structure from schema with default values
    */
-  generateBaseJSON(schema, seenRefs = new Set()) {
-    const normalizedRoot = this.normalizeSchema(schema) || schema;
-    if (!normalizedRoot || normalizedRoot.type !== 'object' || !normalizedRoot.properties) {
-      return {};
-    }
-
-    const baseData = {};
-
-    Object.entries(normalizedRoot.properties).forEach(([key, originalPropSchema]) => {
-      const effective = this.normalizeSchema(originalPropSchema) || originalPropSchema;
-      const refStr = originalPropSchema && originalPropSchema.$ref ? String(originalPropSchema.$ref) : null;
-      if (refStr) {
-        if (seenRefs.has(refStr)) {
-          // Prevent cycles
-          return;
-        }
-        seenRefs.add(refStr);
-      }
-
-      const type = Array.isArray(effective?.type)
-        ? (effective.type.find((t) => t !== 'null') || effective.type[0])
-        : effective?.type;
-
-      switch (type) {
-        case 'string':
-          baseData[key] = effective.default || '';
-          break;
-        case 'number':
-        case 'integer':
-          baseData[key] = effective.default || 0;
-          break;
-        case 'boolean':
-          baseData[key] = effective.default || false;
-          break;
-        case 'array':
-          // Always initialize arrays to [] so optional arrays serialize explicitly
-          baseData[key] = Array.isArray(effective.default) ? effective.default : [];
-          break;
-        case 'object': {
-          // Recursively include all child properties
-          baseData[key] = this.generateBaseJSON(effective, seenRefs);
-          break;
-        }
-        default: {
-          // If effective is a ref to an object without explicit type, try recursing
-          if (effective && typeof effective === 'object' && effective.properties) {
-            baseData[key] = this.generateBaseJSON(effective, seenRefs);
-          } else if (effective && effective.enum) {
-            baseData[key] = effective.default || '';
-          } else {
-            baseData[key] = effective && Object.prototype.hasOwnProperty.call(effective, 'default') ? effective.default : null;
-          }
-        }
-      }
-
-      if (refStr) {
-        seenRefs.delete(refStr);
-      }
-    });
-
-    return baseData;
-  }
+  generateBaseJSON(schema, seenRefs = new Set()) { return genBaseJsonUtil(this.schema, schema, seenRefs); }
 
   /**
    * Generate form HTML from JSON schema
@@ -598,117 +537,7 @@ export default class FormGenerator {
         || !!propSchema.items.$ref
       ))
     ) {
-      const itemsSchema = this.derefNode(propSchema.items) || propSchema.items;
-      const normItemsSchema = this.normalizeSchema(itemsSchema) || itemsSchema || {};
-      const container = document.createElement('div');
-      container.className = 'form-ui-array-container';
-      container.dataset.field = fieldPath;
-
-      const itemsContainer = document.createElement('div');
-      itemsContainer.className = 'form-ui-array-items';
-      container.appendChild(itemsContainer);
-
-      const baseTitle = this.getSchemaTitle(propSchema, fieldPath.split('.').pop());
-      const addButton = document.createElement('button');
-      addButton.type = 'button';
-      addButton.className = 'form-ui-array-add form-ui-placeholder-add';
-      addButton.innerHTML = `<span>+ Add '${baseTitle}' Item</span>`;
-      const addItemAt = (index) => {
-        const itemContainer = document.createElement('div');
-        itemContainer.className = 'form-ui-array-item';
-        // Assign a stable ID so navigation can point to specific items
-        const itemId = `form-array-item-${fieldPath.replace(/[.\[\]]/g, '-')}-${index}`;
-        itemContainer.id = itemId;
-        // Header wrapper containing title separator and actions on one line
-        const headerWrap = document.createElement('div');
-        headerWrap.className = 'form-ui-array-item-header';
-        const itemTitleSep = document.createElement('div');
-        itemTitleSep.className = 'form-ui-separator-text';
-        const itemTitleLabel = document.createElement('div');
-        itemTitleLabel.className = 'form-ui-separator-label';
-        itemTitleLabel.textContent = `${baseTitle} #${index + 1}`;
-        itemTitleSep.appendChild(itemTitleLabel);
-        headerWrap.appendChild(itemTitleSep);
-        const groupContent = document.createElement('div');
-        groupContent.className = 'form-ui-group-content';
-        // Insert header row at the top of the content
-        groupContent.appendChild(headerWrap);
-        const pathPrefix = `${fieldPath}[${index}]`;
-        this.generateObjectFields(
-          groupContent,
-          normItemsSchema.properties || {},
-          normItemsSchema.required || [],
-          pathPrefix,
-        );
-        itemContainer.appendChild(groupContent);
-        // Actions container with delete + confirm flow
-        const actions = document.createElement('div');
-        actions.className = 'form-ui-array-item-actions';
-        const removeButton = document.createElement('button');
-        removeButton.type = 'button';
-        removeButton.className = 'form-ui-remove';
-        removeButton.title = 'Remove item';
-        removeButton.innerHTML = FormIcons.getIconSvg('trash');
-        removeButton.addEventListener('click', () => {
-          if (removeButton.classList.contains('confirm-state')) {
-            if (removeButton.dataset.confirmTimeoutId) {
-              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
-              delete removeButton.dataset.confirmTimeoutId;
-            }
-            // Use centralized command and rebuild
-            this.commandRemoveArrayItem(fieldPath, index);
-            requestAnimationFrame(() => this.validation.validateAllFields());
-          } else {
-            const originalHTML = removeButton.innerHTML;
-            const originalTitle = removeButton.title;
-            const originalClass = removeButton.className;
-            removeButton.innerHTML = '✓';
-            removeButton.title = 'Click to confirm removal';
-            removeButton.classList.add('confirm-state');
-            const timeout = setTimeout(() => {
-              if (removeButton) {
-                removeButton.innerHTML = originalHTML;
-                removeButton.title = originalTitle;
-                removeButton.className = originalClass;
-                delete removeButton.dataset.confirmTimeoutId;
-              }
-            }, 3000);
-            removeButton.dataset.confirmTimeoutId = String(timeout);
-          }
-        });
-
-        actions.appendChild(removeButton);
-        headerWrap.appendChild(actions);
-        itemsContainer.appendChild(itemContainer);
-        // Ensure registry includes the new item for scroll/hover sync
-        this.ensureGroupRegistry();
-      };
-
-      addButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        // Centralized add
-        this.commandAddArrayItem(fieldPath);
-        // Navigate to the newly added item after rebuild
-        requestAnimationFrame(() => {
-          const arr = this.model.getNestedValue(this.data, fieldPath) || [];
-          const newIndex = Math.max(0, arr.length - 1);
-          const targetId = this.arrayItemId(fieldPath, newIndex);
-          const el = this.container?.querySelector?.(`#${targetId}`);
-          if (el && el.id) this.navigation.navigateToGroup(el.id);
-          this.validation.validateAllFields();
-        });
-      });
-      addButton.addEventListener('focus', (e) => this.navigation.highlightActiveGroup?.(e.target));
-      container.appendChild(addButton);
-
-      // Pre-populate items from existing data so rebuilds preserve entries
-      const existing = this.model.getNestedValue(this.data, fieldPath);
-      if (Array.isArray(existing)) {
-        existing.forEach((_, idx) => addItemAt(idx));
-      }
-
-      return container;
+      return createArrayGroupUI(this, fieldPath, propSchema);
     }
 
     // Delegate to factory (events are attached there)
@@ -787,15 +616,9 @@ export default class FormGenerator {
   // -----------------------------
   // Path/ID helpers (single source of truth)
   // -----------------------------
-  hyphenatePath(path) {
-    return String(path || '').replace(/[.\[\]]/g, '-');
-  }
-  pathToGroupId(path) {
-    return `form-group-${this.hyphenatePath(path)}`;
-  }
-  arrayItemId(arrayPath, index) {
-    return `form-array-item-${this.hyphenatePath(arrayPath)}-${index}`;
-  }
+  hyphenatePath(path) { return utilHyphenatePath(path); }
+  pathToGroupId(path) { return utilPathToGroupId(path); }
+  arrayItemId(arrayPath, index) { return utilArrayItemId(arrayPath, index); }
 
   // -----------------------------
   // Schema resolve + command API
@@ -1116,14 +939,7 @@ export default class FormGenerator {
    * Normalize schema node: deref if needed and coerce type arrays
    */
   normalizeSchema(node) {
-    const s = this.derefNode(node) || node;
-    if (!s || typeof s !== 'object') return s;
-    const out = { ...s };
-    if (Array.isArray(out.type)) {
-      const primary = out.type.find((t) => t !== 'null') || out.type[0];
-      out.type = primary;
-    }
-    return out;
+    return normalizeUtil(this.schema, node);
   }
 
   /**

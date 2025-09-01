@@ -5,6 +5,11 @@
  */
 
 import FormIcons from '../utils/icons.js';
+import TextInput from './inputs/text-input.js';
+import TextareaInput from './inputs/textarea-input.js';
+import SelectInput from './inputs/select-input.js';
+import NumberInput from './inputs/number-input.js';
+import CheckboxInput from './inputs/checkbox-input.js';
 
 export default class InputFactory {
   constructor(handlers = {}) {
@@ -16,6 +21,12 @@ export default class InputFactory {
     this.getArrayValue = handlers.getArrayValue || (() => undefined);
     this.onArrayAdd = handlers.onArrayAdd || noop;
     this.onArrayRemove = handlers.onArrayRemove || noop;
+    // Compose input classes with shared handlers
+    this._textInput = new TextInput(handlers);
+    this._textareaInput = new TextareaInput(handlers);
+    this._selectInput = new SelectInput(handlers);
+    this._numberInput = new NumberInput(handlers);
+    this._checkboxInput = new CheckboxInput(handlers);
   }
 
   create(fieldPath, propSchema) {
@@ -23,128 +34,23 @@ export default class InputFactory {
     const { format, enum: enumValues } = propSchema;
     switch (primaryType) {
       case 'string':
-        if (enumValues) return this.createSelectInput(fieldPath, enumValues, propSchema);
-        if (format === 'textarea') return this.createTextareaInput(fieldPath, propSchema);
-        return this.createTextInput(fieldPath, propSchema, format);
+        if (enumValues) return this._selectInput.create(fieldPath, enumValues, propSchema);
+        if (format === 'textarea') return this._textareaInput.create(fieldPath, propSchema);
+        return this._textInput.create(fieldPath, propSchema, format);
       case 'number':
       case 'integer':
-        return this.createNumberInput(fieldPath, propSchema);
+        return this._numberInput.create(fieldPath, propSchema);
       case 'boolean':
-        return this.createCheckboxInput(fieldPath, propSchema);
+        return this._checkboxInput.create(fieldPath, propSchema);
       case 'array':
         return this.createArrayInput(fieldPath, propSchema);
       case 'object':
         return null;
       default:
-        return this.createTextInput(fieldPath, propSchema);
+        return this._textInput.create(fieldPath, propSchema);
     }
   }
 
-  attachCommonEvents(el, fieldPath, schema) {
-    ['input', 'change'].forEach((evt) => {
-      el.addEventListener(evt, () => this.onInputOrChange(fieldPath, schema, el));
-    });
-    el.addEventListener('blur', () => this.onBlur(fieldPath, schema, el));
-    el.addEventListener('focus', (e) => this.onFocus(fieldPath, schema, e.target));
-  }
-
-  getInputType(format) {
-    const formatMap = {
-      email: 'email',
-      uri: 'url',
-      url: 'url',
-      date: 'date',
-      'date-time': 'datetime-local',
-      time: 'time',
-      password: 'password',
-    };
-    return formatMap[format] || 'text';
-  }
-
-  createTextInput(fieldPath, propSchema, format) {
-    const input = document.createElement('input');
-    input.type = this.getInputType(format);
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default) input.value = propSchema.default;
-    if (propSchema.placeholder) input.placeholder = propSchema.placeholder;
-    if (propSchema.pattern) input.pattern = propSchema.pattern;
-    if (propSchema.minLength) input.minLength = propSchema.minLength;
-    if (propSchema.maxLength) input.maxLength = propSchema.maxLength;
-
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return input;
-  }
-
-  createTextareaInput(fieldPath, propSchema) {
-    const textarea = document.createElement('textarea');
-    textarea.name = fieldPath;
-    textarea.className = 'form-ui-textarea';
-    textarea.rows = 3;
-    if (propSchema.default) textarea.value = propSchema.default;
-    if (propSchema.placeholder) textarea.placeholder = propSchema.placeholder;
-
-    this.attachCommonEvents(textarea, fieldPath, propSchema);
-    return textarea;
-  }
-
-  createSelectInput(fieldPath, enumValues, propSchema) {
-    const select = document.createElement('select');
-    select.name = fieldPath;
-    select.className = 'form-ui-select';
-
-    const emptyOption = document.createElement('option');
-    emptyOption.value = '';
-    emptyOption.textContent = '-- Select --';
-    select.appendChild(emptyOption);
-
-    enumValues.forEach((value) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = value;
-      if (propSchema.default === value) option.selected = true;
-      select.appendChild(option);
-    });
-
-    this.attachCommonEvents(select, fieldPath, propSchema);
-    return select;
-  }
-
-  createNumberInput(fieldPath, propSchema) {
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default !== undefined) input.value = propSchema.default;
-    if (propSchema.minimum !== undefined) input.min = propSchema.minimum;
-    if (propSchema.maximum !== undefined) input.max = propSchema.maximum;
-    if (propSchema.type === 'integer') input.step = '1';
-
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return input;
-  }
-
-  createCheckboxInput(fieldPath, propSchema) {
-    const container = document.createElement('div');
-    container.className = 'form-ui-checkbox-container';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.name = fieldPath;
-    input.className = 'form-ui-checkbox';
-    input.checked = propSchema.default || false;
-
-    const label = document.createElement('label');
-    label.appendChild(input);
-    const fieldName = fieldPath.split('.').pop();
-    label.appendChild(document.createTextNode(` ${propSchema.title || this.formatLabel(fieldName)}`));
-
-    container.appendChild(label);
-
-    // Attach to the actual input control
-    this.attachCommonEvents(input, fieldPath, propSchema);
-    return container;
-  }
 
   createArrayInput(fieldPath, propSchema) {
     const container = document.createElement('div');
@@ -382,13 +288,6 @@ export default class InputFactory {
     return container;
   }
 
-  // Local label formatter to avoid coupling
-  formatLabel(name) {
-    return name
-      .replace(/([A-Z])/g, ' $1')
-      .replace(/^./, (str) => str.toUpperCase())
-      .replace(/_/g, ' ');
-  }
 }
 
 
