@@ -79,11 +79,7 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
     headerWrap.appendChild(actions);
     itemsContainer.appendChild(itemContainer);
     generator.ensureGroupRegistry();
-    // Re-map fields to array item so validation markers attach to the item in nav
-    try {
-      // Dynamic import without await to avoid needing async context
-      import('./mapping.js').then((m) => m.mapFieldsToGroups && m.mapFieldsToGroups(generator)).catch(() => {});
-    } catch {}
+    // Mapping is handled in lifecycle.rebuildBody → mapping.mapFieldsToGroups
   };
 
   addButton.addEventListener('click', (event) => {
