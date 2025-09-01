@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Get Help Section",
+  "$defs": {
+    "link": {
+      "type": "object",
+      "title": "Link",
+      "description": "Model path: /conf/account/settings/dam/cfm/models/link",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Name"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Label"
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Url"
+        },
+        "locReady": {
+          "type": "boolean",
+          "title": "Loc Ready"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "url"
+      ]
+    },
+    "getHelpSection": {
+      "type": "object",
+      "title": "Get Help Section",
+      "description": "Model path: /conf/account/settings/dam/cfm/models/getHelpSection",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Name"
+        },
+        "icon": {
+          "type": "string",
+          "title": "Icon"
+        },
+        "titleCopy": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Title"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          },
+          "title": "Links"
+        },
+        "locReady": {
+          "type": "boolean",
+          "title": "Loc Ready"
+        }
+      },
+      "required": [
+        "name",
+        "icon",
+        "titleCopy",
+        "links"
+      ]
+    }
+  },
+  "$ref": "#/$defs/getHelpSection",
+  "type": "object",
+  "required": [
+    "name",
+    "icon",
+    "titleCopy",
+    "links"
+  ]
+}
