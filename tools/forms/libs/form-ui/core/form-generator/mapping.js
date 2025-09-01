@@ -13,7 +13,10 @@ export function mapFieldsToGroups(generator) {
   if (!generator?.container) return;
   generator.container.querySelectorAll('.form-ui-field[data-field-path]').forEach((field) => {
     const { fieldPath } = field.dataset;
-    const groupEl = field.closest('.form-ui-group');
+    // Prefer mapping to the nearest array-item container when present so
+    // per-item errors can be shown in the sidebar on the specific item.
+    const arrayItemEl = field.closest('.form-ui-array-item[id]');
+    const groupEl = arrayItemEl || field.closest('.form-ui-group');
     if (fieldPath && groupEl && groupEl.id) {
       generator.fieldToGroup.set(fieldPath, groupEl.id);
     }
