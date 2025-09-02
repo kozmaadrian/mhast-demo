@@ -14,7 +14,7 @@
  *   }
  *   // Note: legacy top-level `showRemove` is still supported for backwards compatibility
  * });
- * api.updateData(next); api.toggleRawMode(); api.destroy();
+ * api.updateData(next); api.destroy();
  */
 
 import FormGenerator from './form-generator.js';
@@ -38,10 +38,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   host.className = 'code-block-form';
   wrapper.appendChild(host);
 
-  // Prepare code element for raw mode
-  const codePre = document.createElement('pre');
-  const codeEl = document.createElement('code');
-  codePre.appendChild(codeEl);
+  // Raw mode removed: no <pre><code> creation
 
   // Build form
   let generator;
@@ -58,11 +55,10 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     console.error('[mountFormUI] failed to create/generate form:', e);
     throw e;
   }
-  // Keep code element inside container per existing markup
-  formEl.appendChild(codePre);
   host.appendChild(formEl);
-  // Header mode badge element
-  let headerModeEl = formEl.querySelector('.form-ui-mode');
+  // Remove header mode badge element (no longer supported)
+  const headerModeEl = formEl.querySelector('.form-ui-mode');
+  if (headerModeEl) headerModeEl.remove();
   // Breadcrumb moved into header
   const headerElForBreadcrumb = formEl.querySelector('.form-ui-header');
   let contentBreadcrumb = null;
@@ -86,8 +82,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   // Sidebar
   const sidebar = new FormSidebar();
   const sideEl = sidebar.createElement();
-  // Start as floating (class needed by CSS), then move inline under header
-  sideEl.classList.add('floating-panel');
+  // Sidebar is created as inline panel by default; no floating conversion
 
   // Optionally hide remove button for this mount
   if (!effectiveShowRemove) {
@@ -113,16 +108,8 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
 
   // Place sidebar immediately after header (overlay style via CSS)
   wrapper.appendChild(sideEl);
-  // Convert to inline panel
-  sideEl.classList.remove('floating-panel');
-  sideEl.classList.add('form-inline-panel');
-  if (fixedSidebar) {
-    sideEl.classList.remove('collapsed');
-    sidebar.setCollapsed(false);
-  } else {
-    sideEl.classList.add('collapsed');
-    sidebar.setCollapsed(true);
-  }
+  // Already inline; no class conversion needed
+  // Tabs/collapse removed; panel is always expanded
 
   // Align sticky top to header height so the panel starts below the sticky header
   // try {
@@ -133,57 +120,10 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
 
   // Use full-page scroll. No special scroll container for form body.
 
-  // Toggle raw/form view
-  let isRawMode = false;
+  // Raw/form view toggle removed; sidebar no longer controls mode
 
-  function updateModeBadge() {
-    if (!headerModeEl) return;
-    headerModeEl.textContent = isRawMode ? 'Raw View' : 'Form View';
-  }
-
-  // Wire sidebar events
-  function toggleRaw(force) {
-    isRawMode = typeof force === 'boolean' ? force : !isRawMode;
-    if (isRawMode) {
-      host.classList.add('raw-mode');
-      const json = generator.getDataAsJSON();
-      codeEl.textContent = json;
-      codeEl.contentEditable = false; // inspect-only
-    } else {
-      host.classList.remove('raw-mode');
-      // remain read-only; do not parse JSON back from raw view
-      codeEl.contentEditable = false;
-    }
-    updateModeBadge();
-    // Keep sidebar toggle icon/title in sync
-    sidebar.setMode(isRawMode ? 'raw' : 'form');
-  }
-
-  sidebar.onModeToggleHandler((mode) => {
-    const isRaw = mode === 'raw';
-    toggleRaw(isRaw);
-  });
-  if (effectiveShowRemove) {
-    sidebar.onRemoveHandler(() => {
-      if (typeof onRemove === 'function') onRemove();
-    });
-  }
-  // Reset handler
-  sidebar.onResetHandler(() => {
-    // Confirmation UI is handled by components/sidebar.js; this is the confirmed action
-    const base = generator.renderAllGroups
-      ? generator.generateBaseJSON(generator.schema)
-      : generator.model.generateBaseJSON(generator.schema);
-    generator.data = base;
-    generator.activeOptionalGroups = new Set();
-    generator.rebuildBody();
-    if (generator.navigationTree) {
-      generator.navigation.generateNavigationTree();
-    }
-    generator.validation.validateAllFields();
-    if (typeof onChange === 'function') onChange(generator.data);
-    if (isRawMode) codeEl.textContent = generator.getDataAsJSON();
-  });
+  // Mode toggle removed with tabs; sidebar emits no mode events
+  // Remove/reset controls removed with tabs; handlers not needed
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
     if (!navItem) return;
@@ -215,8 +155,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     // After rebuild, reset scroll to top again to prevent jump
     requestAnimationFrame(() => { try { window.scrollTo({ top: 0 }); } catch {} });
   }
-  // Ensure initial badge text
-  updateModeBadge();
+  // No mode badge to initialize
 
   // Listen for changes and bubble up
   generator.onChange((next) => {
@@ -232,7 +171,6 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
       renderAllGroups: !!controls.renderAllGroups,
     });
     const newForm = newGen.generateForm();
-    newForm.appendChild(codePre);
     // Replace current form and update references
     if (formEl.parentNode === host) {
       host.replaceChild(newForm, formEl);
@@ -243,17 +181,16 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     }
     formEl = newForm;
     generator = newGen;
-    // Re-bind header badge element reference and update text to current mode
-    headerModeEl = newForm.querySelector('.form-ui-mode');
-    updateModeBadge();
+    // Remove header mode badge element in new form as well
+    const newHeaderModeEl = newForm.querySelector('.form-ui-mode');
+    if (newHeaderModeEl) newHeaderModeEl.remove();
     const h = newForm.querySelector('.form-ui-header');
     if (h) h.insertAdjacentElement('afterend', sideEl);
     generator.navigationTree = navigationTree;
     requestAnimationFrame(() => generator.navigation.generateNavigationTree());
     generator.onChange((next) => typeof onChange === 'function' && onChange(next));
     generator.loadData(dataSnapshot);
-    // Re-apply current mode visuals/behaviour
-    toggleRaw(isRawMode);
+    // No raw mode to re-apply
   }
   function navigateTo(groupId) { generator.navigation.navigateToGroup(groupId); }
   function getData() { return generator.data; }
@@ -267,7 +204,6 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   return {
     updateData,
     updateSchema,
-    toggleRawMode: toggleRaw,
     navigateTo,
     getData,
     destroy,

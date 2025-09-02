@@ -43,7 +43,7 @@ flowchart LR
 ### State ownership (by class)
 
 - FormNodeView: `schema`, `data` (source-of-truth for ProseMirror content when serializing), `isRawMode` (when no schema). Delegates UI to the mount factory.
-- mountFormUI (factory): `isRawMode` (view mode for the mounted form). Owns DOM wrapper and sidebar placement. Exposes API: `updateData`, `updateSchema`, `toggleRawMode`, `navigateTo`, `getData`, `destroy`.
+- mountFormUI (factory): Owns DOM wrapper and sidebar placement. Exposes API: `updateData`, `updateSchema`, `navigateTo`, `getData`, `destroy`.
 - FormGenerator: `schema`, `model` (FormModel), `data`, `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `activeOptionalGroups`, `inputFactory`, `groupBuilder`, `highlightOverlay`, `renderAllGroups`.
 - FormModel: `schema`; data helpers only (pure): `generateBaseJSON`, `get/ setNestedValue`, `deepMerge`, `getInputValue`.
 - FormSidebar: `element`, `navigationTree`, `isCollapsed`, `currentMode`.
@@ -193,7 +193,7 @@ State involved:
 No parsing is performed when leaving raw mode; the form remains the source of truth for edits.
 
 Stacktrace:
-- Sidebar.onModeToggle → mount.toggleRaw → generator.getDataAsJSON → sidebar.setMode → header badge update
+// Raw mode and header badge removed; sidebar does not toggle modes
 
 State involved:
 - Factory: `isRawMode`

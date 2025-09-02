@@ -326,7 +326,7 @@ const api = mountFormUI({
 
 api.updateData(next);            // replace form data
 api.updateSchema(nextSchema);    // rebuild with a new schema
-api.toggleRawMode(forceBool);    // toggle raw/form mode
+// Raw mode removed: no toggleRawMode API
 api.navigateTo(groupId);         // navigate to group id
 api.getData();                   // read current data
 api.destroy();                   // unmount

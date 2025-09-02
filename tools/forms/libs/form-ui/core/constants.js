@@ -3,7 +3,6 @@ export const UI_CLASS = {
   header: 'form-ui-header',
   titleContainer: 'form-ui-title-container',
   title: 'form-ui-title',
-  mode: 'form-ui-mode',
   body: 'form-ui-body',
   footer: 'form-ui-footer',
   validation: 'form-ui-validation',
