@@ -24,10 +24,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   
   if (!mount) throw new Error('mountFormUI: mount element is required');
   const controls = ui || {};
-  const effectiveShowRemove = typeof controls.showRemove === 'boolean'
-    ? controls.showRemove
-    : (typeof legacyShowRemove === 'boolean' ? legacyShowRemove : true);
-  const showReset = typeof controls.showReset === 'boolean' ? controls.showReset : false;
+  
 
   // Wrapper
   const wrapper = document.createElement('div');
@@ -81,23 +78,9 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   const sideEl = sidebar.createElement();
   // Sidebar is created as inline panel by default; no floating conversion
 
-  // Optionally hide remove button for this mount
-  if (!effectiveShowRemove) {
-    const removeBtn = sideEl.querySelector('.form-ui-remove');
-    if (removeBtn) removeBtn.remove();
-  }
-  // Optionally hide reset button
-  if (!showReset) {
-    const resetBtn = sideEl.querySelector('.form-ui-reset');
-    if (resetBtn) resetBtn.remove();
-  }
+  
 
-  // Optionally make the sidebar fixed open (no collapse control)
-  const fixedSidebar = !!controls.fixedSidebar;
-  if (fixedSidebar) {
-    const collapseBtn = sideEl.querySelector('.form-side-panel-collapse');
-    if (collapseBtn) collapseBtn.remove();
-  }
+  // Collapse control removed
 
   // Insert wrapper into mount
   

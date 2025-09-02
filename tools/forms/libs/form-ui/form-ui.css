@@ -234,7 +234,7 @@
 
 
 
-.form-side-panel.form-inline-panel:not(.collapsed) {
+.form-side-panel.form-inline-panel {
   width: 360px;
   min-width: 360px;
   margin-right: -320px;
@@ -246,7 +246,7 @@
 
 
 
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-main {
+.form-side-panel.form-inline-panel .form-side-panel-main {
   width: 320px;
   min-width: 320px;
   background: #FFF;
@@ -418,47 +418,11 @@
   letter-spacing: -0.025em;
 }
 
-.form-side-panel-toggle {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  color: #374151;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 500;
-}
-
-.form-side-panel-toggle:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  color: #111827;
-}
 
 
 
-.form-side-panel-collapse {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  color: #6b7280;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-}
 
-.form-side-panel-collapse:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #374151;
-}
+
 
 
 
