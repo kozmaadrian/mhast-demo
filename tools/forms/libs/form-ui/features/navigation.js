@@ -192,8 +192,6 @@ export default class FormNavigation {
       return { label: [this.formGenerator.getSchemaTitle(propNorm || {}, key)], nextSchema: propNorm };
     };
     const parts = [];
-    const rootTitle = this.formGenerator?.schema?.title || 'Form';
-    parts.push(rootTitle);
     const tokens = String(schemaPath)
       .split('.')
       .filter((t) => t && t !== 'root');

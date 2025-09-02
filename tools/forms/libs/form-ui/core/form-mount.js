@@ -63,13 +63,13 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   host.appendChild(formEl);
   // Header mode badge element
   let headerModeEl = formEl.querySelector('.form-ui-mode');
-  // Sticky content breadcrumb at top of form body
-  const bodyElForBreadcrumb = formEl.querySelector('.form-ui-body');
+  // Breadcrumb moved into header
+  const headerElForBreadcrumb = formEl.querySelector('.form-ui-header');
   let contentBreadcrumb = null;
-  if (bodyElForBreadcrumb) {
+  if (headerElForBreadcrumb) {
     contentBreadcrumb = document.createElement('div');
     contentBreadcrumb.className = 'form-content-breadcrumb';
-    bodyElForBreadcrumb.insertBefore(contentBreadcrumb, bodyElForBreadcrumb.firstChild);
+    headerElForBreadcrumb.appendChild(contentBreadcrumb);
   }
 
   // Sidebar
