@@ -70,6 +70,17 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     contentBreadcrumb = document.createElement('div');
     contentBreadcrumb.className = 'form-content-breadcrumb';
     headerElForBreadcrumb.appendChild(contentBreadcrumb);
+    try {
+      const updateHeaderOffset = () => {
+        const headerH = headerElForBreadcrumb.offsetHeight || 0;
+        const extra = 32; // extra breathing room below sticky header
+        // Expose scroll offset for sticky header + breadcrumb
+        formEl.style.setProperty('--form-scroll-offset', `${headerH + extra}px`);
+        if (generator) generator._headerOffset = headerH + extra;
+      };
+      updateHeaderOffset();
+      window.addEventListener('resize', updateHeaderOffset, { passive: true });
+    } catch {}
   }
 
   // Sidebar
@@ -100,13 +111,8 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   
   mount.appendChild(wrapper);
 
-  // Reposition sidebar inline under header
-  const header = formEl.querySelector('.form-ui-header');
-  if (header) {
-    header.insertAdjacentElement('afterend', sideEl);
-  } else {
-    mount.appendChild(sideEl);
-  }
+  // Place sidebar immediately after header (overlay style via CSS)
+  wrapper.appendChild(sideEl);
   // Convert to inline panel
   sideEl.classList.remove('floating-panel');
   sideEl.classList.add('form-inline-panel');
@@ -117,6 +123,13 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     sideEl.classList.add('collapsed');
     sidebar.setCollapsed(true);
   }
+
+  // Align sticky top to header height so the panel starts below the sticky header
+  // try {
+  //   const headerEl = formEl.querySelector('.form-ui-header');
+  //   const headerH = headerEl ? headerEl.offsetHeight : 0;
+  //   sideEl.style.top = `${Math.max(0, headerH)}px`;
+  // } catch {}
 
   // Use full-page scroll. No special scroll container for form body.
 
@@ -185,6 +198,8 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   generator.navigationTree = navigationTree;
   // Expose content breadcrumb element for navigation/scroll sync
   generator.contentBreadcrumbEl = contentBreadcrumb;
+  // Expose header offset so programmatic window scroll accounts for sticky header
+  try { generator._headerOffset = (formEl.querySelector('.form-ui-header')?.offsetHeight || 0) + 32; } catch {}
   requestAnimationFrame(() => {
     
     generator.navigation.generateNavigationTree();

@@ -33,7 +33,7 @@ export default class FormSidebar {
     titleWrap.className = 'form-side-panel-title-container';
     const title = document.createElement('span');
     title.className = 'form-side-panel-title';
-    title.textContent = 'Form Structure';
+    title.textContent = 'Navigation';
     titleWrap.appendChild(title);
     header.appendChild(titleWrap);
     const content = document.createElement('div');

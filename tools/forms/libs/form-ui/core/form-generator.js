@@ -700,7 +700,7 @@ export default class FormGenerator {
     if (!targetGroup) return;
 
     const bodyEl = this.container.querySelector('.form-ui-body');
-    const scrollPadding = 8; // small padding from the top
+    const scrollPadding = (this._headerOffset || 0); // account for sticky header/breadcrumb
 
     const isScrollable = (el) => !!el && el.scrollHeight > el.clientHeight;
     if (isScrollable(bodyEl)) {

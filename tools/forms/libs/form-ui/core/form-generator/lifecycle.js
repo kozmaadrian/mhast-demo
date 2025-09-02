@@ -30,7 +30,7 @@ export function generateForm(self) {
     self.groupElements = self.groupBuilder.build(
       body,
       rootSchema,
-      [rootSchema.title || 'Form'],
+      [],
       [],
       new Map(),
     );
@@ -81,7 +81,7 @@ export function rebuildBody(self) {
     self.groupElements = self.groupBuilder.buildInline(
       body,
       rootSchema,
-      [rootSchema.title || 'Form'],
+      [],
       [],
       new Map(),
     );
