@@ -172,24 +172,3 @@ label[for="schema-select"] {
         transform: translateY(0) scale(1);
     }
 }
-
-.schema-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    margin: 6px 0 10px 0;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: linear-gradient(180deg, #f8fafc, #ffffff);
-}
-
-.schema-label {
-    color: #475569;
-    font-size: 13px;
-}
-
-.schema-name {
-    color: #0f172a;
-    font-weight: 600;
-}

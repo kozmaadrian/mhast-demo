@@ -15,7 +15,6 @@ export function generateForm(self) {
   header.innerHTML = `
       <div class="${CLASS.titleContainer}">
         <span class="${CLASS.title}">${self.schema.title || 'Form'}</span>
-        <span class="${CLASS.mode}">Form View</span>
       </div>
     `;
   container.appendChild(header);

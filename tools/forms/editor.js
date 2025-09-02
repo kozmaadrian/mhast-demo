@@ -505,12 +505,7 @@ class FormsEditor extends LitElement {
           </div>
         ` : nothing}
 
-        ${!this.showSchemaDialog && this._selectedSchemaName ? html`
-          <div class="schema-banner">
-            <span class="schema-label">Schema:</span>
-            <span class="schema-name">${this._selectedSchemaName}</span>
-          </div>
-        ` : nothing}
+        ${nothing}
         <div id="form-root"></div>
 
         <h2>Document Data</h2>

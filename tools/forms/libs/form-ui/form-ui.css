@@ -199,7 +199,7 @@
   flex: 1;
 }
 
-/* .form-ui-mode removed */
+
 
 /* Form sidebar positioned as inline sticky panel - opens to the right */
 .form-side-panel.form-inline-panel {
@@ -238,7 +238,7 @@
   flex: 1;
 }
 
-/* collapsed styles removed */
+
 
 .form-side-panel.form-inline-panel:not(.collapsed) {
   width: 360px;
@@ -880,7 +880,7 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Optional object placeholders removed from content; activation is sidebar-only */
+
 
 /* Object inputs - now handled by groups, no special styling */
 .form-ui-object-container {
@@ -914,25 +914,7 @@
   color: #de350b;
 }
 
-/* Raw JSON mode */
-.form-ui-raw {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  background: #f4f5f7;
-  border: 1px solid #dfe1e6;
-  border-radius: 3px;
-  padding: 12px;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  min-height: 100px;
-  font-size: 13px;
-}
-
-.form-ui-raw:focus {
-  outline: none;
-  border-color: #0052cc;
-}
-
-/* Code block integration */
+/* Code block container */
 .code-block-form {
   position: relative;
   display: flow-root;
@@ -960,49 +942,7 @@
   background: var(--form-ui-separator-bg, #fff);
 }
 
-.code-block-form pre {
-  display: none;
-  background: #f4f5f7;
-  border: 1px solid #dfe1e6;
-  border-radius: 0 0 3px 3px;
-  padding: 12px;
-  margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  overflow-x: auto;
-  min-height: 120px;
-  white-space: pre-wrap;
-}
-
-.code-block-form pre code {
-  background: none;
-  padding: 0;
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.code-block-form pre code:focus {
-  outline: 2px solid #0052cc;
-  outline-offset: 2px;
-}
-
-.code-block-form.raw-mode pre {
-  display: block;
-}
-
-.code-block-form.raw-mode .form-ui-body {
-  display: none;
-}
-
-.code-block-form.raw-mode .form-ui-footer {
-  display: none;
-}
-
-/* Keep header visible in both modes for toggle button */
+/* Header at top of form */
 .code-block-form .form-ui-header {
   display: flex;
   margin-bottom: 16px;
@@ -1028,15 +968,7 @@
   margin: 0;
 }
 
-.code-block-form.raw-mode .form-ui-header {
-  border-bottom: none;
-  border-radius: 0;
-}
 
-.code-block-form.raw-mode pre {
-  border-top: none;
-  border-radius: 0;
-}
 
 /* Section Titles */
 .form-ui-section {
@@ -1141,7 +1073,7 @@
 
 
 
-/* All old object container styling removed - using groups instead */
+
 
 /* Mobile responsive */
 @media (max-width: 768px) {
@@ -1325,7 +1257,7 @@
   color: #1976d2;
 }
 
-/* Legacy support - removed bold, keep only color */
+
 .form-ui-nav-item-title-only .form-ui-nav-item-title {
   color: #424242;
 }

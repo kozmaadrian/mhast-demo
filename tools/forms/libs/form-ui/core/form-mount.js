@@ -38,7 +38,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   host.className = 'code-block-form';
   wrapper.appendChild(host);
 
-  // Raw mode removed: no <pre><code> creation
+  
 
   // Build form
   let generator;
@@ -56,9 +56,6 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     throw e;
   }
   host.appendChild(formEl);
-  // Remove header mode badge element (no longer supported)
-  const headerModeEl = formEl.querySelector('.form-ui-mode');
-  if (headerModeEl) headerModeEl.remove();
   // Breadcrumb moved into header
   const headerElForBreadcrumb = formEl.querySelector('.form-ui-header');
   let contentBreadcrumb = null;
@@ -108,22 +105,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
 
   // Place sidebar immediately after header (overlay style via CSS)
   wrapper.appendChild(sideEl);
-  // Already inline; no class conversion needed
-  // Tabs/collapse removed; panel is always expanded
 
-  // Align sticky top to header height so the panel starts below the sticky header
-  // try {
-  //   const headerEl = formEl.querySelector('.form-ui-header');
-  //   const headerH = headerEl ? headerEl.offsetHeight : 0;
-  //   sideEl.style.top = `${Math.max(0, headerH)}px`;
-  // } catch {}
+  
 
   // Use full-page scroll. No special scroll container for form body.
 
-  // Raw/form view toggle removed; sidebar no longer controls mode
-
-  // Mode toggle removed with tabs; sidebar emits no mode events
-  // Remove/reset controls removed with tabs; handlers not needed
   sidebar.onNavigationClickHandler((e) => {
     const navItem = e.target.closest('.form-ui-nav-item');
     if (!navItem) return;
@@ -181,16 +167,14 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     }
     formEl = newForm;
     generator = newGen;
-    // Remove header mode badge element in new form as well
-    const newHeaderModeEl = newForm.querySelector('.form-ui-mode');
-    if (newHeaderModeEl) newHeaderModeEl.remove();
+    
     const h = newForm.querySelector('.form-ui-header');
     if (h) h.insertAdjacentElement('afterend', sideEl);
     generator.navigationTree = navigationTree;
     requestAnimationFrame(() => generator.navigation.generateNavigationTree());
     generator.onChange((next) => typeof onChange === 'function' && onChange(next));
     generator.loadData(dataSnapshot);
-    // No raw mode to re-apply
+    
   }
   function navigateTo(groupId) { generator.navigation.navigateToGroup(groupId); }
   function getData() { return generator.data; }
