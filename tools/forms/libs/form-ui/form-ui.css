@@ -224,18 +224,12 @@
   align-self: flex-start;
 }
 
-.form-side-panel.form-inline-panel .form-side-panel-tabs {
-  display: none;
-}
 
-/* Add separator line to the right of tabs */
-.form-side-panel.form-inline-panel .form-side-panel-tabs::after {
-  display: none;
-}
 
 .form-side-panel.form-inline-panel .form-side-panel-main {
   order: 1;
   flex: 1;
+  margin-left: 30px;
 }
 
 
@@ -250,9 +244,7 @@
   max-height: none;
 }
 
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-tabs {
-  display: none;
-}
+
 
 .form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-main {
   width: 320px;
@@ -265,27 +257,18 @@
   overflow: hidden;
 }
 
-/* Ensure form-tab styling is identical in expanded state */
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-tabs .form-tab {
-  display: none;
-}
 
-/* Red confirm state for inline panel delete button */
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab {
-  display: none;
-}
 
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state:hover,
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-reset.confirm-state:hover {
-  background: #dc2626 !important;
-}
+
+
+
+
 
 .form-ui-controls {
   display: flex;
   gap: 4px;
 }
 
-.form-ui-toggle,
 .form-ui-remove {
   background: transparent;
   border: 1px solid #dfe1e6;
@@ -297,9 +280,7 @@
   transition: all 0.2s ease;
 }
 
-.form-ui-toggle:hover {
-  background: #e4e6ea;
-}
+
 
 .form-ui-remove {
   border: none;
@@ -395,20 +376,11 @@
   cursor: move;
 }
 
-.form-side-panel.floating-panel.collapsed {
-  width: 40px;
-  min-width: 40px;
-  overflow: hidden;
-}
 
-.form-side-panel.floating-panel.collapsed .form-side-panel-main {
-  display: none;
-}
 
-.form-side-panel.floating-panel.collapsed .form-side-panel-tabs {
-  width: 40px;
-  padding: 8px 0;
-}
+
+
+
 
 .form-side-panel-header {
   display: flex;
@@ -497,92 +469,28 @@
   min-width: 0;
 }
 
-.form-side-panel-tabs {
-  width: 40px;
-  background: transparent;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  gap: 6px;
-  border-radius: 0 12px 12px 0;
-  position: relative;
-}
 
-/* Add separator line for general tabs */
-.form-side-panel-tabs::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  right: 0;
-  width: 1px;
-  background: #e5e7eb;
-}
 
-.form-tab {
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
+
+
+
 
 /* Normalize SVG icon sizing for tabs and bump panel icon slightly */
 
 
-.form-tab:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
 
-.form-tab:active {
-  background: #e5e7eb;
-  transform: translateY(1px);
-}
 
-/* Add subtle separators between expanded tab icons */
-.form-side-panel:not(.form-inline-panel) .form-tab:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 1px;
-  background: #e5e7eb;
-}
 
-.form-tab.form-ui-remove.confirm-state,
-.form-tab.form-ui-reset.confirm-state {
-  background: #ff5630;
-  color: white;
-  animation: pulse-confirm 1s ease-in-out infinite;
-}
 
-.form-tab.form-ui-remove.confirm-state:hover,
-.form-tab.form-ui-reset.confirm-state:hover {
-  background: #de350b;
-}
 
-.form-tab.form-ui-reset-position {
-  background: #3b82f6;
-  color: white;
-}
 
-.form-tab.form-ui-reset-position:hover {
-  background: #2563eb;
-  color: white;
-}
+
+
+
+
+
+
+
 
 .form-side-panel-content {
   flex: 1;
@@ -597,18 +505,15 @@
 }
 
 /* Ensure the main content sits to the right of the 40px tabs without shifting icons */
-.form-side-panel.form-inline-panel .form-side-panel-main {
-  margin-left: 30px;
-}
+
 
 /* Remove the vertical separator next to the icons for inline panel */
-.form-side-panel.form-inline-panel .form-side-panel-tabs::after {
-  display: none;
-}
+
 
 /* Navigation Tree */
 .form-navigation-tree {
-  padding: 0;
+  padding: 6px 12px 6px 0px;
+  min-height: 100px;
   position: relative;
   /* anchor for active indicator */
   max-height: calc(100vh - 20px - 56px);
@@ -1116,12 +1021,7 @@
     z-index: 1001 !important;
   }
 
-  .form-side-panel.floating-panel.collapsed {
-    width: 200px !important;
-    min-width: 200px !important;
-    max-width: 200px !important;
-    max-height: 40px !important;
-  }
+
 
   .form-ui-nav-item-content {
     padding: 6px 12px;
