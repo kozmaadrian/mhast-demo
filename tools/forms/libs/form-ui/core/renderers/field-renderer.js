@@ -37,6 +37,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     groupContainer.className = CLASS.group;
     groupContainer.id = pathToGroupId(fullPath);
     groupContainer.dataset.groupPath = fullPath;
+    groupContainer.dataset.schemaPath = fullPath;
     groupContainer.dataset.fieldPath = fullPath;
     groupContainer.dataset.required = isRequired ? 'true' : 'false';
 
@@ -94,8 +95,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
   if (isObjectType && propSchema.properties) {
     // Optional object group gating: allow when renderAllGroups
     if (!isRequired) {
-      const insideArrayItem = /\[\d+\]/.test(fullPath);
-      const shouldGate = (!formGenerator.renderAllGroups || insideArrayItem);
+      const insideArrayItem = /\[\d+\]/.test(pathPrefix || '');
+      const isDirectChildOfArrayItem = /\[\d+\]$/.test(pathPrefix || '');
+      const shouldGate = (!formGenerator.renderAllGroups || insideArrayItem) && !isDirectChildOfArrayItem;
       if (shouldGate && !formGenerator.isOptionalGroupActive(fullPath)) {
         const placeholder = document.createElement('div');
         placeholder.className = CLASS.placeholderAdd;
@@ -114,6 +116,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     groupContainer.className = CLASS.group;
     groupContainer.id = pathToGroupId(fullPath);
     groupContainer.dataset.groupPath = fullPath;
+    groupContainer.dataset.schemaPath = fullPath;
 
     const groupHeader = document.createElement('div');
     groupHeader.className = CLASS.groupHeader;

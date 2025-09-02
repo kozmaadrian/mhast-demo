@@ -23,6 +23,32 @@ export default class FormNavigation {
     this._onResizeHandler = null;
   }
 
+  // Given a schema path for a section/object, pick the first descendant path that is a group with primitives
+  resolveFirstDescendantGroupPath(sectionPath) {
+    const sectionSchema = this.formGenerator.resolveSchemaByPath(sectionPath);
+    const norm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(sectionSchema) || sectionSchema || {});
+    if (!norm || !norm.properties) return null;
+    // Prefer direct children with primitives
+    for (const [key, child] of Object.entries(norm.properties)) {
+      const eff = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(child) || child || {});
+      if (!eff) continue;
+      const childPath = sectionPath ? `${sectionPath}.${key}` : key;
+      if (eff.type === 'object' && eff.properties) {
+        if (this.formGenerator.hasPrimitiveFields(eff)) return childPath;
+        // Otherwise recurse
+        const deeper = this.resolveFirstDescendantGroupPath(childPath);
+        if (deeper) return deeper;
+      } else if (eff.type === 'array') {
+        // Skip arrays here; user will add items explicitly
+        continue;
+      } else {
+        // Primitive under section: its parent group is the section itself
+        return sectionPath;
+      }
+    }
+    return null;
+  }
+
   /**
    * Map fields to their groups after the group structure is built
    */
@@ -76,9 +102,16 @@ export default class FormNavigation {
 
       // Persist currently active group so we can restore after hover
       this.formGenerator.activeGroupId = activeGroupId;
+      // Persist active schema path in state (schema-driven)
+      const schemaPath = activeGroup.schemaPath
+        || activeGroup.element?.dataset?.schemaPath
+        || '';
+      this.formGenerator.activeSchemaPath = schemaPath;
 
       // Update navigation tree active state
       this.updateNavigationActiveState(activeGroupId);
+      // Update content breadcrumb to reflect the active group path
+      this.updateContentBreadcrumb(activeGroupId);
     }
   }
 
@@ -123,11 +156,61 @@ export default class FormNavigation {
       this.formGenerator.highlightFormGroup(groupId);
 
       // Scroll to the group
+      // Mark a short programmatic-scroll window to defer breadcrumb updates
+      try { this.formGenerator._programmaticScrollUntil = Date.now() + 1200; } catch {}
       this.formGenerator.scrollToFormGroup(groupId);
 
       // Update active state
       this.updateActiveGroup(groupId);
+      // Immediately compute breadcrumb for the intended target (avoid wait for scrollspy)
+      this.updateContentBreadcrumb(groupId);
     }
+  }
+
+  updateContentBreadcrumb(groupId) {
+    const bc = this.formGenerator?.contentBreadcrumbEl;
+    if (!bc) return;
+    // Schema/data-driven breadcrumb: use stored group schema path and schema titles
+    // Use schema-driven active path and schema; no DOM fallbacks
+    const schemaPath = this.formGenerator?.activeSchemaPath || '';
+    const buildTitleForToken = (parentSchema, token, index) => {
+      const m = token.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+      const key = m ? m[1] : token;
+      const idx = m && m[2] ? Number(m[2]) : null;
+      const norm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(parentSchema) || parentSchema || {});
+      const propSchema = norm?.properties?.[key];
+      const propNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(propSchema) || propSchema || {});
+      if (propNorm?.type === 'array') {
+        const title = this.formGenerator.getSchemaTitle(propNorm, key);
+        const labels = [];
+        // Always include the array's title
+        if (title) labels.push(title);
+        // If an index is present, include item label as well
+        if (idx != null) labels.push(`${title} #${(idx || 0) + 1}`);
+        return { label: labels, nextSchema: this.formGenerator.derefNode(propNorm.items) || propNorm.items };
+      }
+      return { label: [this.formGenerator.getSchemaTitle(propNorm || {}, key)], nextSchema: propNorm };
+    };
+    const parts = [];
+    const rootTitle = this.formGenerator?.schema?.title || 'Form';
+    parts.push(rootTitle);
+    const tokens = String(schemaPath)
+      .split('.')
+      .filter((t) => t && t !== 'root');
+    let curSchema = this.formGenerator.schema;
+    tokens.forEach((tok) => {
+      const m = tok.match(/^([^\[]+)(?:\[(\d+)\])?$/);
+      const key = m ? m[1] : tok;
+      const idx = m && m[2] ? Number(m[2]) : null;
+      const { label, nextSchema } = buildTitleForToken(curSchema, tok, idx);
+      if (Array.isArray(label)) parts.push(...label.filter(Boolean));
+      // Advance schema for next token
+      const curNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(curSchema) || curSchema || {});
+      let next = curNorm?.properties?.[key];
+      const nextNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(next) || next || {});
+      curSchema = nextNorm?.type === 'array' ? (this.formGenerator.derefNode(nextNorm.items) || nextNorm.items) : nextNorm || nextSchema;
+    });
+    bc.textContent = parts.join(' › ');
   }
 
   /**
@@ -245,6 +328,9 @@ export default class FormNavigation {
 
   updateActiveGroupFromScroll() {
     if (!this.formGenerator?.groupElements || this.formGenerator.groupElements.size === 0) return;
+    // During programmatic navigation/scroll, skip scrollspy updates entirely
+    const until = this.formGenerator?._programmaticScrollUntil || 0;
+    if (until && Date.now() <= until) return;
     const { el, type } = this.getScrollSource();
 
     let candidateId = null;
@@ -289,6 +375,17 @@ export default class FormNavigation {
     if (!candidateId) return;
     this.updateNavigationActiveState(candidateId);
     this.formGenerator.activeGroupId = candidateId;
+    // Keep active schema path in sync when scroll selects a group
+    const info = this.formGenerator.groupElements.get(candidateId);
+    if (info) {
+      const schemaPath = info.schemaPath || info.element?.dataset?.schemaPath || '';
+      this.formGenerator.activeSchemaPath = schemaPath;
+    }
+    // Update content breadcrumb unless we are in a programmatic scroll window
+    const until2 = this.formGenerator?._programmaticScrollUntil || 0;
+    if (!until2 || Date.now() > until2) {
+      this.updateContentBreadcrumb(candidateId);
+    }
   }
 
   /**
@@ -308,6 +405,34 @@ export default class FormNavigation {
       const groupPath = pathPrefix || 'root';
       const groupId = this.formGenerator.pathToGroupId(groupPath);
       const groupTitle = normalized.title || (level === 0 ? 'Form' : this.formGenerator.formatLabel(pathPrefix.split('.').pop()));
+
+      // Gate optional plain objects that contain primitives (leaf groups)
+      if (groupPath !== 'root') {
+        const parentPath = groupPath.replace(/\.[^\.]+$/, (m) => '')
+          .replace(/\[[^\]]+\]$/, (m) => '');
+        const lastTokenMatch = groupPath.match(/(^|\.)[^.\[]+$/);
+        const lastToken = lastTokenMatch ? lastTokenMatch[0].replace(/^\./, '') : '';
+        const parentSchema = this.formGenerator.resolveSchemaByPath(parentPath) || {};
+        const parentNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(parentSchema) || parentSchema || {});
+        const isOptional = !(new Set(parentNorm.required || [])).has(lastToken);
+        if (isOptional && !this.formGenerator.isOptionalGroupActive(groupPath)) {
+          const addItem = document.createElement('div');
+          addItem.className = `${CLASS.navItem} ${CLASS.navItemAdd}`;
+          addItem.dataset.groupId = `form-optional-${hyphenatePath(groupPath)}`;
+          addItem.dataset.path = groupPath;
+          addItem.dataset.level = level;
+          const content = document.createElement('div');
+          content.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
+          content.style.setProperty('--nav-level', level);
+          const titleEl = document.createElement('span');
+          titleEl.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
+          titleEl.textContent = `+ Add ${groupTitle}`;
+          content.appendChild(titleEl);
+          addItem.appendChild(content);
+          items.push(addItem);
+          return items;
+        }
+      }
 
       const navItem = document.createElement('div');
       navItem.className = CLASS.navItem;
@@ -445,13 +570,12 @@ export default class FormNavigation {
 
               const childPath = `${nestedPath}[${idx}].${childKey}`;
               const childOptional = !itemRequired.has(childKey);
-              // Inside array items, do NOT auto-activate optional objects based on renderAllGroups.
-              // Only show when required or explicitly active (data present or toggled).
+              // Arrays-of-objects are gated; objects are always shown
               const childActive = (!childOptional)
                 || this.formGenerator.isOptionalGroupActive(childPath);
 
-              if (!childActive) {
-                // Show an add option for the nested array under this item
+              if (childIsArrayOfObjects && !childActive) {
+                // Show an add option under this item for the nested array-of-objects
                 const addChild = document.createElement('div');
                 addChild.className = `${CLASS.navItem} ${CLASS.navItemAdd}`;
                 addChild.dataset.groupId = `form-optional-${hyphenatePath(childPath)}`;
@@ -469,7 +593,7 @@ export default class FormNavigation {
                 continue;
               }
 
-              // Render nested object-or-array-of-objects under this item without duplicating objects
+              // Render nested object or active array-of-objects
               const childGroupId = this.formGenerator.pathToGroupId(childPath);
               if (childIsArrayOfObjects) {
                 const childNav = document.createElement('div');
@@ -486,7 +610,25 @@ export default class FormNavigation {
                 childNav.appendChild(childContent);
                 items.push(childNav);
               } else if (childIsObject) {
-                // For nested objects, rely on recursive generation to avoid duplicate entry
+                // Insert a section node for the nested object (e.g., Geographic Location)
+                const sectionId = `form-section-${this.formGenerator.hyphenatePath(childPath)}`;
+                const childGroupIdForSection = this.formGenerator.pathToGroupId(childPath);
+                const sectionItem = document.createElement('div');
+                sectionItem.className = 'form-ui-nav-item form-ui-section-title-nav';
+                // Use the real group id so clicking behaves like other groups
+                sectionItem.dataset.groupId = childGroupIdForSection;
+                sectionItem.dataset.level = level + 3;
+                sectionItem.dataset.path = childPath;
+                const sectionContent = document.createElement('div');
+                sectionContent.className = 'form-ui-nav-item-content';
+                sectionContent.style.setProperty('--nav-level', level + 3);
+                const sectionTitleEl = document.createElement('span');
+                sectionTitleEl.className = 'form-ui-nav-item-title';
+                sectionTitleEl.textContent = this.formGenerator.getSchemaTitle(childProp, childKey);
+                sectionContent.appendChild(sectionTitleEl);
+                sectionItem.appendChild(sectionContent);
+                items.push(sectionItem);
+                // And include its children (e.g., + Add GPS Coordinates)
                 const nestedChildItems = this.generateNavigationItems(childProp, childPath, level + 3);
                 items.push(...nestedChildItems);
               }
@@ -538,6 +680,8 @@ export default class FormNavigation {
           sectionItem.className = 'form-ui-nav-item form-ui-section-title-nav';
           sectionItem.dataset.groupId = sectionId;
           sectionItem.dataset.level = level + 1;
+          // Provide schema path so clicks are data-driven
+          sectionItem.dataset.path = nestedPath;
 
           const sectionContent = document.createElement('div');
           sectionContent.className = 'form-ui-nav-item-content';
@@ -615,25 +759,31 @@ export default class FormNavigation {
     
     const { groupId } = navItem.dataset;
     if (!groupId) return;
-    if (navItem.classList.contains(CLASS.navItemAdd)) {
-      // Activate corresponding optional group directly from schema path
-      const path = navItem.dataset.path || groupId.replace(/^form-optional-/, '').replace(/-/g, '.');
-      
-      // Use centralized command to activate; it will auto-add first array item if empty
-      this.formGenerator.commandActivateOptional(path);
-      // After activation, navigate accordingly
-      requestAnimationFrame(() => {
-        const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
-        if (Array.isArray(value) && value.length > 0) {
-          const id = this.formGenerator.arrayItemId(path, 0);
-          const el = this.formGenerator.container?.querySelector?.(`#${id}`);
-          if (el && el.id) this.navigateToGroup(el.id);
-        } else {
-          const gid = this.formGenerator.pathToGroupId(path);
-          this.navigateToGroup(gid);
-        }
-        this.formGenerator.validation.validateAllFields();
-      });
+    // Purely data-driven: use schema path when present
+    if (navItem.dataset && navItem.dataset.path) {
+      const path = navItem.dataset.path;
+      const isActive = this.formGenerator.isOptionalGroupActive(path);
+      if (!isActive) {
+        // Optional group not active: activate
+        this.formGenerator.commandActivateOptional(path);
+        requestAnimationFrame(() => {
+          const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
+          if (Array.isArray(value) && value.length > 0) {
+            const id = this.formGenerator.arrayItemId(path, 0);
+            this.navigateToGroup(id);
+          } else {
+            const target = this.resolveFirstDescendantGroupPath(path) || path;
+            const gid = this.formGenerator.pathToGroupId(target);
+            this.navigateToGroup(gid);
+          }
+          this.formGenerator.validation.validateAllFields();
+        });
+      } else {
+        // Already active: navigate to best target group under this section
+        const target = this.resolveFirstDescendantGroupPath(path) || path;
+        const gid = this.formGenerator.pathToGroupId(target);
+        this.navigateToGroup(gid);
+      }
       return;
     }
     
@@ -661,6 +811,10 @@ export default class FormNavigation {
     if (this.formGenerator.navigationTree) {
       this.formGenerator.navigationTree.querySelectorAll('.form-ui-nav-item-content.active')
         .forEach((item) => item.classList.remove('active'));
+    }
+    // Clear content breadcrumb text
+    if (this.formGenerator?.contentBreadcrumbEl) {
+      this.formGenerator.contentBreadcrumbEl.textContent = '';
     }
   }
 

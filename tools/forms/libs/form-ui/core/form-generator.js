@@ -52,6 +52,7 @@ export default class FormGenerator {
     this.listeners = new Set();
     this.groupCounter = 0;
     this.groupElements = new Map();
+    this.activeSchemaPath = '';
     this.navigationTree = null;
     this.fieldErrors = new Map();
     this.fieldSchemas = new Map();
@@ -188,8 +189,9 @@ export default class FormGenerator {
       if (!this.groupElements.has(id)) {
         this.groupElements.set(id, {
           element: el,
-          path: el.dataset.groupPath ? el.dataset.groupPath.split(' > ') : [],
+          path: [],
           title: el.querySelector('.form-ui-group-title')?.textContent || el.querySelector('.form-ui-label')?.textContent || '',
+          schemaPath: el.dataset?.schemaPath || '',
           isSection: false,
         });
       }

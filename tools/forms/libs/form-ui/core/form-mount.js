@@ -63,6 +63,14 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   host.appendChild(formEl);
   // Header mode badge element
   let headerModeEl = formEl.querySelector('.form-ui-mode');
+  // Sticky content breadcrumb at top of form body
+  const bodyElForBreadcrumb = formEl.querySelector('.form-ui-body');
+  let contentBreadcrumb = null;
+  if (bodyElForBreadcrumb) {
+    contentBreadcrumb = document.createElement('div');
+    contentBreadcrumb.className = 'form-content-breadcrumb';
+    bodyElForBreadcrumb.insertBefore(contentBreadcrumb, bodyElForBreadcrumb.firstChild);
+  }
 
   // Sidebar
   const sidebar = new FormSidebar();
@@ -110,15 +118,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
     sidebar.setCollapsed(true);
   }
 
-  // Auto-float sidebar when it would be outside the viewport (keeps nav and blue marker visible)
-  // Disabled: keep sidebar inline/sticky so it does not move past form
-  const ensureSidebarVisibility = () => {};
-
-  // Listen to scroll/resize to keep panel visible
-  const onScrollOrResize = () => {};
-  // Auto-floating suppressed
-  // Initial check
-  ensureSidebarVisibility();
+  // Use full-page scroll. No special scroll container for form body.
 
   // Toggle raw/form view
   let isRawMode = false;
@@ -183,6 +183,8 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   // Connect navigation tree to form generator (use rAF instead of setTimeout)
   const navigationTree = sideEl.querySelector('.form-navigation-tree');
   generator.navigationTree = navigationTree;
+  // Expose content breadcrumb element for navigation/scroll sync
+  generator.contentBreadcrumbEl = contentBreadcrumb;
   requestAnimationFrame(() => {
     
     generator.navigation.generateNavigationTree();
@@ -191,17 +193,12 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showR
   // Initial data
   if (data) {
     generator.loadData(data);
-    // Ensure starting at top before any rebuild to avoid inherited scroll positions
-    const bodyEl = formEl.querySelector('.form-ui-body');
-    if (bodyEl) bodyEl.scrollTop = 0;
+    // Ensure starting at top before any rebuild
+    try { window.scrollTo({ top: 0 }); } catch {}
     // Rebuild so optional groups present in incoming data are materialized
     generator.rebuildBody();
     // After rebuild, reset scroll to top again to prevent jump
-    requestAnimationFrame(() => {
-      const b = formEl.querySelector('.form-ui-body');
-      if (b) b.scrollTop = 0;
-      try { window.scrollTo({ top: 0 }); } catch { /* noop */ }
-    });
+    requestAnimationFrame(() => { try { window.scrollTo({ top: 0 }); } catch {} });
   }
   // Ensure initial badge text
   updateModeBadge();
