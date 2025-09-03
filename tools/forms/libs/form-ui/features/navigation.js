@@ -723,7 +723,8 @@ export default class FormNavigation {
               }
 
               // Add entries for each nested array item (data-driven)
-              const childDataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, childPath) || [];
+              const rawChildData = this.formGenerator.model.getNestedValue(this.formGenerator.data, childPath);
+              const childDataArray = childIsArrayOfObjects ? (rawChildData || []) : rawChildData;
               if (Array.isArray(childDataArray)) {
                 
                 childDataArray.forEach((_, cidx) => {
@@ -750,9 +751,47 @@ export default class FormNavigation {
                   childItemNav.addEventListener('drop', this.onItemDrop);
                   items.push(childItemNav);
                 });
+
+                // Add control: "+ Add #N item" at end for nested arrays
+                const nextChildIndex = childDataArray.length;
+                const addChildItem = document.createElement('div');
+                addChildItem.className = `${CLASS.navItem} ${CLASS.navItemAdd}`;
+                addChildItem.dataset.groupId = `form-add-${hyphenatePath(childPath)}`;
+                addChildItem.dataset.level = level + 4;
+                addChildItem.dataset.arrayPath = childPath;
+
+                const addChildContent = document.createElement('div');
+                addChildContent.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
+                addChildContent.style.setProperty('--nav-level', level + 4);
+                const addChildTitle = document.createElement('span');
+                addChildTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
+                addChildTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(childProp, childKey)}' Item`;
+                addChildContent.appendChild(addChildTitle);
+                addChildItem.appendChild(addChildContent);
+                items.push(addChildItem);
               }
             }
           });
+
+          // Add control: "+ Add #N item" at end of the list
+          const nextIndex = dataArray.length;
+          const addItem = document.createElement('div');
+          addItem.className = `${CLASS.navItem} ${CLASS.navItemAdd}`;
+          addItem.dataset.groupId = `form-add-${hyphenatePath(nestedPath)}`;
+          addItem.dataset.level = level + 2;
+          addItem.dataset.arrayPath = nestedPath;
+
+          const addContent = document.createElement('div');
+          addContent.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
+          addContent.style.setProperty('--nav-level', level + 2);
+
+          const addTitle = document.createElement('span');
+          addTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
+          addTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(derefProp, key)}' Item`;
+
+          addContent.appendChild(addTitle);
+          addItem.appendChild(addContent);
+          items.push(addItem);
         }
         continue;
       }
@@ -850,6 +889,20 @@ export default class FormNavigation {
     e.preventDefault();
     e.stopPropagation();
     
+    // Handle add-array-item click from nav: items created with dataset.arrayPath
+    if (navItem.classList.contains(CLASS.navItemAdd) && navItem.dataset && navItem.dataset.arrayPath) {
+      const arrayPath = navItem.dataset.arrayPath;
+      this.formGenerator.commandAddArrayItem(arrayPath);
+      requestAnimationFrame(() => {
+        const arr = this.formGenerator.model.getNestedValue(this.formGenerator.data, arrayPath) || [];
+        const newIndex = Math.max(0, arr.length - 1);
+        const targetId = this.formGenerator.arrayItemId(arrayPath, newIndex);
+        this.navigateToGroup(targetId);
+        this.formGenerator.validation.validateAllFields();
+      });
+      return;
+    }
+
     const { groupId } = navItem.dataset;
     if (!groupId) return;
     // Purely data-driven: use schema path when present
