@@ -9,10 +9,8 @@
  *   onChange,
  *   onRemove,
  *   ui: {
- *     showRemove: true,
- *     fixedSidebar: false, // when true: sidebar is always expanded and collapse control is hidden
+ *     // renderAllGroups is supported; other legacy UI toggles were removed
  *   }
- *   // Note: legacy top-level `showRemove` is still supported for backwards compatibility
  * });
  * api.updateData(next); api.destroy();
  */
@@ -20,7 +18,7 @@
 import FormGenerator from './form-generator.js';
 import FormSidebar from '../components/sidebar.js';
 
-export function mountFormUI({ mount, schema, data, onChange, onRemove, ui, showRemove: legacyShowRemove } = {}) {
+export function mountFormUI({ mount, schema, data, onChange, onRemove, ui } = {}) {
   
   if (!mount) throw new Error('mountFormUI: mount element is required');
   const controls = ui || {};

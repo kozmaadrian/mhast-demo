@@ -205,7 +205,7 @@ class FormsEditor extends LitElement {
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { showRemove: false, fixedSidebar: true, renderAllGroups: true, showReset: false },
+          ui: { renderAllGroups: true },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);
@@ -253,8 +253,8 @@ class FormsEditor extends LitElement {
     };
 
     // 1) Conventional default: llrc.schema.json
-    await tryAdd('llrc.schema.json', 'LLRC');
-    await tryAdd('test.schema.json', 'test');
+    // await tryAdd('llrc.schema.json', 'LLRC');
+    // await tryAdd('test.schema.json', 'test');
 
     // 2) Allow query param overrides: ?localSchemas=a.json,b.json
     try {

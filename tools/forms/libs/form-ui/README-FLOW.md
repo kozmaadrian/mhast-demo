@@ -4,11 +4,10 @@ This document explains the runtime flows, class dependencies, responsibilities, 
 
 - Rendering the form
 - Rendering the sidebar
-- Applying highlights (form and sidebar)
+- Applying highlights (form and sidebar) and breadcrumb
 - Changing a field value
 - Optional group activation (“+ Add …”)
 - Validation and error badges
-- Raw JSON mode
 - Rendering strategy: `renderAllGroups`
 
 ### Module dependencies (high level)
@@ -42,11 +41,11 @@ flowchart LR
 
 ### State ownership (by class)
 
-- FormNodeView: `schema`, `data` (source-of-truth for ProseMirror content when serializing), `isRawMode` (when no schema). Delegates UI to the mount factory.
+- FormNodeView: `schema`, `data` (source-of-truth for ProseMirror content when serializing). Delegates UI to the mount factory.
 - mountFormUI (factory): Owns DOM wrapper and sidebar placement. Exposes API: `updateData`, `updateSchema`, `navigateTo`, `getData`, `destroy`.
 - FormGenerator: `schema`, `model` (FormModel), `data`, `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `activeOptionalGroups`, `inputFactory`, `groupBuilder`, `highlightOverlay`, `renderAllGroups`.
 - FormModel: `schema`; data helpers only (pure): `generateBaseJSON`, `get/ setNestedValue`, `deepMerge`, `getInputValue`.
-- FormSidebar: `element`, `navigationTree`, `isCollapsed`, `currentMode`.
+- FormSidebar: `element`, `navigationTree`.
 - Navigation (feature): depends on `FormGenerator`; no persistent state outside event handlers.
 - Validation (feature): depends on `FormGenerator`; derives `groupIdsWithErrors` from `fieldErrors`.
 - HighlightOverlay: `container`, `overlay`.
@@ -61,14 +60,13 @@ flowchart LR
    - State: `schema`, `data`
 
 2) mountFormUI
-   - Creates wrapper and host elements; creates `<pre><code>` for raw view
+   - Creates wrapper and host elements
    - `generator = new FormGenerator(schema, { renderAllGroups })` → `generateForm()` → returns container
-   - Appends code `<pre><code>` to the form container
    - Creates `sidebar = new FormSidebar()` and inserts inline under header
-   - Wires mode toggle, remove, and navigation clicks to generator/navigation
+   - Wires navigation clicks to generator/navigation
    - Assigns `generator.navigationTree` and calls `navigation.generateNavigationTree()`
    - If initial data exists: `generator.loadData(data)`
-   - State: `isRawMode` (factory), sidebar DOM
+   - State: sidebar DOM
 
 3) FormGenerator.generateForm()
    - Builds header, body, footer
@@ -87,7 +85,7 @@ Stacktrace (key calls):
 1) mountFormUI creates `FormSidebar` and inserts it inline under the header
 2) generator.navigationTree = sidebar.getNavigationTree()
 3) requestAnimationFrame → `Navigation.generateNavigationTree()`
-   - Builds items by mirroring schema order with `Navigation.generateNavigationItems()` (includes nested object children under array items)
+   - Builds items by mirroring schema order with `Navigation.generateNavigationItems()` (includes nested object children under array items). Array items are draggable for reordering.
    - Adds section titles, Add-items for inactive optional `$ref`/array groups, and group items
    - Calls `Validation.refreshNavigationErrorMarkers()`
    - Enables hover and scroll sync
@@ -98,30 +96,33 @@ Stacktrace:
 
 State involved:
 - FormGenerator: `groupElements`, `fieldToGroup`, `fieldErrors`, `navigationTree`
-- FormSidebar: `isCollapsed`, `currentMode`
+- FormSidebar: element and `.form-navigation-tree`
 
 ---
 
-## Flow: Applying highlights (form and sidebar)
+## Flow: Applying highlights (form and sidebar) and breadcrumb
 
 Trigger A: Click on a nav item
 - Sidebar click → mount factory handler → `generator.navigation.navigateToGroup(groupId)`
 - Navigation.navigateToGroup → `FormGenerator.highlightFormGroup(groupId)` → `HighlightOverlay.showFor(targetGroup)` → scroll to group → `Navigation.updateActiveGroup(groupId)` → `updateNavigationActiveState`
+- Breadcrumb updates immediately to reflect the active path.
 
 Trigger B: Hover/click within a form group
 - Navigation.enableHoverSync attaches `mouseenter` and `click` handlers to `.form-ui-group`
 - On hover: `updateNavigationActiveState(groupId)` moves the indicator bar
 - On click: `FormGenerator.highlightFormGroup(groupId)` + `Navigation.updateActiveGroup(groupId)`
+- Breadcrumb is not affected by hover; it updates on click.
 
 Trigger C: Focus an input
 - InputFactory attaches `focus` → Navigation.highlightActiveGroup(inputEl) → `updateActiveGroup(groupId)`
 - On `blur` with a delay, if no input is focused inside the active group → `Navigation.clearActiveGroupHighlight()`
+- Breadcrumb updates when focus moves into a different group.
 
 Stacktrace (nav click):
-- Sidebar.onNavigationClick → Navigation.onTreeClick → Navigation.navigateToGroup → FormGenerator.highlightFormGroup → HighlightOverlay.showFor → FormGenerator.scrollToFormGroup → Navigation.updateActiveGroup → Navigation.updateNavigationActiveState
+- Sidebar.onNavigationClick → Navigation.onTreeClick → Navigation.navigateToGroup → FormGenerator.highlightFormGroup → HighlightOverlay.showFor → FormGenerator.scrollToFormGroup → Navigation.updateActiveGroup → Navigation.updateNavigationActiveState → Navigation.updateContentBreadcrumb
 
 State involved:
-- FormGenerator: `groupElements`, `activeGroupId`, `navigationTree`
+- FormGenerator: `groupElements`, `activeGroupId`, `activeSchemaPath`, `navigationTree`, `contentBreadcrumbEl`
 - HighlightOverlay: `overlay`
 
 ---
@@ -180,25 +181,6 @@ Stacktrace:
 
 State involved:
 - FormGenerator: `fieldErrors`, `fieldToGroup`, `navigationTree`
-
----
-
-## Flow: Raw JSON mode (inspect‑only)
-
-1) Mode toggle in sidebar
-   - Sidebar.toggleMode → mount factory `toggleRaw()` → toggles `isRawMode`
-   - Adds/removes `raw-mode` class on host; sets `<pre><code>` content to current `generator.getDataAsJSON()` and keeps it read-only
-   - Updates header mode badge and sidebar icon/title
-
-No parsing is performed when leaving raw mode; the form remains the source of truth for edits.
-
-Stacktrace:
-// Raw mode and header badge removed; sidebar does not toggle modes
-
-State involved:
-- Factory: `isRawMode`
-- FormGenerator: `data`
-- Sidebar: `currentMode`
 
 ---
 
