@@ -3,12 +3,43 @@
  * Handles JSON Schema-based validation for form fields
  */
 
-import FormIcons from '../utils/icons.js';
 import { pathToGroupId } from '../core/form-generator/path-utils.js';
 
 export default class FormValidation {
   constructor(formGenerator) {
     this.formGenerator = formGenerator;
+  }
+
+  /**
+   * Scroll to the first invalid control within a given group using data-driven maps
+   * (fieldErrors, fieldToGroup, fieldElements) rather than DOM queries.
+   */
+  scrollToFirstErrorInGroup(groupId) {
+    if (!groupId) return;
+
+    // Determine the first field in insertion/render order that belongs to this group and has an error
+    let targetFieldPath = null;
+    for (const fieldPath of this.formGenerator.fieldElements.keys()) {
+      if (!this.formGenerator.fieldErrors.has(fieldPath)) continue;
+      const mapped = this.formGenerator.fieldToGroup.get(fieldPath);
+      if (mapped === groupId) { targetFieldPath = fieldPath; break; }
+    }
+
+    // Navigate to group first (ensures section is visible)
+    try { this.formGenerator.navigation.navigateToGroup(groupId); } catch {}
+
+    if (targetFieldPath) {
+      const el = this.formGenerator.fieldElements.get(targetFieldPath)
+        || this.formGenerator.container.querySelector(`[name="${targetFieldPath}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        try { el.focus({ preventScroll: true }); } catch {}
+        return;
+      }
+    }
+
+    // If there are no field-level errors mapped to this group, but the group has a group-level error
+    // (e.g., required empty array), simply keep the navigation at the group.
   }
 
   /**
@@ -157,16 +188,20 @@ export default class FormValidation {
   refreshNavigationErrorMarkers() {
     if (!this.formGenerator.navigationTree) return;
 
-    const groupIdsWithErrors = new Set();
+    // Build error counts per group id (do not color labels; show badge instead)
+    const errorCountByGroupId = new Map();
     this.formGenerator.fieldErrors.forEach((_, key) => {
-      // Keys can be either field paths or direct group IDs (e.g., from required empty groups)
       const maybeGroupId = String(key);
+      let groupId = null;
       if (maybeGroupId.startsWith('form-group-') || maybeGroupId.startsWith('form-array-item-')) {
-        groupIdsWithErrors.add(maybeGroupId);
-        return;
+        groupId = maybeGroupId;
+      } else {
+        groupId = this.formGenerator.fieldToGroup.get(maybeGroupId) || null;
       }
-      const mappedGroupId = this.formGenerator.fieldToGroup.get(maybeGroupId);
-      if (mappedGroupId) groupIdsWithErrors.add(mappedGroupId);
+      if (groupId) {
+        const prev = errorCountByGroupId.get(groupId) || 0;
+        errorCountByGroupId.set(groupId, prev + 1);
+      }
     });
 
     this.formGenerator.navigationTree.querySelectorAll('.form-ui-nav-item').forEach((nav) => {
@@ -179,28 +214,38 @@ export default class FormValidation {
       const titleEl = nav.querySelector('.form-ui-nav-item-title');
       if (!titleEl) return;
 
-      if (groupIdsWithErrors.has(navGroupId)) {
+      const count = errorCountByGroupId.get(navGroupId) || 0;
+      const contentEl = nav.querySelector('.form-ui-nav-item-content');
+      if (!contentEl) return;
+
+      // Update badge based on count
+      let badgeEl = contentEl.querySelector('.error-badge');
+      if (count > 0) {
         nav.classList.add('has-error');
-
-        // Add error indicator SVG if not already present
-        if (!titleEl.querySelector('.error-indicator')) {
-          const errorIcon = FormIcons.getIconSvg('triangle-alert');
-          titleEl.insertAdjacentHTML('afterbegin', errorIcon);
-
-          // Set the nav level for proper positioning
-          const errorIndicator = titleEl.querySelector('.error-indicator');
-          if (errorIndicator) {
-            errorIndicator.style.setProperty('--nav-level', nav.dataset.level || 0);
-          }
+        if (!badgeEl) {
+          badgeEl = document.createElement('span');
+          badgeEl.className = 'error-badge';
+          contentEl.appendChild(badgeEl);
         }
+        badgeEl.textContent = String(count);
+        badgeEl.setAttribute('aria-label', `${count} validation error${count === 1 ? '' : 's'}`);
+        // Make badge interactive: click to jump to first error
+        badgeEl.setAttribute('role', 'button');
+        badgeEl.setAttribute('tabindex', '0');
+        badgeEl.title = 'Jump to first error in this section';
+        const onActivate = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          this.scrollToFirstErrorInGroup(navGroupId);
+        };
+        badgeEl.onclick = onActivate;
+        badgeEl.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') onActivate(e); };
       } else {
         nav.classList.remove('has-error');
-
-        // Remove error indicator SVG if present
+        if (badgeEl) badgeEl.remove();
+        // Also remove any legacy triangle icons if present
         const existingIcon = titleEl.querySelector('.error-indicator');
-        if (existingIcon) {
-          existingIcon.remove();
-        }
+        if (existingIcon) existingIcon.remove();
       }
     });
   }

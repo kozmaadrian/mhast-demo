@@ -4,6 +4,7 @@
  * and delegates clicks to navigate and activate optional groups.
  */
 import { getDeepActiveElement } from '../utils/dom-utils.js';
+ 
 import { UI_CLASS as CLASS } from '../core/constants.js';
 import { pathToGroupId, arrayItemId, hyphenatePath } from '../core/form-generator/path-utils.js';
 
@@ -21,6 +22,7 @@ export default class FormNavigation {
     this._contentClickHandler = null;
     this._onScrollHandler = null;
     this._onResizeHandler = null;
+    
   }
 
   // Given a schema path for a section/object, pick the first descendant path that is a group with primitives
@@ -206,24 +208,93 @@ export default class FormNavigation {
       }
       return { label: [this.formGenerator.getSchemaTitle(propNorm || {}, key)], nextSchema: propNorm };
     };
-    const parts = [];
+    // Build clickable crumbs
+    bc.innerHTML = '';
+    const separator = () => {
+      const s = document.createElement('span');
+      s.textContent = ' › ';
+      return s;
+    };
     const tokens = String(schemaPath)
       .split('.')
       .filter((t) => t && t !== 'root');
     let curSchema = this.formGenerator.schema;
-    tokens.forEach((tok) => {
+    let accPath = '';
+    tokens.forEach((tok, i) => {
       const m = tok.match(/^([^\[]+)(?:\[(\d+)\])?$/);
       const key = m ? m[1] : tok;
       const idx = m && m[2] ? Number(m[2]) : null;
+      accPath = accPath ? `${accPath}.${key}` : key;
       const { label, nextSchema } = buildTitleForToken(curSchema, tok, idx);
-      if (Array.isArray(label)) parts.push(...label.filter(Boolean));
+
+      const addCrumb = (text, dataset) => {
+        if (!text) return;
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'form-ui-breadcrumb-item';
+        el.textContent = text;
+        Object.entries(dataset || {}).forEach(([k, v]) => { if (v != null) el.dataset[k] = v; });
+        el.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const path = el.dataset.path;
+          const gid = el.dataset.groupId;
+          if (gid) {
+            this.navigateToGroup(gid);
+            return;
+          }
+          if (path) {
+            const isActive = this.formGenerator.isOptionalGroupActive(path);
+            if (!isActive) {
+              this.formGenerator.commandActivateOptional(path);
+              requestAnimationFrame(() => {
+                const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
+                if (Array.isArray(value) && value.length > 0) {
+                  const id = this.formGenerator.arrayItemId(path, 0);
+                  this.navigateToGroup(id);
+                } else {
+                  const target = this.resolveFirstDescendantGroupPath(path) || path;
+                  const gid2 = this.formGenerator.pathToGroupId(target);
+                  this.navigateToGroup(gid2);
+                }
+                this.formGenerator.validation.validateAllFields();
+              });
+            } else {
+              const target = this.resolveFirstDescendantGroupPath(path) || path;
+              const gid2 = this.formGenerator.pathToGroupId(target);
+              this.navigateToGroup(gid2);
+            }
+          }
+        });
+        bc.appendChild(el);
+      };
+
+      // For arrays, create two crumbs: the array itself and the specific item
+      if (Array.isArray(label) && label.length > 0) {
+        // Array parent
+        addCrumb(label[0], { path: accPath });
+        // Array item (if index present)
+        if (idx != null && label[1]) {
+          bc.appendChild(separator());
+          const itemGroupId = this.formGenerator.arrayItemId(accPath, idx);
+          addCrumb(label[1], { groupId: itemGroupId });
+        }
+      } else if (Array.isArray(label)) {
+        // No labels
+      } else {
+        addCrumb(label, { path: accPath });
+      }
+
+      // Append separator except after last
+      if (i < tokens.length - 1) bc.appendChild(separator());
+
       // Advance schema for next token
       const curNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(curSchema) || curSchema || {});
       let next = curNorm?.properties?.[key];
       const nextNorm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(next) || next || {});
       curSchema = nextNorm?.type === 'array' ? (this.formGenerator.derefNode(nextNorm.items) || nextNorm.items) : nextNorm || nextSchema;
+      // If array index was present, keep accPath with [idx]
+      if (idx != null) accPath = `${accPath}[${idx}]`;
     });
-    bc.textContent = parts.join(' › ');
   }
 
   /**
@@ -330,6 +401,8 @@ export default class FormNavigation {
         }
       } catch {}
 
+      // (reverted) no inline actions menu on array roots
+
       current.ul.appendChild(li);
       current.lastLi = li;
     });
@@ -348,7 +421,7 @@ export default class FormNavigation {
       const group = e.currentTarget;
       const groupId = group.id;
       if (!groupId) return;
-      // Update nav indicator to hovered group without changing persistent active state
+      // Update nav indicator to hovered group without changing persistent selected state
       this.updateNavigationActiveState(groupId);
     };
     this._hoverHandler = handleMouseEnter;
@@ -415,6 +488,8 @@ export default class FormNavigation {
     return { el: null, type: 'window' };
   }
 
+  // (reverted) actions menu
+
   updateActiveGroupFromScroll() {
     if (!this.formGenerator?.groupElements || this.formGenerator.groupElements.size === 0) return;
     // During programmatic navigation/scroll, skip scrollspy updates entirely
@@ -425,8 +500,12 @@ export default class FormNavigation {
     let candidateId = null;
     let candidateMetric = -Infinity; // larger is better
 
+    // Account for sticky header/breadcrumb and trigger earlier by 100px
+    const headerOffset = Math.max(0, this.formGenerator?._headerOffset || 0);
+    const extraEarly = 100;
+
     if (type === 'element' && el) {
-      const activeOffset = el.scrollTop + 20;
+      const activeOffset = el.scrollTop + headerOffset + extraEarly;
       const getOffsetTopWithinContainer = (element, containerEl) => {
         let top = 0;
         let node = element;
@@ -445,8 +524,7 @@ export default class FormNavigation {
       }
     } else {
       // Window scroll: use viewport positions
-      const viewportTop = 0; // relative in getBoundingClientRect()
-      const threshold = 80; // px from top of viewport
+      const threshold = headerOffset + extraEarly; // px from top of viewport
       for (const [groupId, info] of this.formGenerator.groupElements) {
         const rect = info.element.getBoundingClientRect();
         const top = rect.top;
@@ -523,22 +601,25 @@ export default class FormNavigation {
         }
       }
 
-      const navItem = document.createElement('div');
-      navItem.className = CLASS.navItem;
-      navItem.dataset.groupId = groupId;
-      navItem.dataset.level = level;
+      // Skip adding a navigation entry for the root level; only show children
+      if (groupPath !== 'root') {
+        const navItem = document.createElement('div');
+        navItem.className = CLASS.navItem;
+        navItem.dataset.groupId = groupId;
+        navItem.dataset.level = level;
 
-      const navContent = document.createElement('div');
-      navContent.className = CLASS.navItemContent;
-      navContent.style.setProperty('--nav-level', level);
+        const navContent = document.createElement('div');
+        navContent.className = CLASS.navItemContent;
+        navContent.style.setProperty('--nav-level', level);
 
-      const navTitle = document.createElement('span');
-      navTitle.className = CLASS.navItemTitle;
-      navTitle.textContent = groupTitle;
+        const navTitle = document.createElement('span');
+        navTitle.className = CLASS.navItemTitle;
+        navTitle.textContent = groupTitle;
 
-      navContent.appendChild(navTitle);
-      navItem.appendChild(navContent);
-      items.push(navItem);
+        navContent.appendChild(navTitle);
+        navItem.appendChild(navContent);
+        items.push(navItem);
+      }
     }
 
     // Walk properties in declaration order and append items inline respecting order.
@@ -598,6 +679,7 @@ export default class FormNavigation {
         navItem.className = CLASS.navItem;
         navItem.dataset.groupId = groupId;
         navItem.dataset.level = level + 1;
+        navItem.dataset.arrayPath = nestedPath;
 
         const content = document.createElement('div');
         content.className = CLASS.navItemContent;
