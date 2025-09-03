@@ -1049,9 +1049,15 @@
   background: transparent;
 }
 
+
 .form-ui-nav-item-add .form-ui-nav-item-add-title {
   color: #8c94a3;
   font-weight: 500;
+}
+
+/* Prepend a blue plus via CSS to Add entries */
+.form-ui-nav-item-add .form-ui-nav-item-add-title::before {
+  content: none;
 }
 
 .form-ui-nav-item-add .form-ui-nav-item-add-content:hover {
@@ -1160,7 +1166,8 @@
 }
 
 /* Sidebar error markers for nav titles (no layout shift) */
-.form-ui-nav-item.has-error .form-ui-nav-item-title {
+/* Only color the exact item's title, not descendant items */
+.form-ui-nav-item.has-error>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #b91c1c;
   /* red-700 */
 }

@@ -4,6 +4,7 @@
  */
 
 import FormIcons from '../utils/icons.js';
+import { pathToGroupId } from '../core/form-generator/path-utils.js';
 
 export default class FormValidation {
   constructor(formGenerator) {
@@ -20,17 +21,30 @@ export default class FormValidation {
       if (inputEl) this.validateField(fieldPath, schema, inputEl, true); // Skip marker refresh during batch
     });
 
-    // When renderAllGroups is false, ensure required groups that are not active yet are also surfaced in nav
-    if (!this.formGenerator.renderAllGroups) {
-      this.formGenerator.container.querySelectorAll('.form-ui-group[data-field-path][data-required="true"]').forEach((groupEl) => {
-        const groupId = groupEl.id;
-        if (!groupId) return;
-        const hasAnyInvalid = groupEl.querySelector('.invalid');
-        if (hasAnyInvalid) {
-          this.formGenerator.fieldErrors.set(groupId, 'Group has invalid fields');
+    // Data-driven: mark only required arrays-of-objects that are empty
+    const markRequiredEmptyArrays = (node, pathPrefix = '') => {
+      const normalized = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {});
+      if (!normalized || normalized.type !== 'object' || !normalized.properties) return;
+      const requiredSet = new Set(normalized.required || []);
+      Object.entries(normalized.properties).forEach(([key, child]) => {
+        const childNode = this.formGenerator.derefNode(child) || child || {};
+        const childNorm = this.formGenerator.normalizeSchema(childNode) || childNode || {};
+        const propPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+        const isRequired = requiredSet.has(key);
+        if (childNorm && childNorm.type === 'array' && isRequired) {
+          const val = this.formGenerator.model.getNestedValue(this.formGenerator.data, propPath);
+          if (!Array.isArray(val) || val.length === 0) {
+            this.formGenerator.fieldErrors.set(pathToGroupId(propPath), 'Required list is empty.');
+          } else {
+            this.formGenerator.fieldErrors.delete(pathToGroupId(propPath));
+          }
+        }
+        if (childNorm && childNorm.type === 'object' && childNorm.properties) {
+          markRequiredEmptyArrays(childNorm, propPath);
         }
       });
-    }
+    };
+    markRequiredEmptyArrays(this.formGenerator.schema, '');
     // Update sidebar markers after all validation is complete
     this.refreshNavigationErrorMarkers();
   }
@@ -143,18 +157,28 @@ export default class FormValidation {
     if (!this.formGenerator.navigationTree) return;
 
     const groupIdsWithErrors = new Set();
-    this.formGenerator.fieldErrors.forEach((_, fieldPath) => {
-      const groupId = this.formGenerator.fieldToGroup.get(fieldPath);
-      if (groupId) {
-        groupIdsWithErrors.add(groupId);
+    this.formGenerator.fieldErrors.forEach((_, key) => {
+      // Keys can be either field paths or direct group IDs (e.g., from required empty groups)
+      const maybeGroupId = String(key);
+      if (maybeGroupId.startsWith('form-group-') || maybeGroupId.startsWith('form-array-item-')) {
+        groupIdsWithErrors.add(maybeGroupId);
+        return;
       }
+      const mappedGroupId = this.formGenerator.fieldToGroup.get(maybeGroupId);
+      if (mappedGroupId) groupIdsWithErrors.add(mappedGroupId);
     });
 
     this.formGenerator.navigationTree.querySelectorAll('.form-ui-nav-item').forEach((nav) => {
+      // Skip non-group nav entries like "+ Add ..." items
+      if (nav.classList.contains('form-ui-nav-item-add')) return;
+      const navGroupId = nav.dataset?.groupId || '';
+      // Only mark real groups or array-item entries; ignore activators like form-optional-*, form-add-*
+      const isRealGroup = navGroupId.startsWith('form-group-') || navGroupId.startsWith('form-array-item-');
+      if (!isRealGroup) return;
       const titleEl = nav.querySelector('.form-ui-nav-item-title');
       if (!titleEl) return;
 
-      if (groupIdsWithErrors.has(nav.dataset.groupId)) {
+      if (groupIdsWithErrors.has(navGroupId)) {
         nav.classList.add('has-error');
 
         // Add error indicator SVG if not already present

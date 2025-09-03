@@ -253,7 +253,8 @@ class FormsEditor extends LitElement {
     };
 
     // 1) Conventional default: llrc.schema.json
-    await tryAdd('llrc.schema.json', 'LLRC (local)');
+    await tryAdd('llrc.schema.json', 'LLRC');
+    await tryAdd('test.schema.json', 'test');
 
     // 2) Allow query param overrides: ?localSchemas=a.json,b.json
     try {
@@ -269,7 +270,7 @@ class FormsEditor extends LitElement {
             if (!r.ok) continue;
             // Validate JSON shape quickly
             await r.json();
-            found.push({ id: p, name: `${p} (local)`, url: u.pathname });
+            found.push({ id: p, name: p, url: u.pathname });
           } catch {}
         }
       }

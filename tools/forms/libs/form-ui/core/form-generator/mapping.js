@@ -13,12 +13,32 @@ export function mapFieldsToGroups(generator) {
   if (!generator?.container) return;
   generator.container.querySelectorAll('.form-ui-field[data-field-path]').forEach((field) => {
     const { fieldPath } = field.dataset;
-    // Prefer mapping to the nearest array-item container when present so
-    // per-item errors can be shown in the sidebar on the specific item.
+    if (!fieldPath) return;
+
+    // Strategy:
+    // 1) If the field is inside an array item AND also inside a concrete group under that item,
+    //    map to that inner group (e.g., GPS Coordinates).
+    // 2) Else if inside an array item, map to the array item container (e.g., Address #1).
+    // 3) Else map to the nearest group container.
     const arrayItemEl = field.closest('.form-ui-array-item[id]');
-    const groupEl = arrayItemEl || field.closest('.form-ui-group');
-    if (fieldPath && groupEl && groupEl.id) {
-      generator.fieldToGroup.set(fieldPath, groupEl.id);
+    const nearestGroupEl = field.closest('.form-ui-group[id]');
+
+    let targetId = '';
+    if (arrayItemEl) {
+      // Find a group within this array item specifically
+      const innerGroupEl = field.closest('.form-ui-group[id]');
+      const innerGroupIsWithinItem = innerGroupEl && arrayItemEl.contains(innerGroupEl) && innerGroupEl.id !== 'form-group-root';
+      if (innerGroupIsWithinItem) {
+        targetId = innerGroupEl.id;
+      } else {
+        targetId = arrayItemEl.id;
+      }
+    } else if (nearestGroupEl) {
+      targetId = nearestGroupEl.id;
+    }
+
+    if (targetId) {
+      generator.fieldToGroup.set(fieldPath, targetId);
     }
   });
 }
