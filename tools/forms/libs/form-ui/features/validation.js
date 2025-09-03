@@ -22,29 +22,30 @@ export default class FormValidation {
     });
 
     // Data-driven: mark only required arrays-of-objects that are empty
-    const markRequiredEmptyArrays = (node, pathPrefix = '') => {
-      const normalized = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {});
+    const deref = (n) => this.formGenerator.derefNode(n) || n || {};
+    const norm = (n) => this.formGenerator.normalizeSchema(deref(n)) || deref(n) || {};
+    const scanRequiredEmptyArrays = (node, pathPrefix = '') => {
+      const normalized = norm(node);
       if (!normalized || normalized.type !== 'object' || !normalized.properties) return;
       const requiredSet = new Set(normalized.required || []);
       Object.entries(normalized.properties).forEach(([key, child]) => {
-        const childNode = this.formGenerator.derefNode(child) || child || {};
-        const childNorm = this.formGenerator.normalizeSchema(childNode) || childNode || {};
+        const childNorm = norm(child);
         const propPath = pathPrefix ? `${pathPrefix}.${key}` : key;
         const isRequired = requiredSet.has(key);
-        if (childNorm && childNorm.type === 'array' && isRequired) {
+        const isArrayOfObjects = childNorm && childNorm.type === 'array' && (
+          (childNorm.items && (childNorm.items.type === 'object' || childNorm.items.properties)) || !!childNorm.items?.$ref
+        );
+        if (isRequired && isArrayOfObjects) {
           const val = this.formGenerator.model.getNestedValue(this.formGenerator.data, propPath);
-          if (!Array.isArray(val) || val.length === 0) {
-            this.formGenerator.fieldErrors.set(pathToGroupId(propPath), 'Required list is empty.');
-          } else {
-            this.formGenerator.fieldErrors.delete(pathToGroupId(propPath));
-          }
+          if (!Array.isArray(val) || val.length === 0) this.formGenerator.fieldErrors.set(pathToGroupId(propPath), 'Required list is empty.');
+          else this.formGenerator.fieldErrors.delete(pathToGroupId(propPath));
         }
         if (childNorm && childNorm.type === 'object' && childNorm.properties) {
-          markRequiredEmptyArrays(childNorm, propPath);
+          scanRequiredEmptyArrays(childNorm, propPath);
         }
       });
     };
-    markRequiredEmptyArrays(this.formGenerator.schema, '');
+    scanRequiredEmptyArrays(this.formGenerator.schema, '');
     // Update sidebar markers after all validation is complete
     this.refreshNavigationErrorMarkers();
   }
