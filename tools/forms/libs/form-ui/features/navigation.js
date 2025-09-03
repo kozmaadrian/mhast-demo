@@ -500,8 +500,12 @@ export default class FormNavigation {
     let candidateId = null;
     let candidateMetric = -Infinity; // larger is better
 
+    // Account for sticky header/breadcrumb and trigger earlier by 100px
+    const headerOffset = Math.max(0, this.formGenerator?._headerOffset || 0);
+    const extraEarly = 100;
+
     if (type === 'element' && el) {
-      const activeOffset = el.scrollTop + 20;
+      const activeOffset = el.scrollTop + headerOffset + extraEarly;
       const getOffsetTopWithinContainer = (element, containerEl) => {
         let top = 0;
         let node = element;
@@ -520,8 +524,7 @@ export default class FormNavigation {
       }
     } else {
       // Window scroll: use viewport positions
-      const viewportTop = 0; // relative in getBoundingClientRect()
-      const threshold = 80; // px from top of viewport
+      const threshold = headerOffset + extraEarly; // px from top of viewport
       for (const [groupId, info] of this.formGenerator.groupElements) {
         const rect = info.element.getBoundingClientRect();
         const top = rect.top;
