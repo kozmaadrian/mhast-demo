@@ -1,3 +1,68 @@
+/* Tree view styling inspired by CSSScript Pure CSS Tree View */
+.form-nav-tree {
+  --tree-clr: #9ca3af;
+  /* line and dot color */
+  --tree-font-size: 14px;
+  --tree-item-height: 2;
+  /* line-height multiplier */
+  --tree-offset: 18px;
+  /* left indent to label */
+  --tree-thickness: 1px;
+  --tree-style: dotted;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-nav-tree ul {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--tree-font-size);
+}
+
+.form-nav-tree li {
+  position: relative;
+  line-height: var(--tree-item-height);
+  padding-inline-start: var(--tree-offset);
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li:last-child {
+  border-color: transparent;
+}
+
+.form-nav-tree li::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--tree-item-height) / 2 * -1 * var(--tree-font-size) + var(--tree-thickness));
+  left: calc(var(--tree-thickness) * -1);
+  width: calc(var(--tree-offset) + var(--tree-thickness) * 2);
+  height: calc(var(--tree-item-height) * var(--tree-font-size));
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+  border-bottom: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--tree-clr);
+  top: calc(var(--tree-item-height) / 2 * var(--tree-font-size));
+  left: var(--tree-offset);
+  transform: translate(calc(var(--tree-thickness) * -1), calc(var(--tree-thickness) * -1));
+}
+
+/* Make our existing nav item content align naturally inside the li */
+.form-nav-tree .form-ui-nav-item-content {
+  padding-left: 0;
+  border: none;
+  background: transparent;
+}
+
 .form-ui-main {
   display: grid;
   grid-template-columns: 1fr 360px;
@@ -529,6 +594,7 @@
   font-size: 14px;
   color: #374151;
   font-weight: 500;
+  padding-left: 8px;
 }
 
 .form-ui-body {
@@ -1005,8 +1071,21 @@
   transition: all 0.2s ease;
 }
 
+/* Global hover (for non-tree contexts only). Sidebar tree overrides below. */
 .form-ui-nav-item:hover {
   background-color: #f4f5f7;
+}
+
+/* In the sidebar tree, do NOT color the container; only the direct content may have bg */
+.form-navigation-tree .form-ui-nav-item:hover {
+  background: transparent;
+}
+
+
+
+/* Override inside the tree: only the row's content gets hover bg, container stays transparent */
+.form-navigation-tree .form-ui-nav-item:hover {
+  background: transparent !important;
 }
 
 .form-ui-nav-item.active .form-ui-nav-item-content {
@@ -1017,6 +1096,11 @@
 
 .form-ui-nav-item.active .form-ui-nav-item-content::after {
   display: none;
+}
+
+/* Limit hover to the exact content hovered; avoid ancestor selectors */
+.form-navigation-tree .form-ui-nav-item-content:hover {
+  background: #f3f4f6;
 }
 
 .form-ui-nav-item-content {
@@ -1047,6 +1131,99 @@
   background: #f1f2f4;
 }
 
+/* Tree view styling inspired by CSSScript Pure CSS Tree View */
+.form-nav-tree {
+  --tree-clr: #9ca3af;
+  /* line and dot color */
+  --tree-font-size: 14px;
+  --tree-item-height: 2;
+  /* line-height multiplier */
+  --tree-offset: 18px;
+  /* left indent to label */
+  --tree-thickness: 1px;
+  --tree-style: dotted;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-nav-tree ul {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--tree-font-size);
+}
+
+.form-nav-tree li {
+  position: relative;
+  line-height: var(--tree-item-height);
+  padding-inline-start: var(--tree-offset);
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li:last-child {
+  border-color: transparent;
+}
+
+.form-nav-tree li::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--tree-item-height) / 2 * -1 * var(--tree-font-size) + var(--tree-thickness));
+  left: calc(var(--tree-thickness) * -1);
+  width: calc(var(--tree-offset) + var(--tree-thickness) * 2);
+  height: calc(var(--tree-item-height) * var(--tree-font-size));
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+  border-bottom: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--tree-clr);
+  top: calc(var(--tree-item-height) / 2 * var(--tree-font-size));
+  left: var(--tree-offset);
+  transform: translate(calc(var(--tree-thickness) * -1), calc(var(--tree-thickness) * -1));
+}
+
+/* Make our existing nav item content align naturally inside the li */
+.form-nav-tree .form-ui-nav-item-content {
+  padding-left: 0;
+  border: none;
+  background: transparent;
+}
+
+/* Active path highlighting: stronger color for active + ancestors */
+.form-nav-tree {
+  --tree-clr-active: #6b7280;
+  --tree-thickness-active: 1px;
+}
+
+.form-nav-tree li.tree-active::before,
+.form-nav-tree li.tree-ancestor::before {
+  border-left-color: var(--tree-clr-active);
+  border-bottom-color: var(--tree-clr-active);
+  border-left-width: var(--tree-thickness-active);
+  border-bottom-width: var(--tree-thickness-active);
+}
+
+.form-nav-tree li.tree-active::after,
+.form-nav-tree li.tree-ancestor::after {
+  background-color: var(--tree-clr-active);
+}
+
+/* Limit hover to a single LI row in the tree, do not cascade to descendants */
+.form-nav-tree li:hover>.form-ui-nav-item-content {
+  background: #f3f4f6 !important;
+}
+
+.form-nav-tree li:hover li>.form-ui-nav-item-content {
+  background: transparent !important;
+}
+
 .form-ui-nav-item-title {
   font-size: 14px;
   color: #172b4d;
@@ -1071,7 +1248,7 @@
   pointer-events: none;
 }
 
-.form-ui-nav-item.active .form-ui-nav-item-title {
+.form-ui-nav-item-content.active .form-ui-nav-item-title {
   color: #4d7bff;
   font-weight: 600;
 }
@@ -1090,22 +1267,27 @@
 }
 
 /* Section title navigation items (remove duplicate bold - handled by specific selector below) */
-.form-ui-section-title-nav .form-ui-nav-item-title {
+.form-ui-section-title-nav>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #424242;
 }
 
 /* More prominent bold effect for section titles using CSS class */
-.form-ui-nav-item.form-ui-section-title-nav .form-ui-nav-item-title {
+.form-ui-nav-item.form-ui-section-title-nav>.form-ui-nav-item-content>.form-ui-nav-item-title {
   font-weight: 900;
   color: #2c3e50;
 }
 
-.form-ui-section-title-nav:hover {
+.form-ui-section-title-nav:hover>.form-ui-nav-item-content {
   background-color: #f5f5f5;
 }
 
-.form-ui-section-title-nav:hover .form-ui-nav-item-title {
+/* .form-ui-section-title-nav:hover>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #1976d2;
+} */
+
+/* Ensure child rows under a hovered section title do not inherit its hover */
+.form-ui-section-title-nav:hover li>.form-ui-nav-item-content {
+  background: transparent !important;
 }
 
 /* Form group navigation items (normal styling for actual form groups) */

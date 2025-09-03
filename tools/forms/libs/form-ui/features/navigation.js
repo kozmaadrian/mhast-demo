@@ -124,11 +124,26 @@ export default class FormNavigation {
     // Remove previous active states
     this.formGenerator.navigationTree.querySelectorAll(`.${CLASS.navItemContent}.active`)
       .forEach((item) => item.classList.remove('active'));
+    // Clear previous active/ancestor path highlighting on the UL/LI tree
+    this.formGenerator.navigationTree
+      .querySelectorAll('.form-nav-tree li.tree-active, .form-nav-tree li.tree-ancestor')
+      .forEach((li) => { li.classList.remove('tree-active'); li.classList.remove('tree-ancestor'); });
 
     // Add active state to current item
     const activeNavItem = this.formGenerator.navigationTree.querySelector(`[data-group-id="${activeGroupId}"] .${CLASS.navItemContent}`);
     if (activeNavItem) {
       activeNavItem.classList.add('active');
+
+      // Mark LI and its ancestors for path highlighting (affects dotted connectors via CSS vars)
+      const activeLi = activeNavItem.closest('li');
+      if (activeLi) {
+        activeLi.classList.add('tree-active');
+        let parentLi = activeLi.parentElement ? activeLi.parentElement.closest('li') : null;
+        while (parentLi) {
+          parentLi.classList.add('tree-ancestor');
+          parentLi = parentLi.parentElement ? parentLi.parentElement.closest('li') : null;
+        }
+      }
 
       // Update or create the active indicator element to match active item height/position
       let indicator = this.formGenerator.navigationTree.querySelector(`.${CLASS.navIndicator}`);
@@ -224,9 +239,11 @@ export default class FormNavigation {
     // Clear existing navigation
     this.formGenerator.navigationTree.innerHTML = '';
 
-    // Generate navigation items for form groups
-    const navItems = this.generateNavigationItems(this.formGenerator.schema, '', 0);
-    navItems.forEach((item) => this.formGenerator.navigationTree.appendChild(item));
+    // Generate flat navigation items for form groups (with dataset.level)
+    const flatItems = this.generateNavigationItems(this.formGenerator.schema, '', 0);
+    // Transform to nested UL/LI structure like classic tree views
+    const nested = this.buildNestedListFromFlat(flatItems);
+    this.formGenerator.navigationTree.appendChild(nested);
 
     // Setup delegated click handler on the tree (idempotent)
     this.setupNavigationHandlers();
@@ -244,6 +261,63 @@ export default class FormNavigation {
       const maxTop = Math.max(0, treeEl.scrollHeight - treeEl.clientHeight);
       treeEl.scrollTop = Math.min(prevScrollTop, maxTop);
     });
+  }
+
+  /**
+   * Build a nested UL/LI structure from the flat list of nav items using their dataset.level
+   * Technique inspired by classic tree view nesting used in CSS-only trees
+   */
+  buildNestedListFromFlat(nodes) {
+    const makeUl = () => {
+      const ul = document.createElement('ul');
+      ul.className = 'form-nav-tree';
+      return ul;
+    };
+
+    const rootUl = makeUl();
+    // Each stack frame: { level, ul, lastLi }
+    const stack = [{ level: 0, ul: rootUl, lastLi: null }];
+
+    const ensureLevel = (targetLevel) => {
+      // Collapse to the requested parent level
+      while (stack.length - 1 > targetLevel) stack.pop();
+      // Expand missing levels by creating UL under the last LI of the previous level
+      while (stack.length - 1 < targetLevel) {
+        const parent = stack[stack.length - 1];
+        const parentLi = parent.lastLi;
+        const ul = makeUl();
+        // If no parent LI yet, attach to current UL (edge case for malformed order)
+        if (parentLi) parentLi.appendChild(ul); else parent.ul.appendChild(ul);
+        stack.push({ level: parent.level + 1, ul, lastLi: null });
+      }
+    };
+
+    nodes.forEach((node) => {
+      const level = Number(node?.dataset?.level || 0);
+      ensureLevel(level);
+      const current = stack[stack.length - 1];
+
+      const li = document.createElement('li');
+      li.className = node.className || '';
+      // Copy key attributes/data
+      try {
+        (node.getAttributeNames?.() || []).forEach((name) => {
+          if (name === 'class') return;
+          const val = node.getAttribute(name);
+          if (val != null) li.setAttribute(name, val);
+        });
+      } catch {}
+      try { Object.keys(node.dataset || {}).forEach((k) => { li.dataset[k] = node.dataset[k]; }); } catch {}
+      if (node.draggable) li.draggable = true;
+
+      // Move children/content inside LI
+      while (node.firstChild) li.appendChild(node.firstChild);
+
+      current.ul.appendChild(li);
+      current.lastLi = li;
+    });
+
+    return rootUl;
   }
 
   /**
