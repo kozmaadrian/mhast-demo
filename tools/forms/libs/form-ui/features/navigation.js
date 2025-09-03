@@ -313,6 +313,23 @@ export default class FormNavigation {
       // Move children/content inside LI
       while (node.firstChild) li.appendChild(node.firstChild);
 
+      // If this was an array item entry, attach drag handlers to the content node
+      try {
+        const contentEl = li.querySelector(`.${CLASS.navItemContent}`);
+        const isArrayItem = !!li.dataset && (li.dataset.arrayPath != null && li.dataset.itemIndex != null);
+        if (contentEl && isArrayItem) {
+          // Mirror minimal dataset on the content element so handlers can read it
+          contentEl.dataset.arrayPath = li.dataset.arrayPath;
+          contentEl.dataset.itemIndex = li.dataset.itemIndex;
+          contentEl.dataset.groupId = li.dataset.groupId || '';
+          // Make the content the drag handle/target
+          contentEl.draggable = true;
+          contentEl.addEventListener('dragstart', this.onItemDragStart);
+          contentEl.addEventListener('dragover', this.onItemDragOver);
+          contentEl.addEventListener('drop', this.onItemDrop);
+        }
+      } catch {}
+
       current.ul.appendChild(li);
       current.lastLi = li;
     });
@@ -777,16 +794,19 @@ export default class FormNavigation {
   }
 
   onItemDragStart(e) {
-    const item = e.currentTarget;
-    const { arrayPath, itemIndex } = item.dataset;
+    const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
+    const { arrayPath, itemIndex } = (e.currentTarget.dataset && (e.currentTarget.dataset.arrayPath || e.currentTarget.dataset.itemIndex != null))
+      ? e.currentTarget.dataset
+      : item.dataset || {};
     if (!arrayPath || itemIndex == null) return;
     this._dragData = { arrayPath, fromIndex: Number(itemIndex) };
     try { e.dataTransfer.effectAllowed = 'move'; } catch { /* noop */ }
   }
 
   onItemDragOver(e) {
-    const item = e.currentTarget;
-    const { arrayPath } = item.dataset;
+    const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
+    const data = (e.currentTarget.dataset && (e.currentTarget.dataset.arrayPath != null)) ? e.currentTarget.dataset : item.dataset || {};
+    const { arrayPath } = data;
     if (!this._dragData || !arrayPath || arrayPath !== this._dragData.arrayPath) return;
     e.preventDefault();
     try { e.dataTransfer.dropEffect = 'move'; } catch { /* noop */ }
@@ -794,8 +814,9 @@ export default class FormNavigation {
 
   onItemDrop(e) {
     e.preventDefault();
-    const item = e.currentTarget;
-    const { arrayPath, itemIndex } = item.dataset;
+    const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
+    const data = (e.currentTarget.dataset && (e.currentTarget.dataset.arrayPath != null)) ? e.currentTarget.dataset : item.dataset || {};
+    const { arrayPath, itemIndex } = data;
     if (!this._dragData || !arrayPath || arrayPath !== this._dragData.arrayPath) {
       this._dragData = null;
       return;
