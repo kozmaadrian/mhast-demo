@@ -55,7 +55,7 @@ Key APIs:
 
 - Core: orchestration and rendering pipeline
   - `core/form-nodeview.js`: ProseMirror integration; parses `{ schema, data }`, mounts via the factory, serializes back to the document. It no longer creates or manages the sidebar directly.
-  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, handles raw JSON mode, and exposes a tiny API. Supports UI options (see Factory API).
+  - `core/form-mount.js`: factory that mounts the form UI into a DOM node. Builds `FormGenerator`, creates and wires `FormSidebar`, and exposes a small API. No raw JSON mode UI.
   - `core/form-generator.js`: orchestrates schema→DOM, data updates, and hooks features.
   - `core/form-generator/path-utils.js`: stable path→id helpers (`hyphenatePath`, `pathToGroupId`, `arrayItemId`).
   - `core/form-generator/schema-utils.js`: schema deref/normalization/title/base JSON helpers (pure, cycle-safe).
@@ -67,11 +67,11 @@ Key APIs:
   - `core/form-generator/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
 
 - Features: pluggable behaviors with no DOM structure ownership
-  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs.
+  - `features/navigation.js`: builds/updates sidebar navigation; active/hover sync and indicator bar. Includes nested object children under array items and bracket-aware IDs. Supports drag-and-drop reordering of array items.
   - `features/validation.js`: inline field validation + sidebar error markers (JSON‑Schema style checks).
 
 - Components: reusable UI widgets
-  - `components/sidebar.js`: the right-side panel (collapse, mode toggle, remove) with delegated event API.
+  - `components/sidebar.js`: the right-side navigation panel (navigation-only) with delegated click API.
 
 - Utils: cross‑cutting helpers
   - `utils/schema-loader.js`: fetches/caches `*.schema.json` from a configured repo/branch.
@@ -86,8 +86,7 @@ Key APIs:
 
 2) Create UI
    - `FormNodeView` calls the factory `mountFormUI({ mount, schema, data, onChange, onRemove })`.
-   - The factory builds `FormGenerator` and `FormSidebar`, inserts the panel inline under the header, wires nav/tabs, and manages raw/form mode.
-   - The `<pre><code>` raw JSON node lives inside the container and is toggled by the factory.
+   - The factory builds `FormGenerator` and `FormSidebar`, inserts the navigation panel inline under the header, and wires navigation.
 
 3) Generate DOM from schema in `FormGenerator`
    - Initial render: `generateForm()` uses `GroupBuilder.build()` to create groups (with primitive fields) and sections (containers without primitives).
@@ -98,9 +97,9 @@ Key APIs:
    - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items. It includes nested object children under array items.
    - `Validation.validateAllFields()` runs after render and nav rebuild so required/invalid states are visible on load. It also runs after optional group activation and after array‑item add.
 
-4) Sync back to ProseMirror
+4) Sync back to ProseMirror and breadcrumb
    - On any change, `FormGenerator` emits new `data` → `FormNodeView` replaces the code_block text with `{ schema, data }` JSON.
-   - Raw JSON mode is toggled by the factory and is inspect‑only; switching back does not parse JSON into the form.
+   - A schema-driven content breadcrumb is rendered inside the header and updates on navigation, scroll, and input focus.
 
 ### DOM contract (stable IDs/classes)
 
@@ -128,7 +127,7 @@ Key APIs:
   - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` inline at the property position.
   - Optional `$ref` objects and arrays-of-objects are skipped in content until activated; required ones always render.
 
-### How the sidebar is built (ordered, in-place Add)
+### How the sidebar is built (ordered, in-place Add, drag to reorder)
 
 - `Navigation.generateNavigationItems(schema, path, level)` iterates `properties` in declaration order and mirrors the structure:
   - If the current level contains primitive fields, it adds a nav item for the current group (`form-group-…`).
@@ -140,6 +139,7 @@ Key APIs:
 - Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
 - Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
 - Scroll position: `Navigation.generateNavigationTree()` preserves sidebar `scrollTop` across re-renders.
+- Array items in navigation support drag-and-drop reordering; drag the item to reorder, which delegates to generator commands.
 
 ### What happens when clicking “+ Add …” in the sidebar
 
@@ -210,12 +210,18 @@ All UI actions call these commands, which: `updateData()` → mutate JSON via `F
 
 ### Positioning and visuals (CSS)
 
-- Sidebar tabs remain a fixed vertical strip; expanding opens the content panel to the right.
 - `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin). The panel limits height to the viewport and enables internal scrolling for the navigation tree. Auto-floating is disabled; it stays inline.
-- Reset button (optional) shows a red confirm state before performing the reset.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
 - Add placeholders: optional groups and array add-actions share a unified placeholder style (`.form-ui-placeholder-add`), full-width and hover-highlighted; disabled buttons show reduced opacity and not-allowed cursor.
+
+### Content breadcrumb
+
+- A breadcrumb element is injected into the form header. It is schema-driven (titles from the active path) and updates when:
+  - Navigating via the sidebar
+  - Scrolling (scrollspy selects the topmost group)
+  - Focusing inputs within a group
+- During programmatic navigation/scroll, breadcrumb updates are briefly deferred to avoid flicker.
 
 ### Public maps/refs other modules use
 
@@ -236,7 +242,7 @@ These are considered part of the internal contract that `features/navigation.js`
   - `core/form-generator.js`: data/model/generation lifecycle and the responsibilities of each helper.
   - `core/input-factory.js`, `core/group-builder.js`, `core/highlight-overlay.js`, `core/form-model.js`: single responsibilities and return types.
   - `features/navigation.js` and `features/validation.js`: public APIs.
-  - `components/sidebar.js`: component API (`onModeToggleHandler`, `onRemoveHandler`, `onNavigationClickHandler`, `setCollapsed`, `setMode`).
+  - `components/sidebar.js`: component API (`onNavigationClickHandler`, `getNavigationTree`, `destroy`).
   - `core/form-mount.js`: factory API and responsibilities.
 
 You can generate API documentation with any JSDoc tooling if desired; the code comments are written to be compatible with standard JSDoc parsers.
@@ -276,11 +282,9 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 - Auto-including optional nested objects under array items on add; keep defaults minimal.
 - Updating IDs/paths by ad-hoc regex in multiple places; use the centralized helpers.
 
-### Raw JSON mode (inspect‑only)
+### Raw JSON mode
 
-- Clicking the mode toggle switches between form view and raw JSON view.
-- In raw view, `<pre><code>` shows the current `data` as JSON (with the active `schema` preserved by `FormNodeView` when serializing), and is not editable.
-- Switching back does not parse JSON back into the form. Use `api.updateData(next)` to update programmatically or edit fields in the form.
+There is no raw JSON mode UI in the current implementation. The form view is the sole editing surface. Use the factory API to read or replace data programmatically.
 
 ### Error handling and markers
 
@@ -296,8 +300,8 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 
 ### Troubleshooting
 
-- Sidebar opens but buttons shift: ensure sidebar DOM contains both `.form-side-panel-main` and `.form-side-panel-tabs` (the component now does).
-- First click does nothing after page load: NodeView calls `sidebar.setCollapsed(true)` to sync internal state with the DOM. If customized, keep the DOM class and component state aligned.
+- Sidebar indicator misaligned after window resize: ensure `Navigation.enableScrollSync()` is active; it re-computes indicator dimensions on `resize`.
+- If drag-and-drop reordering does nothing, verify nav items have `data-array-path` and `data-item-index` set.
 
 ### File map
 
@@ -317,16 +321,12 @@ const api = mountFormUI({
   onChange,     // (data) => void, called on every change
   onRemove,     // () => void, called when delete confirmed
   ui: {
-    showRemove: true,        // hides remove button when false (also supported as legacy top-level showRemove)
-    fixedSidebar: false,     // when true, sidebar stays expanded inline (no collapse control)
     renderAllGroups: false,  // when true, render optional object/array groups recursively and include arrays as [] in base data
-    showReset: false,        // when true, shows a reset button (with confirm); resets data and rebuilds
   },
 });
 
 api.updateData(next);            // replace form data
 api.updateSchema(nextSchema);    // rebuild with a new schema
-api.toggleRawMode(forceBool);    // toggle raw/form mode
 api.navigateTo(groupId);         // navigate to group id
 api.getData();                   // read current data
 api.destroy();                   // unmount

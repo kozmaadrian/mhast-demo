@@ -1,3 +1,27 @@
+/* Hide the node dot for the root item */
+.form-nav-tree li[data-group-id="form-group-root"]::before {
+  content: none;
+  display: none;
+}
+
+.form-ui-main {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.form-ui-main .form-ui-body {
+  min-width: 0;
+}
+
+.form-ui-main .form-inline-panel {
+  position: sticky;
+  top: 0;
+  /* will be overridden inline based on header height */
+  align-self: start;
+}
+
 /* Inline text separator style used for group titles and array item titles */
 .form-ui-separator-text {
   position: relative;
@@ -153,12 +177,16 @@
 
 .form-ui-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
   padding: 0;
-  background: transparent;
+  background: var(--form-ui-separator-bg, #fff);
   border-bottom: none;
   border-radius: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1100;
 }
 
 .form-ui-title-container {
@@ -166,9 +194,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 0;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  padding-top: 6px;
 }
 
 .form-ui-title {
@@ -179,23 +205,13 @@
   flex: 1;
 }
 
-.form-ui-mode {
-  font-size: 10px;
-  color: #3b82f6;
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  white-space: nowrap;
-}
+
 
 /* Form sidebar positioned as inline sticky panel - opens to the right */
 .form-side-panel.form-inline-panel {
   position: sticky;
   top: 20px;
+  /* overridden inline in mount to match header height */
   float: right;
   z-index: 1000;
   margin: 0 0 10px 10px;
@@ -214,126 +230,17 @@
   align-self: flex-start;
 }
 
-/* When auto-floating, reuse floating panel visuals */
-.form-side-panel.floating-panel {
-  z-index: 1002;
-}
 
-.form-side-panel.form-inline-panel .form-side-panel-tabs {
-  order: 1;
-  border: none;
-  width: 40px;
-  min-width: 40px;
-  flex-shrink: 0;
-  position: relative;
-}
-
-/* Add separator line to the right of tabs */
-.form-side-panel.form-inline-panel .form-side-panel-tabs::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  right: 0;
-  width: 1px;
-  background: #e5e7eb;
-}
 
 .form-side-panel.form-inline-panel .form-side-panel-main {
-  order: 2;
+  order: 1;
   flex: 1;
+  margin-left: 30px;
 }
 
-.form-side-panel.form-inline-panel.collapsed {
-  width: 40px;
-  min-width: 40px;
-  margin-right: 0;
-  height: auto;
-  min-height: auto;
-  max-height: none;
-  /* Clean styling without any visual effects - no padding difference */
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  box-sizing: border-box;
-}
 
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-main {
-  display: none;
-}
 
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs {
-  width: 40px;
-  min-width: 40px;
-  height: auto;
-  padding: 8px 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-direction: column;
-  gap: 4px;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-}
-
-/* Remove the separator line when collapsed */
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs::after {
-  display: none;
-}
-
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab {
-  display: flex;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  margin: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-  position: relative;
-  transition: background-color 0.15s ease;
-  color: #6b7280;
-  font-size: 14px;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Add subtle separators between icons */
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 1px;
-  background: #e5e7eb;
-}
-
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab:hover {
-  background: #f3f4f6;
-}
-
-/* Red confirm state for collapsed inline panel delete button */
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state,
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab.form-ui-reset.confirm-state {
-  background: #ef4444 !important;
-  color: white !important;
-  width: 28px;
-  height: 28px;
-  margin: 2px;
-  box-sizing: border-box;
-}
-
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state:hover,
-.form-side-panel.form-inline-panel.collapsed .form-side-panel-tabs .form-tab.form-ui-reset.confirm-state:hover {
-  background: #dc2626 !important;
-}
-
-.form-side-panel.form-inline-panel:not(.collapsed) {
+.form-side-panel.form-inline-panel {
   width: 360px;
   min-width: 360px;
   margin-right: -320px;
@@ -343,74 +250,31 @@
   max-height: none;
 }
 
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-tabs {
-  width: 40px;
-  min-width: 40px;
-  padding: 8px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 4px;
-  background: transparent;
-}
 
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-main {
-  width: 320px;
-  min-width: 320px;
+
+.form-side-panel.form-inline-panel .form-side-panel-main {
+  width: 340px;
+  min-width: 340px;
   background: #FFF;
-  border: 1px solid #e1e5e9;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  /* border: 1px solid #e1e5e9; */
+  border-radius: 0px;
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
   max-height: calc(100vh - 20px);
   overflow: hidden;
 }
 
-/* Ensure form-tab styling is identical in expanded state */
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-tabs .form-tab {
-  display: flex;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  margin: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-  position: relative;
-  transition: background-color 0.15s ease;
-  color: #6b7280;
-  font-size: 14px;
-  align-items: center;
-  justify-content: center;
-}
 
-.form-side-panel.form-inline-panel:not(.collapsed) .form-side-panel-tabs .form-tab:hover {
-  background: #f3f4f6;
-}
 
-/* Red confirm state for inline panel delete button */
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state,
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-reset.confirm-state {
-  background: #ef4444 !important;
-  color: white !important;
-  width: 28px;
-  height: 28px;
-  margin: 2px;
-  box-sizing: border-box;
-}
 
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-remove.confirm-state:hover,
-.form-side-panel.form-inline-panel .form-side-panel-tabs .form-tab.form-ui-reset.confirm-state:hover {
-  background: #dc2626 !important;
-}
+
+
+
 
 .form-ui-controls {
   display: flex;
   gap: 4px;
 }
 
-.form-ui-toggle,
 .form-ui-remove {
   background: transparent;
   border: 1px solid #dfe1e6;
@@ -422,9 +286,7 @@
   transition: all 0.2s ease;
 }
 
-.form-ui-toggle:hover {
-  background: #e4e6ea;
-}
+
 
 .form-ui-remove {
   border: none;
@@ -468,6 +330,8 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   position: relative;
   overflow: visible;
+  display: block;
+  /* ensure content column remains independent */
 }
 
 /* Floating Side Panel - EXACT copy of ProseMirror-menubar technique */
@@ -518,20 +382,11 @@
   cursor: move;
 }
 
-.form-side-panel.floating-panel.collapsed {
-  width: 40px;
-  min-width: 40px;
-  overflow: hidden;
-}
 
-.form-side-panel.floating-panel.collapsed .form-side-panel-main {
-  display: none;
-}
 
-.form-side-panel.floating-panel.collapsed .form-side-panel-tabs {
-  width: 40px;
-  padding: 8px 0;
-}
+
+
+
 
 .form-side-panel-header {
   display: flex;
@@ -569,47 +424,11 @@
   letter-spacing: -0.025em;
 }
 
-.form-side-panel-toggle {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  color: #374151;
-  font-size: 14px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 500;
-}
-
-.form-side-panel-toggle:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  color: #111827;
-}
 
 
 
-.form-side-panel-collapse {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  color: #6b7280;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-}
 
-.form-side-panel-collapse:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #374151;
-}
+
 
 
 
@@ -620,92 +439,28 @@
   min-width: 0;
 }
 
-.form-side-panel-tabs {
-  width: 40px;
-  background: transparent;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  gap: 6px;
-  border-radius: 0 12px 12px 0;
-  position: relative;
-}
 
-/* Add separator line for general tabs */
-.form-side-panel-tabs::after {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  right: 0;
-  width: 1px;
-  background: #e5e7eb;
-}
 
-.form-tab {
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
+
+
+
 
 /* Normalize SVG icon sizing for tabs and bump panel icon slightly */
 
 
-.form-tab:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
 
-.form-tab:active {
-  background: #e5e7eb;
-  transform: translateY(1px);
-}
 
-/* Add subtle separators between expanded tab icons */
-.form-side-panel:not(.form-inline-panel) .form-tab:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 1px;
-  background: #e5e7eb;
-}
 
-.form-tab.form-ui-remove.confirm-state,
-.form-tab.form-ui-reset.confirm-state {
-  background: #ff5630;
-  color: white;
-  animation: pulse-confirm 1s ease-in-out infinite;
-}
 
-.form-tab.form-ui-remove.confirm-state:hover,
-.form-tab.form-ui-reset.confirm-state:hover {
-  background: #de350b;
-}
 
-.form-tab.form-ui-reset-position {
-  background: #3b82f6;
-  color: white;
-}
 
-.form-tab.form-ui-reset-position:hover {
-  background: #2563eb;
-  color: white;
-}
+
+
+
+
+
+
+
 
 .form-side-panel-content {
   flex: 1;
@@ -720,18 +475,15 @@
 }
 
 /* Ensure the main content sits to the right of the 40px tabs without shifting icons */
-.form-side-panel.form-inline-panel .form-side-panel-main {
-  margin-left: 30px;
-}
+
 
 /* Remove the vertical separator next to the icons for inline panel */
-.form-side-panel.form-inline-panel .form-side-panel-tabs::after {
-  display: none;
-}
+
 
 /* Navigation Tree */
 .form-navigation-tree {
-  padding: 0;
+  padding: 6px 12px 6px 0px;
+  min-height: 100px;
   position: relative;
   /* anchor for active indicator */
   max-height: calc(100vh - 20px - 56px);
@@ -783,12 +535,13 @@
   font-size: 14px;
   color: #374151;
   font-weight: 500;
+  padding-left: 12px;
 }
 
 .form-ui-body {
   flex: 1;
   padding: 16px;
-  overflow-y: auto;
+  overflow: visible;
   position: relative;
   /* Ensure absolute children (highlight overlay) are positioned relative to the body */
 }
@@ -1003,7 +756,7 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Optional object placeholders removed from content; activation is sidebar-only */
+
 
 /* Object inputs - now handled by groups, no special styling */
 .form-ui-object-container {
@@ -1037,27 +790,11 @@
   color: #de350b;
 }
 
-/* Raw JSON mode */
-.form-ui-raw {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  background: #f4f5f7;
-  border: 1px solid #dfe1e6;
-  border-radius: 3px;
-  padding: 12px;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  min-height: 100px;
-  font-size: 13px;
-}
-
-.form-ui-raw:focus {
-  outline: none;
-  border-color: #0052cc;
-}
-
-/* Code block integration */
+/* Code block container */
 .code-block-form {
   position: relative;
+  display: flow-root;
+  /* contain floats so content width is unaffected */
 }
 
 .code-block-form .form-ui-container {
@@ -1065,67 +802,54 @@
   border-radius: 0;
 }
 
-.code-block-form pre {
-  display: none;
-  background: #f4f5f7;
-  border: 1px solid #dfe1e6;
-  border-radius: 0 0 3px 3px;
-  padding: 12px;
-  margin: 0;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 13px;
-  overflow-x: auto;
-  min-height: 120px;
-  white-space: pre-wrap;
-}
-
-.code-block-form pre code {
-  background: none;
-  padding: 0;
-  border: none;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.code-block-form pre code:focus {
-  outline: 2px solid #0052cc;
-  outline-offset: 2px;
-}
-
-.code-block-form.raw-mode pre {
+/* Content breadcrumb - sticky and multi-line */
+.form-ui-header .form-content-breadcrumb {
   display: block;
+  width: 100%;
+  padding: 6px 0px 12px 0px;
+  font-size: 12px;
+  color: var(--form-ui-separator-text-color, #666);
+  line-height: 1.3;
+  word-break: break-word;
+  white-space: normal;
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  background: var(--form-ui-separator-bg, #fff);
 }
 
-.code-block-form.raw-mode .form-ui-body {
-  display: none;
-}
-
-.code-block-form.raw-mode .form-ui-footer {
-  display: none;
-}
-
-/* Keep header visible in both modes for toggle button */
+/* Header at top of form */
 .code-block-form .form-ui-header {
   display: flex;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.code-block-form.raw-mode .form-ui-header {
-  border-bottom: none;
-  border-radius: 0;
+/* Layout: content left, sidebar right as siblings */
+.form-container-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 0px;
+  align-items: start;
 }
 
-.code-block-form.raw-mode pre {
-  border-top: none;
-  border-radius: 0;
+.form-container-wrapper .code-block-form {
+  min-width: 0;
 }
+
+.form-container-wrapper .form-side-panel.form-inline-panel {
+  position: sticky;
+  top: 0px;
+  /* header height covered by sticky header itself */
+  right: 0;
+  margin: 0;
+}
+
+
 
 /* Section Titles */
 .form-ui-section {
   margin-bottom: 24px;
-  scroll-margin-top: -150px;
+  scroll-margin-top: var(--form-scroll-offset, 80px);
 }
 
 .form-ui-section-header {
@@ -1148,7 +872,7 @@
   border-radius: 0;
   position: relative;
   transition: all 0.3s ease;
-  scroll-margin-top: -150px;
+  scroll-margin-top: var(--form-scroll-offset, 80px);
 }
 
 .form-ui-group:last-child {
@@ -1225,7 +949,7 @@
 
 
 
-/* All old object container styling removed - using groups instead */
+
 
 /* Mobile responsive */
 @media (max-width: 768px) {
@@ -1268,12 +992,7 @@
     z-index: 1001 !important;
   }
 
-  .form-side-panel.floating-panel.collapsed {
-    width: 200px !important;
-    min-width: 200px !important;
-    max-width: 200px !important;
-    max-height: 40px !important;
-  }
+
 
   .form-ui-nav-item-content {
     padding: 6px 12px;
@@ -1282,33 +1001,41 @@
 
 /* Navigation Tree Styles */
 .form-navigation-tree {
-  padding: 6px 0;
+  padding: 6px 12px 6px 0px;
   min-height: 100px;
 }
 
 .form-ui-nav-item {
-  margin: 1px 0;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
+/* Global hover (for non-tree contexts only). Sidebar tree overrides below. */
 .form-ui-nav-item:hover {
   background-color: #f4f5f7;
 }
 
-.form-ui-nav-item.active .form-ui-nav-item-content {
+/* In the sidebar tree, do NOT color the container; only the direct content may have bg */
+.form-navigation-tree .form-ui-nav-item:hover {
   background: transparent;
-  border-left: 3px solid transparent;
-  /* reserve space to avoid title shift */
 }
+
+
+
+/* Override inside the tree: only the row's content gets hover bg, container stays transparent */
+.form-navigation-tree .form-ui-nav-item:hover {
+  background: transparent !important;
+}
+
+
 
 .form-ui-nav-item.active .form-ui-nav-item-content::after {
   display: none;
 }
 
 .form-ui-nav-item-content {
-  padding: 6px 12px;
+  padding: 5px 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1322,9 +1049,15 @@
   background: transparent;
 }
 
+
 .form-ui-nav-item-add .form-ui-nav-item-add-title {
   color: #8c94a3;
   font-weight: 500;
+}
+
+/* Prepend a blue plus via CSS to Add entries */
+.form-ui-nav-item-add .form-ui-nav-item-add-title::before {
+  content: none;
 }
 
 .form-ui-nav-item-add .form-ui-nav-item-add-content:hover {
@@ -1335,6 +1068,97 @@
   background: #f1f2f4;
 }
 
+/* Tree view styling inspired by CSSScript Pure CSS Tree View */
+.form-nav-tree {
+  --tree-clr: #dadfe6;
+  /* line and dot color */
+  --tree-font-size: 14px;
+  --tree-item-height: 2;
+  /* line-height multiplier */
+  --tree-offset: 18px;
+  /* left indent to label */
+  --tree-thickness: 1px;
+  --tree-style: dotted;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.form-nav-tree ul {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--tree-font-size);
+}
+
+.form-nav-tree li {
+  position: relative;
+  line-height: var(--tree-item-height);
+  padding-inline-start: var(--tree-offset);
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li:last-child {
+  border-color: transparent;
+}
+
+.form-nav-tree li::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--tree-item-height) / 2 * -1 * var(--tree-font-size) + var(--tree-thickness));
+  left: calc(var(--tree-thickness) * -1);
+  width: calc(var(--tree-offset) + var(--tree-thickness) * 2);
+  height: calc(var(--tree-item-height) * var(--tree-font-size));
+  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+  border-bottom: var(--tree-thickness) var(--tree-style) var(--tree-clr);
+}
+
+.form-nav-tree li::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--tree-clr);
+  top: calc(var(--tree-item-height) / 2 * var(--tree-font-size));
+  left: var(--tree-offset);
+  transform: translate(calc(var(--tree-thickness) * -1), calc(var(--tree-thickness) * -1));
+}
+
+/* Make our existing nav item content align naturally inside the li */
+.form-nav-tree .form-ui-nav-item-content {
+  padding-left: 0;
+  border: none;
+  background: transparent;
+}
+
+/* Active path highlighting: stronger color for active + ancestors */
+.form-nav-tree {
+  --tree-clr-active: #343434;
+  --tree-thickness-active: 1px;
+}
+
+.form-nav-tree li.tree-active::before,
+.form-nav-tree li.tree-ancestor::before {
+  /* border-left-color: var(--tree-clr-active);
+  border-bottom-color: var(--tree-clr-active); */
+  border-left-width: var(--tree-thickness-active);
+  border-bottom-width: var(--tree-thickness-active);
+}
+
+.form-nav-tree li.tree-active::after,
+.form-nav-tree li.tree-ancestor::after {
+  background-color: var(--tree-clr-active);
+}
+
+/* (reverted) */
+
+
+.form-nav-tree li:hover li>.form-ui-nav-item-content {
+  background: transparent !important;
+}
+
 .form-ui-nav-item-title {
   font-size: 14px;
   color: #172b4d;
@@ -1342,7 +1166,8 @@
 }
 
 /* Sidebar error markers for nav titles (no layout shift) */
-.form-ui-nav-item.has-error .form-ui-nav-item-title {
+/* Only color the exact item's title, not descendant items */
+.form-ui-nav-item.has-error>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #b91c1c;
   /* red-700 */
 }
@@ -1359,9 +1184,8 @@
   pointer-events: none;
 }
 
-.form-ui-nav-item.active .form-ui-nav-item-title {
+.form-ui-nav-item-content.active .form-ui-nav-item-title {
   color: #4d7bff;
-  font-weight: 600;
 }
 
 /* Scalable indentation using CSS custom properties - works for any nesting level */
@@ -1378,22 +1202,27 @@
 }
 
 /* Section title navigation items (remove duplicate bold - handled by specific selector below) */
-.form-ui-section-title-nav .form-ui-nav-item-title {
+.form-ui-section-title-nav>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #424242;
 }
 
 /* More prominent bold effect for section titles using CSS class */
-.form-ui-nav-item.form-ui-section-title-nav .form-ui-nav-item-title {
+/* .form-ui-nav-item.form-ui-section-title-nav>.form-ui-nav-item-content>.form-ui-nav-item-title {
   font-weight: 900;
   color: #2c3e50;
-}
+} */
 
-.form-ui-section-title-nav:hover {
+.form-ui-section-title-nav:hover>.form-ui-nav-item-content {
   background-color: #f5f5f5;
 }
 
-.form-ui-section-title-nav:hover .form-ui-nav-item-title {
+/* .form-ui-section-title-nav:hover>.form-ui-nav-item-content>.form-ui-nav-item-title {
   color: #1976d2;
+} */
+
+/* Ensure child rows under a hovered section title do not inherit its hover */
+.form-ui-section-title-nav:hover li>.form-ui-nav-item-content {
+  background: transparent !important;
 }
 
 /* Form group navigation items (normal styling for actual form groups) */
@@ -1409,7 +1238,7 @@
   color: #1976d2;
 }
 
-/* Legacy support - removed bold, keep only color */
+
 .form-ui-nav-item-title-only .form-ui-nav-item-title {
   color: #424242;
 }

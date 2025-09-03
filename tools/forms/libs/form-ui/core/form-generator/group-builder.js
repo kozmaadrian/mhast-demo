@@ -42,6 +42,7 @@ export default class GroupBuilder {
     groupContainer.className = CLASS.group;
     groupContainer.id = groupId;
     groupContainer.dataset.groupPath = currentPath.join(' > ');
+    groupContainer.dataset.schemaPath = groupPath;
 
     if (currentPath.length > 0) {
       const groupHeader = document.createElement('div');

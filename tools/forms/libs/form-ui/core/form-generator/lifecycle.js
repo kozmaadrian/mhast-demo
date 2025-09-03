@@ -15,20 +15,21 @@ export function generateForm(self) {
   header.innerHTML = `
       <div class="${CLASS.titleContainer}">
         <span class="${CLASS.title}">${self.schema.title || 'Form'}</span>
-        <span class="${CLASS.mode}">Form View</span>
       </div>
     `;
   container.appendChild(header);
 
   const body = document.createElement('div');
   body.className = CLASS.body;
+  // Use full-page scroll; do not set a custom scroll container here
+  try { body.style.position = 'relative'; } catch {}
 
   const rootSchema = self.normalizeSchema(self.schema);
   if (rootSchema.type === 'object' && rootSchema.properties) {
     self.groupElements = self.groupBuilder.build(
       body,
       rootSchema,
-      [rootSchema.title || 'Form'],
+      [],
       [],
       new Map(),
     );
@@ -59,17 +60,27 @@ export function rebuildBody(self) {
   const body = self.container.querySelector(`.${CLASS.body}`);
   if (!body) return;
   const previousScrollTop = body.scrollTop;
+  // Preserve sticky content breadcrumb across rebuilds
+  const breadcrumbEl = body.querySelector('.form-content-breadcrumb');
+  // Detach breadcrumb before clearing
+  if (breadcrumbEl && breadcrumbEl.parentNode === body) {
+    body.removeChild(breadcrumbEl);
+  }
   self.groupElements.clear();
   self.fieldSchemas.clear();
   self.fieldElements.clear();
   self.fieldToGroup.clear();
   body.innerHTML = '';
+  // Re-attach breadcrumb at the top
+  if (breadcrumbEl) {
+    body.appendChild(breadcrumbEl);
+  }
   const rootSchema = self.normalizeSchema(self.schema);
   if (rootSchema?.type === 'object' && rootSchema.properties) {
     self.groupElements = self.groupBuilder.buildInline(
       body,
       rootSchema,
-      [rootSchema.title || 'Form'],
+      [],
       [],
       new Map(),
     );

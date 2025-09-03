@@ -21,6 +21,9 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
     const itemContainer = document.createElement('div');
     itemContainer.className = 'form-ui-array-item';
     itemContainer.id = generator.arrayItemId(fieldPath, index);
+    // Schema path for this array item (schema/data-driven breadcrumb)
+    const pathPrefix = `${fieldPath}[${index}]`;
+    itemContainer.dataset.schemaPath = pathPrefix;
     const headerWrap = document.createElement('div');
     headerWrap.className = 'form-ui-array-item-header';
     const itemTitleSep = document.createElement('div');
@@ -33,7 +36,6 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
     const groupContent = document.createElement('div');
     groupContent.className = 'form-ui-group-content';
     groupContent.appendChild(headerWrap);
-    const pathPrefix = `${fieldPath}[${index}]`;
     generator.generateObjectFields(
       groupContent,
       normItemsSchema.properties || {},
