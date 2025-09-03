@@ -1,72 +1,7 @@
-/* Tree view styling inspired by CSSScript Pure CSS Tree View */
-.form-nav-tree {
-  --tree-clr: #dadfe6;
-  /* line and dot color */
-  --tree-font-size: 14px;
-  --tree-item-height: 2;
-  /* line-height multiplier */
-  --tree-offset: 18px;
-  /* left indent to label */
-  --tree-thickness: 1px;
-  --tree-style: dotted;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.form-nav-tree ul {
-  display: grid;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: var(--tree-font-size);
-}
-
-.form-nav-tree li {
-  position: relative;
-  line-height: var(--tree-item-height);
-  padding-inline-start: var(--tree-offset);
-  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
-}
-
-.form-nav-tree li:last-child {
-  border-color: transparent;
-}
-
-.form-nav-tree li::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--tree-item-height) / 2 * -1 * var(--tree-font-size) + var(--tree-thickness));
-  left: calc(var(--tree-thickness) * -1);
-  width: calc(var(--tree-offset) + var(--tree-thickness) * 2);
-  height: calc(var(--tree-item-height) * var(--tree-font-size));
-  border-left: var(--tree-thickness) var(--tree-style) var(--tree-clr);
-  border-bottom: var(--tree-thickness) var(--tree-style) var(--tree-clr);
-}
-
-.form-nav-tree li::after {
-  content: "";
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--tree-clr);
-  top: calc(var(--tree-item-height) / 2 * var(--tree-font-size));
-  left: var(--tree-offset);
-  transform: translate(calc(var(--tree-thickness) * -1), calc(var(--tree-thickness) * -1));
-}
-
 /* Hide the node dot for the root item */
 .form-nav-tree li[data-group-id="form-group-root"]::before {
   content: none;
   display: none;
-}
-
-/* Make our existing nav item content align naturally inside the li */
-.form-nav-tree .form-ui-nav-item-content {
-  padding-left: 0;
-  border: none;
-  background: transparent;
 }
 
 .form-ui-main {
@@ -318,8 +253,8 @@
 
 
 .form-side-panel.form-inline-panel .form-side-panel-main {
-  width: 320px;
-  min-width: 320px;
+  width: 340px;
+  min-width: 340px;
   background: #FFF;
   /* border: 1px solid #e1e5e9; */
   border-radius: 0px;
@@ -1071,7 +1006,6 @@
 }
 
 .form-ui-nav-item {
-  margin: 1px 0;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1101,7 +1035,7 @@
 }
 
 .form-ui-nav-item-content {
-  padding: 6px 12px;
+  padding: 5px 12px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1177,8 +1111,8 @@
 .form-nav-tree li::after {
   content: "";
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background-color: var(--tree-clr);
   top: calc(var(--tree-item-height) / 2 * var(--tree-font-size));
@@ -1195,7 +1129,7 @@
 
 /* Active path highlighting: stronger color for active + ancestors */
 .form-nav-tree {
-  --tree-clr-active: #050505;
+  --tree-clr-active: #343434;
   --tree-thickness-active: 1px;
 }
 
