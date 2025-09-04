@@ -60,6 +60,8 @@ class FormsEditor extends LitElement {
 
     // Get storage version from URL query parameter
     this._storageVersion = urlParams.get('storage');
+    this._showNavConnectors = urlParams.get('showNavConnectors');
+    this._allowLocalSchemas = urlParams.get('allowLocalSchemas');
 
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
@@ -201,11 +203,12 @@ class FormsEditor extends LitElement {
           }, 200);
         }
         
+        const showNavConnectors = !this._showNavConnectors ? true : this._showNavConnectors && this._showNavConnectors === 'true' 
         this._formApi = mountFormUI({
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { renderAllGroups: true },
+          ui: { renderAllGroups: true, showNavConnectors },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);
@@ -253,8 +256,10 @@ class FormsEditor extends LitElement {
     };
 
     // 1) Conventional default: llrc.schema.json
-    // await tryAdd('llrc.schema.json', 'LLRC');
-    // await tryAdd('test.schema.json', 'test');
+    if (this._allowLocalSchemas && this._allowLocalSchemas === 'true') {
+      await tryAdd('llrc.schema.json', 'LLRC');
+      await tryAdd('test.schema.json', 'test');
+    }
 
     // 2) Allow query param overrides: ?localSchemas=a.json,b.json
     try {

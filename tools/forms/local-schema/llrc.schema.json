@@ -2661,7 +2661,10 @@
           "type": "boolean",
           "title": "Loc Ready"
         }
-      }
+      },
+      "required": [
+        "name"
+      ]
     }
   },
   "$ref": "#/$defs/appsPDP",
