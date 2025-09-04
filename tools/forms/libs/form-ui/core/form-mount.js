@@ -22,6 +22,7 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui } = {}
   
   if (!mount) throw new Error('mountFormUI: mount element is required');
   const controls = ui || {};
+  const showNavConnectors = controls?.showNavConnectors !== false;
   
 
   // Wrapper
@@ -102,6 +103,11 @@ export function mountFormUI({ mount, schema, data, onChange, onRemove, ui } = {}
 
   // Connect navigation tree to form generator (use rAF instead of setTimeout)
   const navigationTree = sideEl.querySelector('.form-navigation-tree');
+  // Toggle connector lines via class on the nav tree container
+  try {
+    if (!showNavConnectors) navigationTree.classList.add('hide-tree-connectors');
+    else navigationTree.classList.remove('hide-tree-connectors');
+  } catch {}
   generator.navigationTree = navigationTree;
   // Expose content breadcrumb element for navigation/scroll sync
   generator.contentBreadcrumbEl = contentBreadcrumb;
