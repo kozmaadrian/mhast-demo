@@ -1,141 +1,77 @@
 /**
- * Form UI Commands for ProseMirror
- * Commands to insert and manage form UI elements
+ * Form Commands (core)
+ *
+ * Factory returning high-level commands that mutate the data model and then
+ * rebuild the UI, keeping validation and navigation in sync.
+ * Exposes: activateOptional, addArrayItem, removeArrayItem, reorderArrayItem, resetAll.
  */
-
-// Minimal helper to create the code-block content that the nodeview understands
-import schemaLoader from '../utils/schema-loader.js';
-
-// Editor-agnostic: useful in standalone contexts too
-export function createFormCodeBlock(schema, data = {}, schemaId = null) {
-  const formBlock = {
-    schema: schemaId || 'inline',
-    data,
-  };
-
-  return JSON.stringify(formBlock, null, 2);
-}
 
 /**
- * Insert a form code block with the specified schema
+ * @param {import('../form-generator.js').default} generator
+ * @returns {{
+ *  activateOptional(path:string):void,
+ *  addArrayItem(arrayPath:string):void,
+ *  removeArrayItem(arrayPath:string,index:number):void,
+ *  reorderArrayItem(arrayPath:string,fromIndex:number,toIndex:number):void,
+ *  resetAll():void
+ * }}
  */
-export function insertFormBlock(schema, data = {}) {
-  return (state, dispatch) => {
-    const { code_block } = state.schema.nodes;
-    if (!code_block) return false;
-
-    const content = createFormCodeBlock(schema, data);
-    const node = code_block.create({}, state.schema.text(content));
-
-    if (dispatch) {
-      const tr = state.tr.replaceSelectionWith(node).scrollIntoView();
-      dispatch(tr);
-    }
-
-    return true;
-  };
-}
-
-/**
- * Remove the form block at the current selection if it's a form code block
- */
-export function removeFormBlockCommand() {
-  return (state, dispatch) => {
-    const { $from } = state.selection;
-    const node = $from.node($from.depth);
-    if (!node || node.type.name !== 'code_block') return false;
-
-    // Simple heuristic: treat any code_block containing __schema as a form block
-    const textContent = node.textContent || '';
-    if (!textContent.includes('__schema')) return false;
-
-    if (dispatch) {
-      const pos = $from.before($from.depth);
-      const tr = state.tr.delete(pos, pos + node.nodeSize).scrollIntoView();
-      dispatch(tr);
-    }
-    return true;
-  };
-}
-
-/**
- * Insert a form block with a dynamically loaded schema from GitHub
- */
-export function insertDynamicForm(schemaName) {
-  return async (state, dispatch) => {
-    try {
-      const schema = await schemaLoader.loadSchema(schemaName);
-
-      if (!schema) {
-        return false;
+export default function createFormCommands(generator) {
+  return {
+    activateOptional(path) {
+      const node = generator.model.resolveSchemaByPath(path);
+      if (!node) return;
+      generator.onActivateOptionalGroup(path, node);
+      const normalized = generator.normalizeSchema(node);
+      if (normalized && normalized.type === 'array') {
+        generator.updateData();
+        let arr = generator.model.getNestedValue(generator.data, path);
+        if (!Array.isArray(arr) || arr.length === 0) {
+          if (!Array.isArray(arr)) arr = [];
+          const baseItem = generator.createDefaultObjectFromSchema(
+            generator.derefNode(normalized.items) || normalized.items || {},
+          );
+          generator.model.pushArrayItem(generator.data, path, baseItem);
+          generator.rebuildBody();
+          generator.validation.validateAllFields();
+        }
       }
+    },
 
-      // Create initial data structure based on schema
-      const formGenerator = new (await import('../core/form-generator.js')).default(schema);
-      const initialData = formGenerator.generateBaseJSON(schema);
+    addArrayItem(arrayPath) {
+      generator.updateData();
+      const node = generator.model.resolveSchemaByPath(arrayPath);
+      const normalized = generator.normalizeSchema(node);
+      if (!normalized || normalized.type !== 'array') return;
+      const baseItem = generator.createDefaultObjectFromSchema(
+        generator.derefNode(normalized.items) || normalized.items || {},
+      );
+      generator.model.pushArrayItem(generator.data, arrayPath, baseItem);
+      generator.rebuildBody();
+      generator.validation.validateAllFields();
+    },
 
-      // Insert with schema ID reference
-      const { code_block } = state.schema.nodes;
-      if (!code_block) return false;
+    removeArrayItem(arrayPath, index) {
+      generator.updateData();
+      generator.model.removeArrayItem(generator.data, arrayPath, index);
+      generator.rebuildBody();
+      generator.validation.validateAllFields();
+    },
 
-      const content = createFormCodeBlock(schema, initialData, schemaName);
-      const node = code_block.create({}, state.schema.text(content));
+    reorderArrayItem(arrayPath, fromIndex, toIndex) {
+      generator.reorderArrayItem(arrayPath, fromIndex, toIndex);
+    },
 
-      if (dispatch) {
-        const tr = state.tr.replaceSelectionWith(node).scrollIntoView();
-        dispatch(tr);
-      }
-
-      return true;
-    } catch (error) {
-      // Loading failed; do not insert a fallback
-      return false;
-    }
+    resetAll() {
+      const base = generator.renderAllGroups
+        ? generator.generateBaseJSON(generator.schema)
+        : generator.model.generateBaseJSON(generator.schema);
+      generator.data = base;
+      generator.activeOptionalGroups = new Set();
+      generator.rebuildBody();
+      generator.validation.validateAllFields();
+    },
   };
 }
 
-/**
- * Editor-agnostic helpers (for reuse outside ProseMirror)
- */
 
-// Load a schema by name and build initial data based on defaults and types
-export async function loadSchemaWithDefaults(schemaName) {
-  const schema = await schemaLoader.loadSchema(schemaName);
-  const FormGenerator = (await import('../core/form-generator.js')).default;
-  const generator = new FormGenerator(schema);
-  const initialData = generator.generateBaseJSON(schema);
-  return { schema, initialData };
-}
-
-// Get list of discoverable schemas without binding to PM commands
-export async function discoverSchemasPlain() {
-  const names = await schemaLoader.discoverSchemas();
-  return names.map((id) => ({ id, name: schemaLoader.formatSchemaName(id) }));
-}
-
-/**
- * Get available schemas (only remote schemas now)
- */
-export async function getAvailableSchemas() {
-  try {
-    const remoteSchemas = await schemaLoader.discoverSchemas();
-    const remoteSchemaItems = remoteSchemas.map((schemaName) => ({
-      id: schemaName,
-      name: schemaLoader.formatSchemaName(schemaName),
-      type: 'remote',
-      command: insertDynamicForm(schemaName),
-    }));
-
-    return {
-      predefined: [],
-      remote: remoteSchemaItems,
-      all: remoteSchemaItems,
-    };
-  } catch (error) {
-    return {
-      predefined: [],
-      remote: [],
-      all: [],
-    };
-  }
-}

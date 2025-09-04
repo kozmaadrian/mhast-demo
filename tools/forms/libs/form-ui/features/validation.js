@@ -3,16 +3,35 @@
  * Handles JSON Schema-based validation for form fields
  */
 
-import { pathToGroupId } from '../core/form-generator/path-utils.js';
+import { pathToGroupId } from '../form-generator/path-utils.js';
 
+/**
+ * FormValidation
+ *
+ * Schema-driven validation feature for the generated form.
+ *
+ * Responsibilities:
+ * - Validate fields on input/blur using the injected `ValidationService`
+ * - Maintain per-field and per-group error maps on the generator
+ * - Provide UX helpers: inline error messages and nav error badges
+ * - Support jumping to the first error in a group and batch validations
+ */
 export default class FormValidation {
-  constructor(formGenerator) {
+  /**
+   * Create a new FormValidation instance.
+   * @param {object} context - Shared app context with services
+   * @param {import('../form-generator.js').default} formGenerator - Owner generator
+   */
+  constructor(context, formGenerator) {
+    this.context = context;
     this.formGenerator = formGenerator;
+    this.validationService = context.services.validation;
   }
 
   /**
-   * Scroll to the first invalid control within a given group using data-driven maps
-   * (fieldErrors, fieldToGroup, fieldElements) rather than DOM queries.
+   * Scroll to and focus the first invalid control within a given group.
+   * Uses generator maps to resolve the field element efficiently.
+   * @param {string} groupId - Target group DOM id
    */
   scrollToFirstErrorInGroup(groupId) {
     if (!groupId) return;
@@ -71,7 +90,9 @@ export default class FormValidation {
   }
 
   /**
-   * After form render, validate all fields once so required/invalid states are visible on load
+   * Validate all fields currently rendered in the form.
+   * Also computes group-level errors (e.g., empty required arrays)
+   * and refreshes the navigation error markers.
    */
   validateAllFields() {
     // Validate visible inputs first
@@ -81,40 +102,36 @@ export default class FormValidation {
     });
 
     // Data-driven: mark only required arrays-of-objects that are empty
-    const deref = (n) => this.formGenerator.derefNode(n) || n || {};
-    const norm = (n) => this.formGenerator.normalizeSchema(deref(n)) || deref(n) || {};
-    const scanRequiredEmptyArrays = (node, pathPrefix = '') => {
-      const normalized = norm(node);
-      if (!normalized || normalized.type !== 'object' || !normalized.properties) return;
-      const requiredSet = new Set(normalized.required || []);
-      Object.entries(normalized.properties).forEach(([key, child]) => {
-        const childNorm = norm(child);
-        const propPath = pathPrefix ? `${pathPrefix}.${key}` : key;
-        const isRequired = requiredSet.has(key);
-        const isArrayOfObjects = childNorm && childNorm.type === 'array' && (
-          (childNorm.items && (childNorm.items.type === 'object' || childNorm.items.properties)) || !!childNorm.items?.$ref
-        );
-        if (isRequired && isArrayOfObjects) {
-          const val = this.formGenerator.model.getNestedValue(this.formGenerator.data, propPath);
-          if (!Array.isArray(val) || val.length === 0) this.formGenerator.fieldErrors.set(pathToGroupId(propPath), 'Required list is empty.');
-          else this.formGenerator.fieldErrors.delete(pathToGroupId(propPath));
-        }
-        if (childNorm && childNorm.type === 'object' && childNorm.properties) {
-          scanRequiredEmptyArrays(childNorm, propPath);
-        }
-      });
-    };
-    scanRequiredEmptyArrays(this.formGenerator.schema, '');
+    const paths = this.validationService.getEmptyRequiredArrayPaths(
+      this.formGenerator.schema,
+      this.formGenerator.data,
+      {
+        normalize: (node) => this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {}),
+        getValue: (obj, path) => this.formGenerator.model.getNestedValue(obj, path),
+      }
+    );
+    // Maintain group-level errors in a dedicated map
+    this.formGenerator.groupErrors.clear();
+    paths.forEach((p) => {
+      this.formGenerator.groupErrors.set(pathToGroupId(p), 'Required list is empty.');
+    });
     // Update sidebar markers after all validation is complete
     this.refreshNavigationErrorMarkers();
   }
 
   /**
-   * Validate a single field against its schema and show inline error
+   * Validate a single field against its property schema and update UI state.
+   * @param {string} fieldPath - Dotted field path
+   * @param {object} propSchema - Effective JSON Schema for this field
+   * @param {HTMLElement} inputEl - Associated input element
+   * @param {boolean} [skipMarkerRefresh=false] - If true, do not refresh nav markers immediately
+   * @returns {boolean} True if valid, false if invalid
    */
   validateField(fieldPath, propSchema, inputEl, skipMarkerRefresh = false) {
     const value = this.formGenerator.getInputValue(inputEl);
-    const error = this.getValidationError(value, propSchema, inputEl);
+    const error = this.validationService.getValidationError(value, propSchema, {
+      required: inputEl?.classList?.contains('required'),
+    });
     this.setFieldError(inputEl, error);
 
     if (error) {
@@ -131,62 +148,12 @@ export default class FormValidation {
     return !error;
   }
 
-  /**
-   * Basic JSON Schema validations
-   */
-  getValidationError(value, schema, inputEl) {
-    const isEmpty = (v) => v === '' || v === null || v === undefined;
-
-    // required is enforced at the object level; if input has required class, treat empty as error
-    const isRequired = inputEl?.classList?.contains('required');
-    if (isRequired && isEmpty(value)) return 'This field is required.';
-
-    if (isEmpty(value)) return null; // nothing else to validate
-
-    // Type validations
-    if (schema.type === 'number' || schema.type === 'integer') {
-      const num = Number(value);
-      if (Number.isNaN(num)) return 'Please enter a valid number.';
-      if (schema.type === 'integer' && !Number.isInteger(num)) return 'Please enter a whole number.';
-      if (typeof schema.minimum === 'number' && num < schema.minimum) return `Must be at least ${schema.minimum}.`;
-      if (typeof schema.maximum === 'number' && num > schema.maximum) return `Must be at most ${schema.maximum}.`;
-    }
-
-    // String validations
-    if (schema.type === 'string') {
-      if (typeof schema.minLength === 'number' && String(value).length < schema.minLength) {
-        return `Must be at least ${schema.minLength} characters.`;
-      }
-      if (typeof schema.maxLength === 'number' && String(value).length > schema.maxLength) {
-        return `Must be at most ${schema.maxLength} characters.`;
-      }
-      if (schema.pattern) {
-        try {
-          const re = new RegExp(schema.pattern);
-          if (!re.test(String(value))) return 'Invalid format.';
-        } catch {
-          // ignore invalid regex
-        }
-      }
-      if (schema.format === 'email') {
-        const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRe.test(String(value))) return 'Please enter a valid email address.';
-      }
-      if (schema.format === 'uri' || schema.format === 'url') {
-        try { new URL(String(value)); } catch { return 'Please enter a valid URL.'; }
-      }
-    }
-
-    // Enum validation
-    if (Array.isArray(schema.enum) && schema.enum.length > 0) {
-      if (!schema.enum.includes(value)) return 'Invalid value.';
-    }
-
-    return null; // no errors
-  }
+  // getValidationError removed: logic moved to ValidationService
 
   /**
-   * Set error state on field element
+   * Set or clear inline error state for an input element.
+   * @param {HTMLElement} inputEl - Input element
+   * @param {string|null|undefined} message - Error message to show; falsy to clear
    */
   setFieldError(inputEl, message) {
     if (!inputEl) return;
@@ -211,13 +178,15 @@ export default class FormValidation {
   }
 
   /**
-   * Update sidebar navigation error markers
+   * Update sidebar badges showing the number of errors per group.
+   * Includes both field-level and group-level error counts.
    */
   refreshNavigationErrorMarkers() {
     if (!this.formGenerator.navigationTree) return;
 
     // Build error counts per group id (do not color labels; show badge instead)
     const errorCountByGroupId = new Map();
+    // Include both field-level and group-level errors
     this.formGenerator.fieldErrors.forEach((_, key) => {
       const maybeGroupId = String(key);
       let groupId = null;
@@ -230,6 +199,10 @@ export default class FormValidation {
         const prev = errorCountByGroupId.get(groupId) || 0;
         errorCountByGroupId.set(groupId, prev + 1);
       }
+    });
+    this.formGenerator.groupErrors.forEach((_, groupId) => {
+      const prev = errorCountByGroupId.get(groupId) || 0;
+      errorCountByGroupId.set(groupId, prev + 1);
     });
 
     // Counts remain per-group; root shows only its own primitive-field errors
