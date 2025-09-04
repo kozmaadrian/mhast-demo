@@ -18,6 +18,8 @@ export default class FormValidation {
     if (!groupId) return;
 
     const rootGroupId = pathToGroupId('root');
+    // During programmatic navigation, suppress scrollspy updates so active stays on clicked item
+    try { this.formGenerator._programmaticScrollUntil = Date.now() + 1500; } catch {}
     // Special handling for root: jump to the first error among root-level primitive fields
     if (groupId === rootGroupId) {
       let targetFieldPath = null;
@@ -34,6 +36,9 @@ export default class FormValidation {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         try { el.focus({ preventScroll: true }); } catch {}
       }
+      // Re-assert active selection and extend suppression window briefly
+      try { this.formGenerator.navigation.updateActiveGroup(rootGroupId); } catch {}
+      try { this.formGenerator._programmaticScrollUntil = Date.now() + 1500; } catch {}
       return;
     }
 
@@ -54,6 +59,9 @@ export default class FormValidation {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         try { el.focus({ preventScroll: true }); } catch {}
+        // Keep the clicked group's nav selection sticky during any ensuing scroll
+        try { this.formGenerator.navigation.updateActiveGroup(groupId); } catch {}
+        try { this.formGenerator._programmaticScrollUntil = Date.now() + 1500; } catch {}
         return;
       }
     }
