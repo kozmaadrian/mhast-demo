@@ -76,7 +76,10 @@
               }
             }
           }
-        }
+        },
+        "required": [
+          "street"
+        ],
       }
     },
     "preferences": {
