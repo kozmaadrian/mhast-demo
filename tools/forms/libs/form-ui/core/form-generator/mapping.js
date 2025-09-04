@@ -29,8 +29,10 @@ export function mapFieldsToGroups(generator) {
 
     // Decide if this object renders its own group container in content (except array item roots)
     const rendersGroup = hasPrims(s) && !inArrayItemRoot;
+    // Normalize empty root path to 'root' so IDs and mappings are consistent
+    const idPath = objectPath && objectPath.length > 0 ? objectPath : 'root';
     const nextGroupId = rendersGroup
-      ? generator.pathToGroupId(objectPath)
+      ? generator.pathToGroupId(idPath)
       : (currentGroupId || (inArrayItemRoot && parentArrayPathAndIndex(objectPath)
         ? generator.arrayItemId(parentArrayPathAndIndex(objectPath).arrayPath, parentArrayPathAndIndex(objectPath).index)
         : generator.pathToGroupId('root')));

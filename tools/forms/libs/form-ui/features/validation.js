@@ -17,6 +17,26 @@ export default class FormValidation {
   scrollToFirstErrorInGroup(groupId) {
     if (!groupId) return;
 
+    const rootGroupId = pathToGroupId('root');
+    // Special handling for root: jump to the first error among root-level primitive fields
+    if (groupId === rootGroupId) {
+      let targetFieldPath = null;
+      for (const fieldPath of this.formGenerator.fieldElements.keys()) {
+        if (!this.formGenerator.fieldErrors.has(fieldPath)) continue;
+        const mapped = this.formGenerator.fieldToGroup.get(fieldPath);
+        if (mapped === rootGroupId) { targetFieldPath = fieldPath; break; }
+      }
+      if (!targetFieldPath) return;
+      try { this.formGenerator.navigation.navigateToGroup(rootGroupId); } catch {}
+      const el = this.formGenerator.fieldElements.get(targetFieldPath)
+        || this.formGenerator.container.querySelector(`[name="${targetFieldPath}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        try { el.focus({ preventScroll: true }); } catch {}
+      }
+      return;
+    }
+
     // Determine the first field in insertion/render order that belongs to this group and has an error
     let targetFieldPath = null;
     for (const fieldPath of this.formGenerator.fieldElements.keys()) {
@@ -203,6 +223,8 @@ export default class FormValidation {
         errorCountByGroupId.set(groupId, prev + 1);
       }
     });
+
+    // Counts remain per-group; root shows only its own primitive-field errors
 
     this.formGenerator.navigationTree.querySelectorAll('.form-ui-nav-item').forEach((nav) => {
       // Skip non-group nav entries like "+ Add ..." items

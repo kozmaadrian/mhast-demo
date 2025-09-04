@@ -602,24 +602,22 @@ export default class FormNavigation {
       }
 
       // Skip adding a navigation entry for the root level; only show children
-      if (groupPath !== 'root') {
-        const navItem = document.createElement('div');
-        navItem.className = CLASS.navItem;
-        navItem.dataset.groupId = groupId;
-        navItem.dataset.level = level;
+      const navItem = document.createElement('div');
+      navItem.className = CLASS.navItem;
+      navItem.dataset.groupId = groupId;
+      navItem.dataset.level = level;
 
-        const navContent = document.createElement('div');
-        navContent.className = CLASS.navItemContent;
-        navContent.style.setProperty('--nav-level', level);
+      const navContent = document.createElement('div');
+      navContent.className = CLASS.navItemContent;
+      navContent.style.setProperty('--nav-level', level);
 
-        const navTitle = document.createElement('span');
-        navTitle.className = CLASS.navItemTitle;
-        navTitle.textContent = groupTitle;
+      const navTitle = document.createElement('span');
+      navTitle.className = CLASS.navItemTitle;
+      navTitle.textContent = groupTitle;
 
-        navContent.appendChild(navTitle);
-        navItem.appendChild(navContent);
-        items.push(navItem);
-      }
+      navContent.appendChild(navTitle);
+      navItem.appendChild(navContent);
+      items.push(navItem);
     }
 
     // Walk properties in declaration order and append items inline respecting order.
