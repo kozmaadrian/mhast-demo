@@ -5,11 +5,35 @@
  */
 import { getDeepActiveElement } from '../utils/dom-utils.js';
  
-import { UI_CLASS as CLASS } from '../core/constants.js';
-import { pathToGroupId, arrayItemId, hyphenatePath } from '../core/form-generator/path-utils.js';
+import { UI_CLASS as CLASS } from '../constants.js';
+import { pathToGroupId, arrayItemId, hyphenatePath } from '../form-generator/path-utils.js';
 
+/**
+ * FormNavigation
+ *
+ * Builds and maintains the sidebar navigation for a generated form.
+ *
+ * High-level responsibilities:
+ * - Generate a flat list of navigation items from the active JSON Schema structure
+ * - Convert that flat list into a nested UL/LI tree used in the sidebar
+ * - Keep nav selection in sync with the content scroll position (scrollspy)
+ * - Provide hover and click interactions to highlight and navigate to groups
+ * - Support arrays-of-objects with per-item entries and drag-and-drop reordering
+ * - Emit and maintain an "active group" concept across content and navigation
+ *
+ * Usage:
+ * - Instantiated by `FormGenerator` and wired with the same context and model
+ * - Call `generateNavigationTree()` after the form body is (re)built
+ * - Call `destroy()` on teardown to remove event listeners
+ */
 export default class FormNavigation {
-  constructor(formGenerator) {
+  /**
+   * Create a new FormNavigation instance
+   * @param {object} context - Shared app context (services, config, DOM refs)
+   * @param {import('../form-generator.js').default} formGenerator - Owner generator
+   */
+  constructor(context, formGenerator) {
+    this.context = context;
     this.formGenerator = formGenerator;
     // Single delegated handler bound once to avoid duplicate listeners
     this.onTreeClick = this.onTreeClick.bind(this);
@@ -25,9 +49,16 @@ export default class FormNavigation {
     
   }
 
-  // Given a schema path for a section/object, pick the first descendant path that is a group with primitives
+  /**
+   * Given a schema path for a section/object, return the first descendant path
+   * that represents a concrete group (has primitive fields) to navigate to.
+   * Falls back to the section itself if a primitive is directly under it.
+   *
+   * @param {string} sectionPath - Dotted schema path for the section/object
+   * @returns {string|null} - Best descendant group path or null if none
+   */
   resolveFirstDescendantGroupPath(sectionPath) {
-    const sectionSchema = this.formGenerator.resolveSchemaByPath(sectionPath);
+    const sectionSchema = this.formGenerator.model.resolveSchemaByPath(sectionPath);
     const norm = this.formGenerator.normalizeSchema(this.formGenerator.derefNode(sectionSchema) || sectionSchema || {});
     if (!norm || !norm.properties) return null;
     // Prefer direct children with primitives
@@ -53,6 +84,9 @@ export default class FormNavigation {
 
   /**
    * Map fields to their groups after the group structure is built
+   *
+   * Build a mapping from field paths to their owning group element IDs.
+   * Must be called after the DOM groups/fields are rendered.
    */
   mapFieldsToGroups() {
     this.formGenerator.container.querySelectorAll(`.${CLASS.field}[data-field-path]`).forEach((field) => {
@@ -66,6 +100,10 @@ export default class FormNavigation {
 
   /**
    * Scroll to a group by path index
+   *
+   * Scroll the content area to the group whose path length matches `pathIndex+1`.
+   * Primarily used by index-based navigation affordances.
+   * @param {number} pathIndex - Zero-based depth index into the group path
    */
   scrollToGroup(pathIndex) {
     // Find group by path index
@@ -89,7 +127,9 @@ export default class FormNavigation {
   }
 
   /**
-   * Update active group indicator
+   * Mark a given group as active across content and sidebar and update
+   * the schema-path-driven breadcrumb.
+   * @param {string} activeGroupId - DOM id of the group to activate
    */
   updateActiveGroup(activeGroupId) {
     // Remove previous active states
@@ -118,7 +158,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Update active state in navigation tree
+   * Update active state and visual indicator inside the navigation tree.
+   * @param {string} activeGroupId - DOM id of the group to reflect as active
    */
   updateNavigationActiveState(activeGroupId) {
     if (!this.formGenerator.navigationTree) return;
@@ -164,7 +205,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Navigate to a specific group
+   * Programmatically navigate to a group: highlight, scroll to, and activate it.
+   * @param {string} groupId - DOM id of the target group
    */
   navigateToGroup(groupId) {
     const groupInfo = this.formGenerator.groupElements.get(groupId);
@@ -184,6 +226,12 @@ export default class FormNavigation {
     }
   }
 
+  /**
+   * Rebuild the breadcrumb displayed above the content based on the
+   * currently active schema path. Breadcrumb items are clickable to
+   * activate optional groups or navigate to array items.
+   * @param {string} groupId - Current active group id (used for immediate updates)
+   */
   updateContentBreadcrumb(groupId) {
     const bc = this.formGenerator?.contentBreadcrumbEl;
     if (!bc) return;
@@ -298,7 +346,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Generate navigation tree for sidebar
+   * Build and render the full navigation tree into the sidebar container.
+   * Applies event handlers and restores scroll position.
    */
   generateNavigationTree() {
     if (!this.formGenerator.navigationTree) return;
@@ -312,7 +361,6 @@ export default class FormNavigation {
 
     // Generate flat navigation items for form groups (with dataset.level)
     const flatItems = this.generateNavigationItems(this.formGenerator.schema, '', 0);
-    // Transform to nested UL/LI structure like classic tree views
     const nested = this.buildNestedListFromFlat(flatItems);
     this.formGenerator.navigationTree.appendChild(nested);
 
@@ -335,8 +383,11 @@ export default class FormNavigation {
   }
 
   /**
-   * Build a nested UL/LI structure from the flat list of nav items using their dataset.level
-   * Technique inspired by classic tree view nesting used in CSS-only trees
+   * Convert a flat array of nav item elements (each carrying dataset.level)
+   * into a nested UL/LI structure suitable for the sidebar tree.
+   *
+   * @param {HTMLElement[]} nodes - Flat nav items with metadata
+   * @returns {HTMLUListElement} - Root UL element of the nested tree
    */
   buildNestedListFromFlat(nodes) {
     const makeUl = () => {
@@ -411,7 +462,8 @@ export default class FormNavigation {
   }
 
   /**
-   * When hovering a form group in content, move the sidebar indicator to that item.
+   * Sync the nav active indicator while hovering groups in the content area.
+   * Also sets up a delegated click handler to select a group when clicked.
    */
   enableHoverSync() {
     if (!this.formGenerator.container || !this.formGenerator.navigationTree) return;
@@ -449,7 +501,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Keep sidebar indicator in sync with scroll position (scrollspy)
+   * Attach a throttled scroll listener (or window listener) that updates the
+   * active nav item based on the current scroll position (scrollspy behavior).
    */
   enableScrollSync() {
     const { el, type } = this.getScrollSource();
@@ -480,6 +533,11 @@ export default class FormNavigation {
     this.updateActiveGroupFromScroll();
   }
 
+  /**
+   * Determine which element is the scroll container: the form body (preferred)
+   * or the window/document as a fallback.
+   * @returns {{el:HTMLElement|null,type:'element'|'window'}}
+   */
   getScrollSource() {
     const bodyEl = this.formGenerator?.container?.querySelector?.(`.${CLASS.body}`) || null;
     const isScrollable = (el) => !!el && el.scrollHeight > el.clientHeight;
@@ -488,8 +546,11 @@ export default class FormNavigation {
     return { el: null, type: 'window' };
   }
 
-  // (reverted) actions menu
-
+  /**
+   * Compute the currently visible group based on scroll position and update
+   * navigation and breadcrumb accordingly. Skips updates during programmatic
+   * scrolling windows to avoid flicker.
+   */
   updateActiveGroupFromScroll() {
     if (!this.formGenerator?.groupElements || this.formGenerator.groupElements.size === 0) return;
     // During programmatic navigation/scroll, skip scrollspy updates entirely
@@ -556,7 +617,14 @@ export default class FormNavigation {
   }
 
   /**
-   * Generate navigation items recursively
+   * Recursively generate flat navigation items for the given schema subtree.
+   * Items include sections, groups, arrays-of-objects, and per-item entries.
+   * Optional inactive groups render as "+ Add" affordances.
+   *
+   * @param {object} schema - Effective schema node for the current level
+   * @param {string} [pathPrefix=''] - Dotted path to this node
+   * @param {number} [level=0] - Indentation level for visual nesting
+   * @returns {HTMLElement[]} - Flat array of nav item elements
    */
   generateNavigationItems(schema, pathPrefix = '', level = 0) {
     const items = [];
@@ -912,6 +980,11 @@ export default class FormNavigation {
     return items;
   }
 
+  /**
+   * Drag handler: begin dragging an array item entry in the nav tree.
+   * Stores source array path and index.
+   * @param {DragEvent} e
+   */
   onItemDragStart(e) {
     const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
     const { arrayPath, itemIndex } = (e.currentTarget.dataset && (e.currentTarget.dataset.arrayPath || e.currentTarget.dataset.itemIndex != null))
@@ -922,6 +995,11 @@ export default class FormNavigation {
     try { e.dataTransfer.effectAllowed = 'move'; } catch { /* noop */ }
   }
 
+  /**
+   * Drag handler over potential drop targets. Allows drop when dragging within
+   * the same array path.
+   * @param {DragEvent} e
+   */
   onItemDragOver(e) {
     const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
     const data = (e.currentTarget.dataset && (e.currentTarget.dataset.arrayPath != null)) ? e.currentTarget.dataset : item.dataset || {};
@@ -931,6 +1009,11 @@ export default class FormNavigation {
     try { e.dataTransfer.dropEffect = 'move'; } catch { /* noop */ }
   }
 
+  /**
+   * Drop handler: delegate to the generator to reorder the underlying data
+   * and rebuild UI, then navigate to the moved item.
+   * @param {DragEvent} e
+   */
   onItemDrop(e) {
     e.preventDefault();
     const item = e.currentTarget.closest?.(`.${CLASS.navItem}`) || e.currentTarget;
@@ -949,7 +1032,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Setup click handlers for navigation items
+   * Attach a single delegated click listener to the navigation tree container.
+   * Safe to call multiple times; existing listener is removed first.
    */
   setupNavigationHandlers() {
     const tree = this.formGenerator.navigationTree;
@@ -961,7 +1045,11 @@ export default class FormNavigation {
   }
 
   /**
-   * Delegated click handler for nav tree
+   * Delegated click handler for navigation items. Handles three cases:
+   * - "+ Add" controls for arrays (adds new item and navigates to it)
+   * - Clicks on optional sections (activates them, then navigates)
+   * - Regular group navigation by group id
+   * @param {MouseEvent} e
    */
   onTreeClick(e) {
     const navItem = e.target.closest(`.${CLASS.navItem}`);
@@ -1017,7 +1105,9 @@ export default class FormNavigation {
   }
 
   /**
-   * Highlight the active group when an input is focused
+   * Highlight and mark active the group that contains the given input element.
+   * Used by focus handlers from inputs to hint current editing context.
+   * @param {HTMLElement} inputEl
    */
   highlightActiveGroup(inputEl) {
     const groupEl = inputEl.closest('.form-ui-group');
@@ -1027,7 +1117,7 @@ export default class FormNavigation {
   }
 
   /**
-   * Clear active group highlight
+   * Remove active and breadcrumb states across content and navigation.
    */
   clearActiveGroupHighlight() {
     this.formGenerator.groupElements.forEach((groupInfo) => {
@@ -1045,7 +1135,8 @@ export default class FormNavigation {
   }
 
   /**
-   * Check if any input is focused in the active group
+   * Check if any focusable control is currently focused inside the active group.
+   * @returns {boolean}
    */
   isAnyInputFocusedInActiveGroup() {
     if (!this.formGenerator.activeGroupId) return false;
@@ -1060,6 +1151,9 @@ export default class FormNavigation {
   }
 }
 
+/**
+ * Cleanup listeners and transient state for the navigation feature.
+ */
 FormNavigation.prototype.destroy = function destroy() {
   const tree = this.formGenerator?.navigationTree;
   if (tree) tree.removeEventListener('click', this.onTreeClick);

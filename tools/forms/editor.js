@@ -1,18 +1,21 @@
 import { LitElement, html, nothing } from "da-lit";
 import "https://da.live/nx/public/sl/components.js";
 import getStyle from "https://da.live/nx/utils/styles.js";
-import { readDocument, saveDaVersion, saveDocument, saveToAem } from "./libs/backend/actions.js";
-import "./libs/form-ui/components/title/title.js";
-// Form UI library (standalone mounting API)
-// mountFormUI is lazily imported on demand to reduce initial load
-import schemaLoader from "./libs/form-ui/utils/schema-loader.js";
-import { discoverSchemasPlain, loadSchemaWithDefaults } from "./libs/form-ui/commands/form-commands.js";
+import "./components/title/title.js";
+import { ServiceContainer } from "./libs/services/service-container.js";
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
 const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
 
+/**
+ * FormsEditor
+ *
+ * Standalone web component that loads a page's form data from DA, lets the
+ * user pick a JSON Schema, mounts the schema-driven Form UI, and provides
+ * actions to save/preview/publish via backend services.
+ */
 class FormsEditor extends LitElement {
   static properties = {
     documentData: { type: Object },
@@ -26,6 +29,7 @@ class FormsEditor extends LitElement {
     context: { type: Object },
   };
 
+  /** Initialize editor state and internal references. */
   constructor() {
     super();
     this.documentData = null;
@@ -33,7 +37,7 @@ class FormsEditor extends LitElement {
     this.error = null;
     // Form UI runtime refs
     this._formApi = null;
-    this._schemaLoaderConfigured = false;
+    this._schemaLoaderConfigured = false; // deprecated; kept to avoid accidental reuse
     this.schemas = [];
     this.selectedSchema = '';
     this.loadingSchemas = false;
@@ -43,35 +47,33 @@ class FormsEditor extends LitElement {
     this._onFormChangeDebounced = null;
     this._pagePath = '';
     this._selectedSchemaName = '';
+    this._context = {};
+    this._services = null;
   }
 
+  /** Lifecycle: attach styles, initialize services, and bootstrap the UI. */
   async connectedCallback() {
     super.connectedCallback();
     this.shadowRoot.adoptedStyleSheets = [style, formStyles];
 
     // init DA SDK context
     const { context } = await DA_SDK;
-    this.context = { ...context };
+    this._context = { ...context };
+    this._services = new ServiceContainer(this._context);
+    this._context.services = this._services;
 
-    // Get page path from URL query parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    let pagePath = window.location.hash?.replace('#/', '/') || urlParams.get('page');
-    let schemaFromUrl = urlParams.get('schema');
-
-    // Get storage version from URL query parameter
-    this._storageVersion = urlParams.get('storage');
-    this._showNavConnectors = urlParams.get('showNavConnectors');
-    this._allowLocalSchemas = urlParams.get('allowLocalSchemas');
+    // Parse URL config using ConfigService
+    const cfg = this._services.config.parseUrl(window.location.href);
+    let pagePath = cfg.pagePath;
+    let schemaFromUrl = cfg.schemaFromUrl;
+    this._storageVersion = cfg.storageVersion;
+    this._showNavConnectors = cfg.showNavConnectors;
+    this._allowLocalSchemas = cfg.allowLocalSchemas;
+    this._localSchemas = cfg.localSchemas;
 
     if (!pagePath) {
       this.error = 'Missing required "page" query parameter. Please provide a page path.';
       return;
-    }
-
-    // Remove org and site from the start of the pagePath, so only the path remains
-    const parts = pagePath.split('/');
-    if (parts.length > 3) {
-      pagePath = '/' + parts.slice(3).join('/');
     }
 
     // Load document data before initial render
@@ -79,8 +81,7 @@ class FormsEditor extends LitElement {
     this._pagePath = pagePath;
     schemaFromUrl = this.documentData?.schemaId || schemaFromUrl;
 
-    // Prepare Form UI (styles + schema loader), and discover schemas for selection
-    await this.configureSchemaLoader();
+    // Prepare Form UI (styles), and discover schemas for selection via services
     await this.discoverSchemas();
     // If schema provided in URL and is valid, auto-load and skip dialog
     if (schemaFromUrl && this.schemas.some((s) => s.id === schemaFromUrl)) {
@@ -96,10 +97,11 @@ class FormsEditor extends LitElement {
     this.addEventListener('editor-preview-publish', this._handlePreviewPublish);
   }
 
+  /** Fetch and parse the page document into editor state. */
   async loadDocumentData(pagePath) {
     try {
       this.loading = true;
-      this.documentData = await readDocument(pagePath, { storageVersion: this._storageVersion });
+      this.documentData = await this._services.backend.readDocument(pagePath, { storageVersion: this._storageVersion });
     } catch (error) {
       this.error = `Failed to load document: ${error.message}`;
       console.error('Error loading document:', error);
@@ -108,52 +110,25 @@ class FormsEditor extends LitElement {
     }
   }
 
-  async configureSchemaLoader() {
-    if (this._schemaLoaderConfigured) return;
-    try {
-      const { org, repo, ref } = this.context || {};
-      const owner = org || 'kozmaadrian';
-      const repository = repo || 'mhast-demo';
-      const branch = ref || 'main';
-      schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
-      this._schemaLoaderConfigured = true;
-    } catch (e) {
-      // Use safe defaults if DA SDK context is not available
-      try {
-        const owner = 'kozmaadrian';
-        const repository = 'mhast-demo';
-        const branch = 'main';
-        schemaLoader.configure({ owner, repo: repository, ref: branch, basePath: 'forms/' });
-        this._schemaLoaderConfigured = true;
-      } catch {}
-    }
-  }
-
+  /** Discover available schemas from remote and (optional) local sources. */
   async discoverSchemas() {
     try {
       this.loadingSchemas = true;
       this.schemaError = null;
-      // Try cache first
-      const cacheKey = 'forms.schemas.manifest';
-      const cached = sessionStorage.getItem(cacheKey);
-      let items = [];
-      if (cached) {
-        try { items = JSON.parse(cached) || []; } catch {}
-      }
-      if (!items || items.length === 0) {
-        const discovered = await discoverSchemasPlain();
-        items = Array.isArray(discovered) ? discovered : [];
-        try { sessionStorage.setItem(cacheKey, JSON.stringify(items)); } catch {}
-      }
-      // Append local schemas (from tools/forms/local-schema/manifest.json if available)
-      const localSchemas = await this._discoverLocalSchemas().catch(() => []);
-      const combined = Array.isArray(items) ? [...items] : [];
-      // Ensure unique ids by prefixing local entries
-      for (const ls of localSchemas) {
+      const remote = await this._services.schemaLoader.getSchemasList();
+      // Merge in local schemas using LocalSchemaService (editor decides based on URL flags)
+      let locals = [];
+      try {
+        const allowDefaults = !!this._allowLocalSchemas;
+        const explicitList = Array.isArray(this._localSchemas) ? this._localSchemas : [];
+        locals = await this._services.localSchema.discoverSchemas({ allowDefaults, explicitList });
+      } catch {}
+      const merged = Array.isArray(remote) ? [...remote] : [];
+      for (const ls of locals) {
         const id = `local:${ls.id || ls.name || ls.url}`;
-        combined.push({ id, name: `${ls.name || ls.id || 'Local Schema'} (local)`, url: ls.url, _source: 'local' });
+        merged.push({ id, name: `${ls.name || ls.id || 'Local Schema'} (local)`, url: ls.url, _source: 'local' });
       }
-      this.schemas = combined;
+      this.schemas = merged;
       // Preselect first if available, but do not auto-load
       this.selectedSchema = this.schemas[0]?.id || '';
     } catch (e) {
@@ -165,6 +140,7 @@ class FormsEditor extends LitElement {
     }
   }
 
+  /** Load the selected schema, mount or update the Form UI, and sync state. */
   async loadSelectedSchema() {
     const schemaId = this.selectedSchema;
     const mountEl = this.renderRoot?.querySelector('#form-root');
@@ -175,13 +151,11 @@ class FormsEditor extends LitElement {
       let schema;
       let initialData = {};
       if (selected.url) {
-        // Load local schema directly by URL
-        const res = await fetch(new URL(selected.url, window.location.origin), { cache: 'no-store' });
-        if (!res.ok) throw new Error(`Failed to fetch local schema (${res.status})`);
-        schema = await res.json();
+        // Load local schema via LocalSchemaService
+        schema = await this._services.localSchema.loadSchemaByUrl(selected.url);
       } else {
-        // Load from default manifest-backed source
-        const loaded = await loadSchemaWithDefaults(schemaId);
+        // Load from default manifest-backed source via service
+        const loaded = await this._services.schemaLoader.loadSchemaWithDefaults(schemaId);
         schema = loaded.schema; initialData = loaded.initialData;
       }
       
@@ -192,8 +166,7 @@ class FormsEditor extends LitElement {
         : initialData;
       if (!this._formApi) {
         // Lazy-load the form mount API
-        
-        const { default: mountFormUI } = await import('./libs/form-ui/core/form-mount.js');
+        const { default: mountFormUI } = await import('./libs/form-ui/form-mount.js');
         
         // Debounced sync function
         if (!this._onFormChangeDebounced) {
@@ -203,12 +176,11 @@ class FormsEditor extends LitElement {
           }, 200);
         }
         
-        const showNavConnectors = !this._showNavConnectors ? true : this._showNavConnectors && this._showNavConnectors === 'true' 
-        this._formApi = mountFormUI({
+        this._formApi = mountFormUI(this._context, {
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { renderAllGroups: true, showNavConnectors },
+          ui: { renderAllGroups: true, showNavConnectors: this._showNavConnectors },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);
@@ -243,51 +215,12 @@ class FormsEditor extends LitElement {
     }
   }
 
-  async _discoverLocalSchemas() {
-    const found = [];
-    const base = new URL('./local-schema/', import.meta.url);
-    const tryAdd = async (relPath, nameHint) => {
-      try {
-        const url = new URL(relPath, base);
-        const res = await fetch(url, { cache: 'no-store', method: 'HEAD' });
-        if (!res.ok) return;
-        found.push({ id: relPath, name: nameHint || relPath, url: url.pathname });
-      } catch {}
-    };
-
-    // 1) Conventional default: llrc.schema.json
-    if (this._allowLocalSchemas && this._allowLocalSchemas === 'true') {
-      await tryAdd('llrc.schema.json', 'LLRC');
-      await tryAdd('test.schema.json', 'test');
-    }
-
-    // 2) Allow query param overrides: ?localSchemas=a.json,b.json
-    try {
-      const url = new URL(window.location.href);
-      const list = url.searchParams.get('localSchemas') || url.searchParams.get('localSchema');
-      if (list) {
-        const parts = list.split(',').map((s) => s.trim()).filter(Boolean);
-        // Fetch with GET to ensure JSON is valid
-        for (const p of parts) {
-          try {
-            const u = new URL(p, base);
-            const r = await fetch(u, { cache: 'no-store' });
-            if (!r.ok) continue;
-            // Validate JSON shape quickly
-            await r.json();
-            found.push({ id: p, name: p, url: u.pathname });
-          } catch {}
-        }
-      }
-    } catch {}
-
-    return found;
-  }
-
+  /** Handle schema selection changes from the dialog. */
   onSchemaChange(e) {
     this.selectedSchema = e.target?.value || '';
   }
 
+  /** Lifecycle: cleanup mounted form and event listeners. */
   disconnectedCallback() {
     try { this._formApi?.destroy(); } catch {}
     this._formApi = null;
@@ -296,6 +229,7 @@ class FormsEditor extends LitElement {
     super.disconnectedCallback();
   }
 
+  /** Setup global keyboard shortcuts (e.g., Cmd/Ctrl+S to save). */
   firstUpdated() {
     // Global shortcuts
     this._onGlobalKeydown = (e) => {
@@ -309,6 +243,7 @@ class FormsEditor extends LitElement {
     window.addEventListener('keydown', this._onGlobalKeydown);
   }
 
+  /** Maintain focus trapping for the modal dialog when shown. */
   updated(changed) {
     if (changed.has('showSchemaDialog')) {
       if (this.showSchemaDialog) {
@@ -326,6 +261,7 @@ class FormsEditor extends LitElement {
     }
   }
 
+  /** Enable focus trap within modal dialog and handle Esc/Enter/Tab keys. */
   _enableDialogFocusTrap(dialog) {
     if (!dialog) return;
     const overlay = this.renderRoot?.querySelector('.modal-overlay');
@@ -360,6 +296,7 @@ class FormsEditor extends LitElement {
     overlay?.addEventListener('keydown', keyHandler);
   }
 
+  /** Remove dialog focus trap listeners. */
   _disableDialogFocusTrap() {
     const overlay = this.renderRoot?.querySelector('.modal-overlay');
     if (overlay && this._dialogKeyHandler) {
@@ -368,6 +305,7 @@ class FormsEditor extends LitElement {
     }
   }
 
+  /** Utility: debounce a function by `wait` ms. */
   _debounce(fn, wait) {
     let t;
     return (...args) => {
@@ -376,6 +314,7 @@ class FormsEditor extends LitElement {
     };
   }
 
+  /** Dispatch an editor-save event with current page path and form details. */
   _emitSave() {
     const formMeta = {
       title: this.documentData?.title || '',
@@ -389,8 +328,9 @@ class FormsEditor extends LitElement {
     this.dispatchEvent(new CustomEvent('editor-save', { detail }));
   }
 
+  /** Compute path details used by the UI header component. */
   _getPathDetails() {
-    const { org, repo, ref } = this.context || {};
+    const { org, repo, ref } =this._context || {};
     const parentPath = this._pagePath.split('/').slice(0, -1).join('/');
     const parentName = parentPath.split('/').pop();
     const name = this._pagePath.split('/').pop();
@@ -404,6 +344,7 @@ class FormsEditor extends LitElement {
     }
   }
 
+  /** Show a user-facing error and clear any sending state on the action button. */
   handleError(err, action = 'operation', location) {
     try {
       const message = err?.error?.message || err?.message || (typeof err === 'string' ? err : JSON.stringify(err));
@@ -418,16 +359,18 @@ class FormsEditor extends LitElement {
     }
   }
 
+  /** Save handler: serialize current form to DA. */
   async _handleSave(e) {
-    const resp = await saveDocument(e.detail, { storageVersion: this._storageVersion });
+    const resp = await this._services.backend.saveDocument(e.detail, { storageVersion: this._storageVersion });
     if (!resp?.ok) {
       this.handleError(resp, 'save');
     }
   }
 
+  /** Preview/Publish handler: save to DA, then trigger AEM actions. */
   async _handlePreviewPublish(e) {
     const { action, location } = e.detail;
-    const { org, repo } = this.context;
+    const { org, repo } =this._context;
 
     location.classList.add("is-sending");
 
@@ -441,25 +384,25 @@ class FormsEditor extends LitElement {
         formMeta,
         formData: this.documentData?.formData || null,
       };
-      const daResp = await saveDocument(detail, { storageVersion: this._storageVersion });
+      const daResp = await this._services.backend.saveDocument(detail, { storageVersion: this._storageVersion });
       if (daResp.error) {
         this.handleError(daResp, action, location);
         return;
       }
 
       const aemPath = `/${org}/${repo}${this._pagePath}`;
-      let json = await saveToAem(aemPath, "preview");
+      let json = await this._services.backend.saveToAem(aemPath, "preview");
       if (json.error) {
         this.handleError(json, action, location);
         return;
       }
       if (action === "publish") {
-        json = await saveToAem(aemPath, "live");
+        json = await this._services.backend.saveToAem(aemPath, "live");
         if (json.error) {
           this.handleError(json, action, location);
           return;
         }
-        saveDaVersion(aemPath);
+        this._services.backend.saveDaVersion(aemPath);
       }
 
       const toOpenInAem = `${MHAST_LIVE}${aemPath}?head=false&schema=true${action === "preview" ? "&preview=true" : ""}`;

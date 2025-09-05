@@ -1,19 +1,22 @@
 /**
  * HighlightOverlay
- * Renders the blue vertical overlay aligned with a target group.
- * Extracted so visual effect is isolated from form generation logic.
+ *
+ * Visual helper that renders a blue overlay aligned with a target form group
+ * inside the scrollable body container.
  */
-
 export default class HighlightOverlay {
+  /** Initialize overlay state; actual DOM is created on demand. */
   constructor() {
     this.container = null;
     this.overlay = null;
   }
 
+  /** Attach the overlay to a container element (usually the form body). */
   attach(containerEl) {
     this.container = containerEl;
   }
 
+  /** Remove any existing overlay element. */
   clear() {
     if (this.overlay) {
       this.overlay.remove();
@@ -21,6 +24,7 @@ export default class HighlightOverlay {
     }
   }
 
+  /** Position and display the overlay to match `targetGroup` bounding box. */
   showFor(targetGroup) {
     if (!this.container || !targetGroup) return;
     this.clear();
