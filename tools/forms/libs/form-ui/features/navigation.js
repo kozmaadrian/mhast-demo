@@ -7,6 +7,7 @@ import { getDeepActiveElement } from '../utils/dom-utils.js';
  
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId, arrayItemId, hyphenatePath } from '../form-generator/path-utils.js';
+import FormIcons from '../utils/icons.js';
 
 /**
  * FormNavigation
@@ -911,10 +912,17 @@ export default class FormNavigation {
                 const addChildContent = document.createElement('div');
                 addChildContent.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
                 addChildContent.style.setProperty('--nav-level', level + 4);
-                const addChildTitle = document.createElement('span');
-                addChildTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
-                addChildTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(childProp, childKey)}' Item`;
-                addChildContent.appendChild(addChildTitle);
+
+                const addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'form-ui-array-add';
+                const icon = FormIcons.renderIcon('plus');
+                addBtn.appendChild(icon);
+                const label = document.createElement('span');
+                label.textContent = 'Add';
+                addBtn.appendChild(label);
+
+                addChildContent.appendChild(addBtn);
                 addChildItem.appendChild(addChildContent);
                 items.push(addChildItem);
               }
@@ -933,11 +941,16 @@ export default class FormNavigation {
           addContent.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
           addContent.style.setProperty('--nav-level', level + 2);
 
-          const addTitle = document.createElement('span');
-          addTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
-          addTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(derefProp, key)}' Item`;
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'form-ui-array-add';
+          const icon = FormIcons.renderIcon('plus');
+          addBtn.appendChild(icon);
+          const label = document.createElement('span');
+          label.textContent = 'Add';
+          addBtn.appendChild(label);
 
-          addContent.appendChild(addTitle);
+          addContent.appendChild(addBtn);
           addItem.appendChild(addContent);
           items.push(addItem);
         }

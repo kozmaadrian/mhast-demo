@@ -31,6 +31,7 @@ export class LocalSchemaService {
     if (allowDefaults) {
       await tryAdd('llrc.schema.json', 'LLRC');
       await tryAdd('test.schema.json', 'test');
+      await tryAdd('inputs.schema.json', 'Inputs');
     }
 
     if (Array.isArray(explicitList) && explicitList.length > 0) {

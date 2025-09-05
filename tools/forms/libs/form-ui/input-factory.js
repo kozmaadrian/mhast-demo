@@ -38,6 +38,32 @@ export default class InputFactory {
   create(fieldPath, propSchema) {
     const primaryType = Array.isArray(propSchema.type) ? (propSchema.type.find((t) => t !== 'null') || propSchema.type[0]) : propSchema.type;
     const { format, enum: enumValues } = propSchema;
+    // Semantic type override (optional, non-breaking)
+    const semantic = propSchema['x-semantic-type'];
+    if (semantic) {
+      switch (semantic) {
+        case 'long-text':
+          return this._registry.get('textarea').create(fieldPath, propSchema);
+        case 'date':
+          return this._registry.get('string').create(fieldPath, propSchema, 'date');
+        case 'date-time':
+          return this._registry.get('string').create(fieldPath, propSchema, 'date-time');
+        case 'time':
+          return this._registry.get('string').create(fieldPath, propSchema, 'time');
+        case 'image':
+          // Use URL input for now; can be replaced by a dedicated upload widget later
+          return this._registry.get('string').create(fieldPath, propSchema, 'uri');
+        case 'color':
+          return this._registry.get('string').create(fieldPath, propSchema, 'color');
+        default:
+          if (typeof semantic === 'string' && semantic.startsWith('reference:')) {
+            // For now, treat references as plain string inputs (ids/urls)
+            return this._registry.get('string').create(fieldPath, propSchema);
+          }
+          // Unknown semantic type → fall through to default inference
+          break;
+      }
+    }
     if (primaryType === 'array') return this.createArrayInput(fieldPath, propSchema);
     if (primaryType === 'object') return null;
     if (enumValues && primaryType === 'string') {
@@ -73,7 +99,7 @@ export default class InputFactory {
     addButton.textContent = '';
     addButton.appendChild(FormIcons.renderIcon('plus'));
     const labelSpan = document.createElement('span');
-    labelSpan.textContent = `Add '${baseTitle}' Item`;
+    labelSpan.textContent = `Add`;
     addButton.appendChild(labelSpan);
     // Determine if items are primitives (vs objects)
     const itemsSchema = propSchema.items || {};

@@ -96,8 +96,14 @@
   border: 1px dashed #d1d5db;
   border-radius: 8px;
   cursor: pointer;
-  align-self: flex-end;
+  align-self: flex-start;
   /* bottom-right for primitive arrays */
+}
+
+.form-ui-nav-item-add-content .form-ui-array-add {
+  border: none;
+  margin: 0;
+  padding: 0 0 0 12px;
 }
 
 /* For primitive arrays, align add button with the select/input right edge (account for delete icon) */
@@ -513,7 +519,7 @@
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 3px solid transparent;
   border-radius: 0 8px 8px 0;
-  margin: 2px 8px 2px 0;
+  /* margin: 2px 8px 2px 0; */
 }
 
 .form-ui-nav-item-content:hover {
@@ -591,6 +597,26 @@
   transition: all 0.15s ease-in-out;
   box-sizing: border-box;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Compact controls: size to content rather than full width */
+.form-ui-input[type="date"],
+.form-ui-input[type="datetime-local"],
+.form-ui-input[type="time"],
+.form-ui-input[type="color"],
+.form-ui-select {
+  width: max-content;
+  min-width: 220px;
+  max-width: 220px;
+}
+
+/* Prevent compact controls from stretching inside primitive array rows */
+.form-ui-array-item .form-ui-input[type="date"],
+.form-ui-array-item .form-ui-input[type="datetime-local"],
+.form-ui-array-item .form-ui-input[type="time"],
+.form-ui-array-item .form-ui-input[type="color"],
+.form-ui-array-item .form-ui-select {
+  flex: 0 0 auto;
 }
 
 /* Required flag is used for validation logic only; styling is applied via .invalid */
