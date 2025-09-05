@@ -85,7 +85,8 @@
   flex-direction: column;
 }
 
-.form-ui-array-add {
+.form-ui-array-add,
+.form-ui-nav-item-add-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -100,11 +101,9 @@
   /* bottom-right for primitive arrays */
 }
 
-.form-ui-nav-item-add-content .form-ui-array-add {
-  border: none;
-  margin: 0;
-  padding: 0 0 0 12px;
-  color: #9ca3af;
+.form-ui-nav-item-add-content .form-ui-nav-item-add-title {
+  padding: 2px 12px 2px 12px;
+  margin: 0px 0px 0px 10px;
 }
 
 /* For primitive arrays, align add button with the select/input right edge (account for delete icon) */
@@ -744,7 +743,7 @@
 .form-ui-array-item {
   display: flex;
   gap: 8px;
-  margin-bottom: 30px;
+  margin-bottom: 15px;
   align-items: flex-start;
 }
 
