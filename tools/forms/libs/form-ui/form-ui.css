@@ -85,7 +85,8 @@
   flex-direction: column;
 }
 
-.form-ui-array-add {
+.form-ui-array-add,
+.form-ui-nav-item-add-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -96,8 +97,13 @@
   border: 1px dashed #d1d5db;
   border-radius: 8px;
   cursor: pointer;
-  align-self: flex-end;
+  align-self: flex-start;
   /* bottom-right for primitive arrays */
+}
+
+.form-ui-nav-item-add-content .form-ui-nav-item-add-title {
+  padding: 2px 12px 2px 12px;
+  margin: 0px 0px 0px 10px;
 }
 
 /* For primitive arrays, align add button with the select/input right edge (account for delete icon) */
@@ -513,7 +519,7 @@
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 3px solid transparent;
   border-radius: 0 8px 8px 0;
-  margin: 2px 8px 2px 0;
+  /* margin: 2px 8px 2px 0; */
 }
 
 .form-ui-nav-item-content:hover {
@@ -558,7 +564,7 @@
   display: block;
   margin-bottom: 8px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 12px;
   color: #374151;
   line-height: 1.25;
 }
@@ -569,7 +575,7 @@
 }
 
 .form-ui-description {
-  font-size: 14px;
+  font-size: 12px;
   color: #6b7280;
   margin-top: 6px;
   margin-bottom: 0;
@@ -584,13 +590,33 @@
   padding: 0 8px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.4;
   color: #111827;
   background-color: #ffffff;
   transition: all 0.15s ease-in-out;
   box-sizing: border-box;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Compact controls: size to content rather than full width */
+.form-ui-input[type="date"],
+.form-ui-input[type="datetime-local"],
+.form-ui-input[type="time"],
+.form-ui-input[type="color"],
+.form-ui-select {
+  width: max-content;
+  min-width: 220px;
+  max-width: 220px;
+}
+
+/* Prevent compact controls from stretching inside primitive array rows */
+.form-ui-array-item .form-ui-input[type="date"],
+.form-ui-array-item .form-ui-input[type="datetime-local"],
+.form-ui-array-item .form-ui-input[type="time"],
+.form-ui-array-item .form-ui-input[type="color"],
+.form-ui-array-item .form-ui-select {
+  flex: 0 0 auto;
 }
 
 /* Required flag is used for validation logic only; styling is applied via .invalid */
@@ -618,7 +644,7 @@
   padding: 8px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.4;
   color: #111827;
   background-color: #ffffff;
@@ -626,7 +652,10 @@
   box-sizing: border-box;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   resize: vertical;
-  min-height: 80px;
+  height: 200px;
+  height: 200px;
+  overflow-y: auto;
+  resize: none;
 }
 
 .form-ui-input:focus,
@@ -678,7 +707,7 @@
   display: flex;
   align-items: center;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 12px;
   color: #374151;
   cursor: pointer;
   line-height: 1.5;
@@ -714,7 +743,7 @@
 .form-ui-array-item {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 15px;
   align-items: flex-start;
 }
 
@@ -931,7 +960,7 @@
 
 .form-ui-group-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #111827;
   line-height: 1.25;
@@ -944,7 +973,7 @@
 
 /* Adjust existing field styling for groups */
 .form-ui-group .form-ui-field {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .form-ui-group .form-ui-field:last-child {
@@ -1087,7 +1116,7 @@
 .form-nav-tree {
   --tree-clr: #dadfe6;
   /* line and dot color */
-  --tree-font-size: 14px;
+  --tree-font-size: 13px;
   --tree-item-height: 2;
   /* line-height multiplier */
   --tree-offset: 18px;
@@ -1175,7 +1204,7 @@
 }
 
 .form-ui-nav-item-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #172b4d;
   line-height: 1.2;
 }
@@ -1362,7 +1391,7 @@
   text-align: center;
   cursor: pointer;
   margin: 8px 0 16px;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.4;
   font-weight: 500;
 }

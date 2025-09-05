@@ -6,6 +6,7 @@
 import getControlElement from '../utils/dom-utils.js';
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId, hyphenatePath } from '../form-generator/path-utils.js';
+import FormIcons from '../utils/icons.js';
 
 /**
  * Render a single field based on its schema and location in the model.
@@ -37,7 +38,11 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
         placeholder.className = 'form-ui-placeholder-add';
         placeholder.dataset.path = fullPath;
         const title = formGenerator.getSchemaTitle(propSchema, key);
-        placeholder.textContent = `+ Add ${title}`;
+        placeholder.textContent = '';
+        placeholder.appendChild(FormIcons.renderIcon('plus'));
+        const label = document.createElement('span');
+        label.textContent = `Add ${title}`;
+        placeholder.appendChild(label);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);
@@ -79,7 +84,11 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
       placeholder.className = CLASS.placeholderAdd;
       placeholder.dataset.path = fullPath;
       const title = formGenerator.getSchemaTitle(propSchema, key);
-      placeholder.textContent = `+ Add ${title} Item`;
+      placeholder.textContent = '';
+      placeholder.appendChild(FormIcons.renderIcon('plus'));
+      const label = document.createElement('span');
+      label.textContent = `Add ${title} Item`;
+      placeholder.appendChild(label);
       placeholder.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
         formGenerator.commandAddArrayItem(fullPath);
@@ -115,7 +124,11 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
         placeholder.className = CLASS.placeholderAdd;
         placeholder.dataset.path = fullPath;
         const title = formGenerator.getSchemaTitle(propSchema, key);
-        placeholder.textContent = `+ Add ${title}`;
+        placeholder.textContent = '';
+        placeholder.appendChild(FormIcons.renderIcon('plus'));
+        const label = document.createElement('span');
+        label.textContent = `Add ${title}`;
+        placeholder.appendChild(label);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);

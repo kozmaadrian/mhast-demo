@@ -4,7 +4,7 @@
  * and delegates clicks to navigate and activate optional groups.
  */
 import { getDeepActiveElement } from '../utils/dom-utils.js';
- 
+
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId, arrayItemId, hyphenatePath } from '../form-generator/path-utils.js';
 
@@ -46,7 +46,7 @@ export default class FormNavigation {
     this._contentClickHandler = null;
     this._onScrollHandler = null;
     this._onResizeHandler = null;
-    
+
   }
 
   /**
@@ -762,7 +762,6 @@ export default class FormNavigation {
         // Child items: one entry per existing array item in the form
         const dataArray = this.formGenerator.model.getNestedValue(this.formGenerator.data, nestedPath) || [];
         if (Array.isArray(dataArray)) {
-          
           dataArray.forEach((_, idx) => {
             // Each item gets a child nav node with its own anchor to the item container
             const itemNav = document.createElement('div');
@@ -823,7 +822,7 @@ export default class FormNavigation {
                 addContent.style.setProperty('--nav-level', level + 3);
                 const addTitle = document.createElement('span');
                 addTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
-                addTitle.textContent = `+ Add ${this.formGenerator.getSchemaTitle(childProp, childKey)}`;
+                addTitle.textContent = `+ Add ${this.formGenerator.getSchemaTitle(childProp, childKey)} Item`;
                 addContent.appendChild(addTitle);
                 addChild.appendChild(addContent);
                 items.push(addChild);
@@ -874,7 +873,7 @@ export default class FormNavigation {
               const rawChildData = this.formGenerator.model.getNestedValue(this.formGenerator.data, childPath);
               const childDataArray = childIsArrayOfObjects ? (rawChildData || []) : rawChildData;
               if (Array.isArray(childDataArray)) {
-                
+
                 childDataArray.forEach((_, cidx) => {
                   const childItemNav = document.createElement('div');
                   childItemNav.className = CLASS.navItem;
@@ -911,10 +910,11 @@ export default class FormNavigation {
                 const addChildContent = document.createElement('div');
                 addChildContent.className = `${CLASS.navItemContent} ${CLASS.navItemAddContent}`;
                 addChildContent.style.setProperty('--nav-level', level + 4);
-                const addChildTitle = document.createElement('span');
-                addChildTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
-                addChildTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(childProp, childKey)}' Item`;
-                addChildContent.appendChild(addChildTitle);
+
+                const addTitle = document.createElement('span');
+                addTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
+                addTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(derefProp, key)}' Item`
+                addChildContent.appendChild(addTitle);
                 addChildItem.appendChild(addChildContent);
                 items.push(addChildItem);
               }
@@ -935,8 +935,7 @@ export default class FormNavigation {
 
           const addTitle = document.createElement('span');
           addTitle.className = `${CLASS.navItemTitle} ${CLASS.navItemAddTitle}`;
-          addTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(derefProp, key)}' Item`;
-
+          addTitle.textContent = `+ Add '${this.formGenerator.getSchemaTitle(derefProp, key)}' Item`
           addContent.appendChild(addTitle);
           addItem.appendChild(addContent);
           items.push(addItem);
@@ -1056,7 +1055,7 @@ export default class FormNavigation {
     if (!navItem) return;
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Handle add-array-item click from nav: items created with dataset.arrayPath
     if (navItem.classList.contains(CLASS.navItemAdd) && navItem.dataset && navItem.dataset.arrayPath) {
       const arrayPath = navItem.dataset.arrayPath;
@@ -1100,7 +1099,7 @@ export default class FormNavigation {
       }
       return;
     }
-    
+
     this.navigateToGroup(groupId);
   }
 
