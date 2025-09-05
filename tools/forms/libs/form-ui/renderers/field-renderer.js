@@ -40,11 +40,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
         const title = formGenerator.getSchemaTitle(propSchema, key);
         placeholder.textContent = '';
         placeholder.appendChild(FormIcons.renderIcon('plus'));
-        {
-          const label = document.createElement('span');
-          label.textContent = `Add ${title}`;
-          placeholder.appendChild(label);
-        }
+        const label = document.createElement('span');
+        label.textContent = `Add ${title}`;
+        placeholder.appendChild(label);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);
@@ -88,11 +86,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
       const title = formGenerator.getSchemaTitle(propSchema, key);
       placeholder.textContent = '';
       placeholder.appendChild(FormIcons.renderIcon('plus'));
-      {
-        const label = document.createElement('span');
-        label.textContent = `Add ${title} Item`;
-        placeholder.appendChild(label);
-      }
+      const label = document.createElement('span');
+      label.textContent = `Add ${title} Item`;
+      placeholder.appendChild(label);
       placeholder.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
         formGenerator.commandAddArrayItem(fullPath);
@@ -130,11 +126,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
         const title = formGenerator.getSchemaTitle(propSchema, key);
         placeholder.textContent = '';
         placeholder.appendChild(FormIcons.renderIcon('plus'));
-        {
-          const label = document.createElement('span');
-          label.textContent = `Add ${title}`;
-          placeholder.appendChild(label);
-        }
+        const label = document.createElement('span');
+        label.textContent = `Add ${title}`;
+        placeholder.appendChild(label);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);
