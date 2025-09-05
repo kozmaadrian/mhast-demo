@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/input-examples.schema.json",
+  "title": "Form Input Examples",
+  "description": "Demonstrates each available input type supported by the renderer, including optional x-semantic-type overrides.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "textField": {
+      "type": "string",
+      "title": "Text"
+    },
+    "longTextField": {
+      "type": "string",
+      "title": "Long Text",
+      "x-semantic-type": "long-text"
+    },
+    "emailField": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+    },
+    "urlField": {
+      "type": "string",
+      "format": "uri",
+      "title": "URL"
+    },
+    "colorField": {
+      "type": "string",
+      "title": "Color",
+      "x-semantic-type": "color"
+    },
+    "dateField": {
+      "type": "string",
+      "title": "Date",
+      "x-semantic-type": "date"
+    },
+    "dateTimeField": {
+      "type": "string",
+      "title": "Date & Time",
+      "x-semantic-type": "date-time"
+    },
+    "timeField": {
+      "type": "string",
+      "title": "Time",
+      "x-semantic-type": "time"
+    },
+    "selectField": {
+      "type": "string",
+      "title": "Select (enum)",
+      "enum": [
+        "Option A",
+        "Option B",
+        "Option C"
+      ]
+    },
+    "numberField": {
+      "type": "number",
+      "title": "Number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "integerField": {
+      "type": "integer",
+      "title": "Integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "booleanField": {
+      "type": "boolean",
+      "title": "Boolean"
+    },
+    "imageUrl": {
+      "type": "string",
+      "format": "uri",
+      "title": "Image URL",
+      "x-semantic-type": "image"
+    },
+    "referenceUser": {
+      "type": "string",
+      "title": "Reference: User",
+      "x-semantic-type": "reference:user"
+    },
+    "tags": {
+      "type": "array",
+      "title": "Tags",
+      "items": {
+        "type": "string"
+      }
+    },
+    "enumArray": {
+      "type": "array",
+      "title": "Repeated Enum",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Red",
+          "Green",
+          "Blue"
+        ]
+      }
+    },
+    "addressList": {
+      "type": "array",
+      "title": "Addresses",
+      "items": {
+        "type": "object",
+        "title": "Address",
+        "properties": {
+          "street": {
+            "type": "string",
+            "title": "Street"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "zip": {
+            "type": "string",
+            "title": "ZIP",
+            "maxLength": 10
+          }
+        },
+        "required": [
+          "city"
+        ]
+      }
+    },
+    "profile": {
+      "type": "object",
+      "title": "Profile (nested object)",
+      "properties": {
+        "firstName": {
+          "type": "string",
+          "title": "First Name"
+        },
+        "lastName": {
+          "type": "string",
+          "title": "Last Name"
+        },
+        "age": {
+          "type": "integer",
+          "title": "Age",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "required": [
+    "textField",
+    "longTextField"
+  ]
+}
