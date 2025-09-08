@@ -6,18 +6,15 @@
  */
 export default class BaseInput {
   /**
-   * @param {any} contextOrHandlers - Backward-compat: some callers pass handlers as first arg
+   * @param {object} context
    * @param {{onInputOrChange?:Function,onBlur?:Function,onFocus?:Function}} [handlers]
    */
-  constructor(contextOrHandlers, handlers = {}) {
+  constructor(context, handlers = {}) {
     const noop = () => {};
-    // Support legacy signature where only a single handlers object was passed
-    const resolvedHandlers = (handlers && (handlers.onInputOrChange || handlers.onBlur || handlers.onFocus))
-      ? handlers
-      : (contextOrHandlers || {});
-    this.onInputOrChange = resolvedHandlers.onInputOrChange || noop;
-    this.onBlur = resolvedHandlers.onBlur || noop;
-    this.onFocus = resolvedHandlers.onFocus || noop;
+    this.context = context || {};
+    this.onInputOrChange = handlers.onInputOrChange || noop;
+    this.onBlur = handlers.onBlur || noop;
+    this.onFocus = handlers.onFocus || noop;
   }
 
   /** Attach standard input/change/blur/focus events to an element. */

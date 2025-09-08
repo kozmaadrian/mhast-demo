@@ -5,15 +5,15 @@ import NumberInput from './number-input.js';
 import CheckboxInput from './checkbox-input.js';
 import PictureInput from './picture-input.js';
 
-export function registry(handlers) {
+export function registry(context, handlers) {
   return new Map([
-    ['string', new TextInput(handlers)],
-    ['textarea', new TextareaInput(handlers)],
-    ['select', new SelectInput(handlers)],
-    ['number', new NumberInput(handlers)],
-    ['integer', new NumberInput(handlers)],
-    ['boolean', new CheckboxInput(handlers)],
-    ['picture', new PictureInput(handlers)],
+    ['string', new TextInput(context, handlers)],
+    ['textarea', new TextareaInput(context, handlers)],
+    ['select', new SelectInput(context, handlers)],
+    ['number', new NumberInput(context, handlers)],
+    ['integer', new NumberInput(context, handlers)],
+    ['boolean', new CheckboxInput(context, handlers)],
+    ['picture', new PictureInput(context, handlers)],
   ]);
 }
 

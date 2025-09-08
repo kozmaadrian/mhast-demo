@@ -31,8 +31,7 @@ export default class InputFactory {
     this.onArrayAdd = handlers.onArrayAdd || noop;
     this.onArrayRemove = handlers.onArrayRemove || noop;
     this.services = context?.services;
-    const registryContext = { ...handlers, services: this.services };
-    this._registry = createRegistry(registryContext);
+    this._registry = createRegistry(context, handlers);
   }
 
   /** Create an input control appropriate for the property schema. */

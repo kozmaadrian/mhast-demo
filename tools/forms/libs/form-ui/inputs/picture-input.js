@@ -10,11 +10,12 @@ import FormIcons from '../utils/icons.js';
  */
 export default class PictureInput extends BaseInput {
   /**
+   * @param {object} context
    * @param {{ onInputOrChange?:Function, onBlur?:Function, onFocus?:Function }} handlers
    */
-  constructor(handlers = {}) {
-    super(handlers);
-    this.services = handlers.services || null;
+  constructor(context, handlers = {}) {
+    super(context, handlers);
+    this.services = context?.services || handlers?.services || null;
   }
 
   /** Create the picture input UI. */

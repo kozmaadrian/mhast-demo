@@ -7,6 +7,7 @@ import BaseInput from './base-input.js';
  * to appropriate HTML input types (email, url, date, etc.).
  */
 export default class TextInput extends BaseInput {
+  constructor(context, handlers = {}) { super(context, handlers); }
   /** Map JSON Schema `format` to an HTML input type. */
   getInputType(format) {
     const map = { email: 'email', uri: 'url', url: 'url', date: 'date', 'date-time': 'datetime-local', time: 'time', password: 'password', color: 'color' };
