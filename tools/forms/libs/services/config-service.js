@@ -8,6 +8,8 @@
  *
  * Parses editor URL query/hash parameters and normalizes runtime flags.
  */
+import { STORAGE_VERSIONS } from './storage/index.js';
+
 export class ConfigService {
   /** Parse URL and return normalized config flags and paths. */
   parseUrl(urlString) {
@@ -26,7 +28,7 @@ export class ConfigService {
         }
       }
       const schemaFromUrl = params.get('schema') || '';
-      const storageVersion = params.get('storage') || '';
+      const storageVersion = params.get('storage') || STORAGE_VERSIONS.HTML;
       
       const showNavConnectors = params.get('showNavConnectors') ? (params.get('showNavConnectors') !== 'false') : true;
       const allowLocalSchemas = params.get('allowLocalSchemas') === 'true';
@@ -43,7 +45,7 @@ export class ConfigService {
         localSchemas,
       };
     } catch {
-      return { pagePath: '', schemaFromUrl: '', storageVersion: '', showNavConnectors: false, allowLocalSchemas: false, localSchemas: [] };
+      return { pagePath: '', schemaFromUrl: '', storageVersion, showNavConnectors: false, allowLocalSchemas: false, localSchemas: [] };
     }
   }
 }

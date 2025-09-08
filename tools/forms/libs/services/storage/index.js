@@ -7,8 +7,6 @@ export const STORAGE_VERSIONS = {
 };
 
 function getStorageStrategy(storageVersion) {
-  // Temporary: force code storage for now
-  storageVersion = STORAGE_VERSIONS.CODE;
   switch (storageVersion) {
     case STORAGE_VERSIONS.CODE:
       return new CodeBlockStorage();

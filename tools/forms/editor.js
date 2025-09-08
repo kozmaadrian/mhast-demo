@@ -64,6 +64,7 @@ class FormsEditor extends LitElement {
 
     // Parse URL config using ConfigService
     const cfg = this._services.config.parseUrl(window.location.href);
+    console.log('cfg', cfg);
     let pagePath = cfg.pagePath;
     let schemaFromUrl = cfg.schemaFromUrl;
     this._storageVersion = cfg.storageVersion;
