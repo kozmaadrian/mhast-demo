@@ -108,15 +108,13 @@ export class DaService {
       formData.append('data', file, targetName);
       const opts = { method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: formData };
       console.log('uploadImage', fullUrl, opts);
-      // returm;
       const resp = await fetch(fullUrl, opts);
       const ok = resp.ok;
       const status = resp.status;
       const daPath = `${dirPath}/${targetName}`; // /{org}/{repo}/.image/name
       const resourcePath = `/${subdir}/${targetName}`; // /.image/name (relative)
       const previewUrl = `${DA_ORIGIN}/source${daPath}`; // absolute URL for previews and saving
-      // Debug the computed return payload for investigation
-      try { console.log('uploadImage result', { ok, status, daPath, resourcePath, previewUrl }); } catch {}
+
       return { ok, status, daPath, resourcePath, previewUrl, response: resp };
     } catch (error) {
       return { ok: false, status: 0, daPath: '', resourcePath: '', previewUrl: '', error };
