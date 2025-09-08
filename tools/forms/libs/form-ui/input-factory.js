@@ -11,7 +11,7 @@ import { registry as createRegistry } from './inputs/index.js';
 
 export default class InputFactory {
   /**
-   * @param {object} services - Shared services (label formatting, etc.)
+   * @param {object} context - Shared context (services, etc.)
    * @param {{
    *   onInputOrChange?:Function,
    *   onBlur?:Function,
@@ -21,7 +21,7 @@ export default class InputFactory {
    *   onArrayRemove?:Function,
    * }} handlers
    */
-  constructor(services, handlers = {}) {
+  constructor(context, handlers = {}) {
     const noop = () => {};
     this.onInputOrChange = handlers.onInputOrChange || noop;
     this.onBlur = handlers.onBlur || noop;
@@ -30,8 +30,9 @@ export default class InputFactory {
     this.getArrayValue = handlers.getArrayValue || (() => undefined);
     this.onArrayAdd = handlers.onArrayAdd || noop;
     this.onArrayRemove = handlers.onArrayRemove || noop;
-    this.services = services;
-    this._registry = createRegistry(handlers);
+    this.services = context?.services;
+    const registryContext = { ...handlers, services: this.services };
+    this._registry = createRegistry(registryContext);
   }
 
   /** Create an input control appropriate for the property schema. */
@@ -51,8 +52,9 @@ export default class InputFactory {
         case 'time':
           return this._registry.get('string').create(fieldPath, propSchema, 'time');
         case 'image':
-          // Use URL input for now; can be replaced by a dedicated upload widget later
-          return this._registry.get('string').create(fieldPath, propSchema, 'uri');
+        case 'picture':
+          // Picture: dedicated upload widget that stores resource path string
+          return this._registry.get('picture')?.create(fieldPath, propSchema) || this._registry.get('string').create(fieldPath, propSchema, 'uri');
         case 'color':
           return this._registry.get('string').create(fieldPath, propSchema, 'color');
         default:
