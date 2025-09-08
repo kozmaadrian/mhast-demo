@@ -1403,6 +1403,213 @@
   background: #f8fafc;
 }
 
+/* Picture input: dropzone styles */
+.form-ui-picture-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-ui-dropzone {
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  min-height: 140px;
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  color: #6b7280;
+  background: #fafafa;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.form-ui-dropzone:hover {
+  border-color: #93c5fd;
+  color: #374151;
+  background: #f8fafc;
+}
+
+.form-ui-dropzone.drag-over {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.06);
+  color: #111827;
+}
+
+.form-ui-dropzone:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-ui-picture-input>img {
+  display: block;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  max-width: 360px;
+  height: auto;
+}
+
+/* Preview box sized like dropzone to avoid layout shift */
+.form-ui-preview-box {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 140px;
+  padding: 0;
+  display: block;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  position: relative;
+}
+
+/* Make preview row expand the full available width inside the preview box */
+.form-ui-preview-box .form-ui-upload-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Position a top-right remove action when present (non-array picture input) */
+.form-ui-preview-box>.form-ui-array-remove,
+.form-ui-preview-box>.form-ui-remove {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+/* Make preview image large and use full width inside the preview box */
+.form-ui-preview-box .form-ui-upload-left {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.form-ui-preview-box .form-ui-upload-thumb {
+  width: 100%;
+  height: 160px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.form-ui-preview-box .form-ui-upload-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.form-ui-preview-box .form-ui-upload-name {
+  max-width: 100%;
+}
+
+/* Bottom row: filename left, trash right */
+.form-ui-upload-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Right-side actions column width similar to array items */
+.form-ui-preview-box .form-ui-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Upload preview list */
+.form-ui-upload-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-ui-upload-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.form-ui-upload-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.form-ui-upload-thumb {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.form-ui-upload-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.form-ui-upload-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-ui-upload-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.form-ui-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-ui-upload-remove {
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.form-ui-upload-remove:hover {
+  color: #111827;
+  background: #f9fafb;
+}
+
 /* Optionally hide tree connector lines and dots when toggled via class on container */
 .form-navigation-tree.hide-tree-connectors .form-nav-tree li {
   border-left: none;

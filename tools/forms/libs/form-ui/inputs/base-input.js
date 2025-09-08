@@ -6,10 +6,12 @@
  */
 export default class BaseInput {
   /**
-   * @param {{onInputOrChange?:Function,onBlur?:Function,onFocus?:Function}} handlers
+   * @param {object} context
+   * @param {{onInputOrChange?:Function,onBlur?:Function,onFocus?:Function}} [handlers]
    */
-  constructor(handlers = {}) {
+  constructor(context, handlers = {}) {
     const noop = () => {};
+    this.context = context || {};
     this.onInputOrChange = handlers.onInputOrChange || noop;
     this.onBlur = handlers.onBlur || noop;
     this.onFocus = handlers.onFocus || noop;

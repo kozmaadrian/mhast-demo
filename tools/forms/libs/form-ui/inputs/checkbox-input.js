@@ -6,6 +6,7 @@ import BaseInput from './base-input.js';
  * Renderer for boolean properties as a checkbox with a label.
  */
 export default class CheckboxInput extends BaseInput {
+  constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a checkbox input bound to `fieldPath` with schema defaults. */
   create(fieldPath, propSchema) {
     const container = document.createElement('div');

@@ -6,6 +6,7 @@ import BaseInput from './base-input.js';
  * Renderer for numeric and integer properties using an <input type="number">.
  */
 export default class NumberInput extends BaseInput {
+  constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a numeric input honoring min/max/step schema constraints. */
   create(fieldPath, propSchema) {
     const input = document.createElement('input');

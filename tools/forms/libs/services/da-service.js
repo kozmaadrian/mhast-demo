@@ -3,7 +3,7 @@
  */
 
 import DA_SDK from "https://da.live/nx/utils/sdk.js";
-import { AEM_ORIGIN, DA_ORIGIN } from "../../utils.js";
+import { AEM_ORIGIN, DA_ORIGIN, DA_LIVE } from "../../utils.js";
 
 /**
  * DaService
@@ -83,6 +83,57 @@ export class DaService {
     const { token } = await DA_SDK;
     const opts = { headers: { Authorization: `Bearer ${token}` }, method: 'POST', body: JSON.stringify({ label: 'Published' }) };
     try { await fetch(fullPath, opts); } catch {}
+  }
+
+  /**
+   * Upload an image (or any binary) to DA source under `/.image/` by default.
+   * Returns paths and status information.
+   *
+   * @param {File|Blob} file - The file/blob to upload
+   * @param {{ subdir?: string, filename?: string }} [options]
+   * @returns {Promise<{ ok:boolean, status:number, daPath:string, resourcePath:string, previewUrl:string, response?:Response, error?:any }>}
+   */
+  async uploadImage(file, { subdir = '.image', filename } = {}) {
+    try {
+      const { context, token } = await DA_SDK;
+      const { org, repo } = context || {};
+      if (!org || !repo) throw new Error('Missing org/repo context');
+      const originalName = /** @type {any} */(file)?.name || `upload-${Date.now()}`;
+      const targetName = filename || originalName;
+      const dirPath = `/${org}/${repo}/${subdir}`;
+      const encodedName = encodeURIComponent(targetName);
+      const fullUrl = `${DA_ORIGIN}/source${dirPath}/${encodedName}`;
+      const formData = new FormData();
+      // When `file` is a Blob (no name), pass the desired filename explicitly
+      formData.append('data', file, targetName);
+      const opts = { method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: formData };
+      console.log('uploadImage', fullUrl, opts);
+      const resp = await fetch(fullUrl, opts);
+      const ok = resp.ok;
+      const status = resp.status;
+      const daPath = `${dirPath}/${targetName}`; // /{org}/{repo}/.image/name
+      const resourcePath = `/${subdir}/${targetName}`; // /.image/name (relative)
+      const previewUrl = `${DA_ORIGIN}/source${daPath}`; // absolute URL for previews and saving
+
+      return { ok, status, daPath, resourcePath, previewUrl, response: resp };
+    } catch (error) {
+      return { ok: false, status: 0, daPath: '', resourcePath: '', previewUrl: '', error };
+    }
+  }
+
+  /**
+   * Build a preview URL for a stored resource path (e.g., '/.image/name.jpg').
+   * If an absolute URL is provided, returns it as-is.
+   * @param {string} resourcePath
+   * @returns {Promise<string>}
+   */
+  async buildPreviewUrl(resourcePath) {
+    if (!resourcePath) return '';
+    if (/^https?:\/\//i.test(resourcePath)) return resourcePath;
+    const { context } = await DA_SDK;
+    const { org, repo } = context || {};
+    const clean = resourcePath.startsWith('/') ? resourcePath : `/${resourcePath}`;
+    return `${DA_ORIGIN}/source/${org}/${repo}${clean}`;
   }
 }
 

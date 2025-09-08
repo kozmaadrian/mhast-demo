@@ -6,6 +6,7 @@ import BaseInput from './base-input.js';
  * Renderer for string enums using a <select> control with an empty option.
  */
 export default class SelectInput extends BaseInput {
+  constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a select control for `enumValues`, applying default selection. */
   create(fieldPath, enumValues, propSchema) {
     const select = document.createElement('select');

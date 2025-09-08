@@ -6,6 +6,7 @@ import BaseInput from './base-input.js';
  * Renderer for long string content using a <textarea> element.
  */
 export default class TextareaInput extends BaseInput {
+  constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a textarea with optional placeholder/default. */
   create(fieldPath, propSchema) {
     const textarea = document.createElement('textarea');
