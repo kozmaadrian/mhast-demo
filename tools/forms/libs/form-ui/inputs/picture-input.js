@@ -29,22 +29,17 @@ export default class PictureInput extends BaseInput {
     hidden.name = fieldPath;
     container.appendChild(hidden);
 
-    // Hidden native file input used for browse interaction (not bound by name)
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.style.display = 'none';
-    container.appendChild(fileInput);
+    // No native file input. We always use the DA asset picker.
 
     // Dropzone UI
     const dropzone = document.createElement('div');
     dropzone.className = 'form-ui-dropzone';
     dropzone.tabIndex = 0;
     dropzone.setAttribute('role', 'button');
-    dropzone.setAttribute('aria-label', 'Upload image: drop file or press Enter to browse');
+    dropzone.setAttribute('aria-label', 'Choose image from assets');
     const dzText = document.createElement('div');
     dzText.className = 'form-ui-description';
-    dzText.textContent = 'Drop your image here or click to browse';
+    dzText.textContent = 'Choose an image from Assets';
     dropzone.appendChild(dzText);
 
     // Preview list (single-item) rendered under the dropzone
@@ -175,66 +170,53 @@ export default class PictureInput extends BaseInput {
       } catch {}
     };
 
-    const handleFile = async (file) => {
-      if (!file) return;
-      // Show local preview immediately
-      try {
-        const objectUrl = URL.createObjectURL(file);
-        renderPreview({ src: objectUrl, name: file.name || 'Image' });
-      } catch {}
-
-      // Background upload via DA backend service
-      try {
-        statusEl.textContent = 'Uploading image...';
+    const openAssetPicker = async () => {
+      const assets = this.services?.assets;
+      if (!assets || typeof assets.openPicker !== 'function') {
+        statusEl.textContent = 'Asset picker not available';
         statusEl.style.display = '';
-        const backend = this.services?.backend;
-        if (!backend || typeof backend.uploadImage !== 'function') {
-          throw new Error('Upload service not available');
-        }
-        const { ok, resourcePath, previewUrl, status } = await backend.uploadImage(file, { subdir: '.image' });
-        if (ok && (resourcePath || previewUrl)) {
-          // Prefer saving an absolute URL to satisfy "format: uri" validation
-          const valueToSave = previewUrl || resourcePath || '';
-          setValueAndNotify(valueToSave);
-          if (previewUrl) renderPreview({ src: previewUrl, name: file.name || (resourcePath ? resourcePath.split('/').pop() : '') });
-          statusEl.textContent = 'Upload complete';
-          setTimeout(() => { statusEl.style.display = 'none'; }, 1200);
-        } else {
-          statusEl.textContent = `Upload failed (${status || 'network'})`;
-        }
-      } catch (e) {
-        statusEl.textContent = 'Upload error';
+        return;
       }
+      statusEl.textContent = 'Opening asset picker...';
+      statusEl.style.display = '';
+      let resolved = false;
+      const onSelected = (e) => {
+        if (resolved) return; resolved = true;
+        window.removeEventListener('da-asset-selected', onSelected);
+        window.removeEventListener('da-asset-cancelled', onCancelled);
+        const selection = e.detail;
+        if (!selection) {
+          statusEl.textContent = 'No asset selected';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 800);
+          return;
+        }
+        const valueUrl = typeof selection === 'string' ? selection : selection.src;
+        const name = (valueUrl?.split('?')[0].split('/')?.pop?.() || 'Image');
+        renderPreview({ src: valueUrl, name });
+        setValueAndNotify(valueUrl);
+        try { console.log('[picture-input] selected asset details:', selection); } catch {}
+        statusEl.style.display = 'none';
+      };
+      const onCancelled = () => {
+        if (resolved) return; resolved = true;
+        window.removeEventListener('da-asset-selected', onSelected);
+        window.removeEventListener('da-asset-cancelled', onCancelled);
+        statusEl.textContent = 'No asset selected';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 800);
+      };
+      window.addEventListener('da-asset-selected', onSelected, { once: true });
+      window.addEventListener('da-asset-cancelled', onCancelled, { once: true });
+      try { await assets.openPicker(); } catch (e) { /* error already logged in service */ }
     };
 
-    // File input change -> upload
-    fileInput.addEventListener('change', async () => {
-      const [file] = fileInput.files || [];
-      handleFile(file);
-      // reset so selecting same file re-triggers
-      try { fileInput.value = ''; } catch {}
-    });
-
-    // Dropzone interactions
-    dropzone.addEventListener('click', () => fileInput.click());
+    // Interactions: open DA asset picker on click/Enter/Space
+    dropzone.addEventListener('click', () => openAssetPicker());
     dropzone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        fileInput.click();
+        openAssetPicker();
       }
     });
-    const onDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.add('drag-over'); };
-    const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
-    const onDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('drag-over'); };
-    const onDrop = (e) => {
-      e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('drag-over');
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) handleFile(files[0]);
-    };
-    dropzone.addEventListener('dragenter', onDragEnter);
-    dropzone.addEventListener('dragover', onDragOver);
-    dropzone.addEventListener('dragleave', onDragLeave);
-    dropzone.addEventListener('drop', onDrop);
 
     // Focus/blur wiring for highlight behavior on the dropzone
     dropzone.addEventListener('focus', (e) => this.onFocus(fieldPath, propSchema, e.target));

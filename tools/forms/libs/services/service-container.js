@@ -18,6 +18,7 @@ import { DaService } from './da-service.js';
 import { LabelService } from './label-service.js';
 import { ValidationService } from './validation-service.js';
 import { ConfigService } from './config-service.js';
+import { AssetsService } from './assets-service/AssetsService.js';
 /**
  * ServiceContainer
  *
@@ -88,6 +89,13 @@ export class ServiceContainer {
       this._services.config = new ConfigService();
     }
     return this._services.config;
+  }
+
+  get assets() {
+    if (!this._services.assets) {
+      this._services.assets = new AssetsService(this._context);
+    }
+    return this._services.assets;
   }
 
 }
