@@ -1,3 +1,4 @@
+import FormIcons from '../utils/icons.js';
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId } from '../form-generator/path-utils.js';
 
@@ -31,7 +32,12 @@ export function renderGroupContainer({
     label.className = CLASS.separatorLabel;
     const titleSpan = document.createElement('span');
     titleSpan.className = CLASS.groupTitle;
-    titleSpan.textContent = title || (breadcrumbPath[breadcrumbPath.length - 1] || '');
+    const iconEl = FormIcons.renderIcon('section');
+    const textEl = document.createElement('span');
+    textEl.textContent = title || (breadcrumbPath[breadcrumbPath.length - 1] || '');
+    titleSpan.appendChild(iconEl);
+    titleSpan.appendChild(document.createTextNode(' '));
+    titleSpan.appendChild(textEl);
     label.appendChild(titleSpan);
     sep.appendChild(label);
     groupHeader.appendChild(sep);

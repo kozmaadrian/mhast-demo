@@ -8,6 +8,7 @@
 import FormIcons from './utils/icons.js';
 import { UI_CLASS as CLASS, DATA } from './constants.js';
 import { registry as createRegistry } from './inputs/index.js';
+import { createAddButton } from './utils/dom-utils.js';
 
 export default class InputFactory {
   /**
@@ -50,10 +51,11 @@ export default class InputFactory {
           return this._registry.get('string').create(fieldPath, propSchema, 'date-time');
         case 'time':
           return this._registry.get('string').create(fieldPath, propSchema, 'time');
+        case 'file':
+          return this._registry.get('asset').create(fieldPath, propSchema);
         case 'image':
         case 'picture':
-          // Picture: dedicated upload widget that stores resource path string
-          return this._registry.get('picture')?.create(fieldPath, propSchema) || this._registry.get('string').create(fieldPath, propSchema, 'uri');
+          return this._registry.get('asset')?.create(fieldPath, propSchema);
         case 'color':
           return this._registry.get('string').create(fieldPath, propSchema, 'color');
         default:
@@ -92,16 +94,9 @@ export default class InputFactory {
     itemsContainer.className = CLASS.arrayItems;
     container.appendChild(itemsContainer);
 
-    const addButton = document.createElement('button');
-    addButton.type = 'button';
-    addButton.className = CLASS.arrayAdd;
+    const addButton = createAddButton('Add', fieldPath);
     const lastToken = fieldPath.split('.').pop();
     const baseTitle = propSchema?.title || this.services.label.formatLabel(lastToken);
-    addButton.textContent = '';
-    addButton.appendChild(FormIcons.renderIcon('plus'));
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = `Add`;
-    addButton.appendChild(labelSpan);
     // Determine if items are primitives (vs objects)
     const itemsSchema = propSchema.items || {};
     const isPrimitiveItems = !(itemsSchema && (itemsSchema.type === 'object' || (Array.isArray(itemsSchema.type) && itemsSchema.type.includes('object'))));
@@ -156,8 +151,18 @@ export default class InputFactory {
             removeButton.dataset.confirmTimeoutId = String(timeout);
           }
         });
-        itemContainer.appendChild(itemInput);
-        itemContainer.appendChild(removeButton);
+        // Per-item field actions layout
+        const row = document.createElement('div');
+        row.className = 'form-ui-field-row';
+        const main = document.createElement('div');
+        main.className = 'form-ui-field-main';
+        const actions = document.createElement('div');
+        actions.className = 'form-ui-field-actions';
+        main.appendChild(itemInput);
+        actions.appendChild(removeButton);
+        row.appendChild(main);
+        row.appendChild(actions);
+        itemContainer.appendChild(row);
         itemsContainer.appendChild(itemContainer);
 
         // Disable add until value is provided
@@ -247,8 +252,17 @@ export default class InputFactory {
             removeButton.dataset.confirmTimeoutId = String(timeout);
           }
         });
-        itemContainer.appendChild(itemInput);
-        itemContainer.appendChild(removeButton);
+        const row = document.createElement('div');
+        row.className = 'form-ui-field-row';
+        const main = document.createElement('div');
+        main.className = 'form-ui-field-main';
+        const actions = document.createElement('div');
+        actions.className = 'form-ui-field-actions';
+        main.appendChild(itemInput);
+        actions.appendChild(removeButton);
+        row.appendChild(main);
+        row.appendChild(actions);
+        itemContainer.appendChild(row);
         itemsContainer.appendChild(itemContainer);
         toggleRemoveVisibility();
       });
@@ -302,8 +316,17 @@ export default class InputFactory {
           removeButton.dataset.confirmTimeoutId = String(timeout);
         }
       });
-      itemContainer.appendChild(itemInput);
-      itemContainer.appendChild(removeButton);
+      const row = document.createElement('div');
+      row.className = 'form-ui-field-row';
+      const main = document.createElement('div');
+      main.className = 'form-ui-field-main';
+      const actions = document.createElement('div');
+      actions.className = 'form-ui-field-actions';
+      main.appendChild(itemInput);
+      actions.appendChild(removeButton);
+      row.appendChild(main);
+      row.appendChild(actions);
+      itemContainer.appendChild(row);
       itemsContainer.appendChild(itemContainer);
       const ctrl = itemContainer.querySelector('input, select, textarea');
       if (ctrl && ctrl.addEventListener) {

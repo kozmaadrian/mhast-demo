@@ -105,7 +105,7 @@ function extractFirstSheet(json) {
 }
 
 async function fetchValue(path, key) {
-  if (CONFS[path]?.[key]) return CONFS[path][key];
+  if (CONFS[path] && CONFS[path][key]) return CONFS[path][key];
   const data = await fetchConf(path);
   if (!data) return null;
   const confKey = data.find((conf) => conf.key === key);
@@ -128,42 +128,43 @@ async function getConfKey(owner, repo, key) {
 // ==== End: Config helpers ====
 
 export class AssetsService {
-  /** Check if IMS authentication is ready for the asset picker */
   async getAuthStatus() {
     try {
-      const { token } = await DA_SDK;
-      const authenticated = !!token;
-      return { authenticated };
+      let token = null;
+      if (this._context && this._context.services && this._context.services.auth && this._context.services.auth.getToken) {
+        token = await this._context.services.auth.getToken();
+      } else {
+        const sdk = await DA_SDK;
+        token = sdk && sdk.token;
+      }
+      return { authenticated: !!token };
     } catch (e) {
       return { authenticated: false, error: e };
     }
   }
 
-  /** Prompt IMS sign-in (non-blocking). */
-  async promptSignIn() {
-    try {
-      const mod = await import(`${getNx()}/utils/ims.js`);
-      const { loadIms, handleSignIn } = mod;
-      try { await loadIms(); } catch {}
-      handleSignIn();
-    } catch (e) {
-      // ignore
-    }
-  }
+ 
 
   /** Open asset picker and resolve with a selected asset URL (image rendition). */
   async openPicker() {
     try {
-      // Align with da-assets.js: use IMS for token and repoId from config
-      const { token, context } = await DA_SDK;
-      if (!token) {
+      // Align with da-assets.js: use token and repoId from config
+      const sdk = await DA_SDK;
+      let imsToken = null;
+      if (this._context && this._context.services && this._context.services.auth && this._context.services.auth.getToken) {
+        imsToken = await this._context.services.auth.getToken();
+      } else {
+        imsToken = sdk && sdk.token;
+      }
+      if (!imsToken) {
         try { window.dispatchEvent(new CustomEvent('da-asset-auth-required')); } catch {}
         return null;
       }
-      const imsToken = token;
 
-      const { org, repo } = context || {};
-      if (!org || !repo || !imsToken) return null;
+      const ctx = sdk && sdk.context;
+      const org = ctx && ctx.org;
+      const repo = ctx && ctx.repo;
+      if (!org || !repo) return null;
 
       // Prefer configured repositoryId; fallback to author tier
       const repoId = (await getConfKey(org, repo, 'aem.repositoryId')) || `${org}/${repo}/author`;
@@ -223,16 +224,15 @@ export class AssetsService {
       };
 
       const handleSelection = async (assets) => {
-        const [asset] = assets || [];
+        const asset = assets && assets[0];
         if (!asset) return;
-        const mimetype = (asset.mimetype || asset['dc:format'] || '').toLowerCase();
+        const mimetype = ((asset && (asset.mimetype || asset['dc:format'])) || '').toLowerCase();
         const isImage = mimetype.startsWith('image/');
         // eslint-disable-next-line no-underscore-dangle
-        const status = asset?._embedded?.['http://ns.adobe.com/adobecloud/rel/metadata/asset']?.['dam:assetStatus'];
-        // eslint-disable-next-line no-underscore-dangle
-        const activationTarget = asset?._embedded?.['http://ns.adobe.com/adobecloud/rel/metadata/asset']?.['dam:activationTarget'];
-        const alt = asset?._embedded?.['http://ns.adobe.com/adobecloud/rel/metadata/asset']?.['dc:description']
-          || asset?._embedded?.['http://ns.adobe.com/adobecloud/rel/metadata/asset']?.['dc:title'];
+        const meta = asset && asset._embedded && asset._embedded['http://ns.adobe.com/adobecloud/rel/metadata/asset'];
+        const status = meta && meta['dam:assetStatus'];
+        const activationTarget = meta && meta['dam:activationTarget'];
+        const alt = (meta && (meta['dc:description'] || meta['dc:title'])) || undefined;
         const injectLink = (await getConfKey(org, repo, 'aem.assets.image.type')) === 'link';
 
         if (dmDeliveryEnabled && activationTarget !== 'delivery' && status !== 'approved') {
@@ -241,8 +241,10 @@ export class AssetsService {
             assetSelectorWrapper.style.display = 'none';
             cropSelectorWrapper.style.display = 'block';
             cropSelectorWrapper.innerHTML = '<p class="da-dialog-asset-error">The selected asset is not available because it is not approved for delivery. Please check the status.</p><div class="da-dialog-asset-buttons"><button class="back">Back</button><button class="cancel">Cancel</button></div>';
-            cropSelectorWrapper.querySelector('.cancel')?.addEventListener('click', () => { resetCropSelector(); emitResult(null); });
-            cropSelectorWrapper.querySelector('.back')?.addEventListener('click', () => { resetCropSelector(); });
+            const cancelBtn = cropSelectorWrapper.querySelector('.cancel');
+            const backBtn = cropSelectorWrapper.querySelector('.back');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => { resetCropSelector(); emitResult(null); });
+            if (backBtn) backBtn.addEventListener('click', () => { resetCropSelector(); });
           } else {
             emitResult(null);
           }
@@ -258,7 +260,7 @@ export class AssetsService {
           // Fetch smart crops
           const listSmartCropsResponse = await fetch(`${getBaseDmUrl(asset)}/smartCrops`);
           const listSmartCrops = await listSmartCropsResponse.json();
-          if (!(listSmartCrops.items?.length > 0)) {
+          if (!(listSmartCrops.items && listSmartCrops.items.length > 0)) {
             resetCropSelector();
             // Fall back to single FPO
             const payload = buildResultObject({ asset, src: getAssetUrl(asset) }, {
@@ -287,14 +289,18 @@ export class AssetsService {
           cropSelectorList.classList.add('da-dialog-asset-crops');
           cropSelectorWrapper.append(cropSelectorList);
 
-          cropSelectorWrapper.querySelector('.cancel')?.addEventListener('click', () => { resetCropSelector(); emitResult(null); });
-          cropSelectorWrapper.querySelector('.back')?.addEventListener('click', () => resetCropSelector());
-          cropSelectorWrapper.querySelector('.insert')?.addEventListener('click', () => {
+          const cancelBtn = cropSelectorWrapper.querySelector('.cancel');
+          const backBtn = cropSelectorWrapper.querySelector('.back');
+          const insertBtn = cropSelectorWrapper.querySelector('.insert');
+          if (cancelBtn) cancelBtn.addEventListener('click', () => { resetCropSelector(); emitResult(null); });
+          if (backBtn) backBtn.addEventListener('click', () => resetCropSelector());
+          if (insertBtn) insertBtn.addEventListener('click', () => {
             const insertTypeSelection = cropSelectorWrapper.querySelector('.da-dialog-asset-structure-select input:checked');
             const structureConfig = !insertTypeSelection || insertTypeSelection.value === 'single' ? null : JSON.parse(decodeURIComponent(insertTypeSelection.value));
             const selectedCropLis = cropSelectorList.querySelectorAll('li.selected');
-            const selectedCrops = Array.from(selectedCropLis).map((li) => ({ name: li.dataset.name, src: li.querySelector('img')?.src }));
-            const primary = selectedCrops[0]?.src || getAssetUrl(asset);
+            const selectedCrops = Array.prototype.slice.call(selectedCropLis).map((li) => ({ name: li.dataset.name, src: (li.querySelector('img') && li.querySelector('img').src) || '' }));
+            const firstSelected = selectedCrops[0];
+            const primary = (firstSelected && firstSelected.src) || getAssetUrl(asset);
             const payload = buildResultObject({ asset, src: primary }, {
               org, repo, repoId, aemTierType, dmDeliveryEnabled, prodOrigin, injectLink, alt,
             });
@@ -304,15 +310,17 @@ export class AssetsService {
             resetCropSelector();
           });
 
-          cropSelectorWrapper.querySelector('.da-dialog-asset-structure-select')?.addEventListener('change', (e) => {
+          const structureSelect = cropSelectorWrapper.querySelector('.da-dialog-asset-structure-select');
+          if (structureSelect) structureSelect.addEventListener('change', (e) => {
             if (e.target.value === 'single') {
-              cropSelectorList.querySelectorAll('li').forEach((crop) => crop.classList.remove('selected'));
-              cropSelectorList.querySelector('li[data-name="original"]')?.classList.add('selected');
+              cropSelectorList.querySelectorAll('li').forEach((li) => li.classList.remove('selected'));
+              const original = cropSelectorList.querySelector('li[data-name="original"]');
+              if (original) original.classList.add('selected');
             } else {
               const structure = JSON.parse(decodeURIComponent(e.target.value));
-              cropSelectorList.querySelectorAll('li').forEach((crop) => {
-                if (structure.crops.includes(crop.dataset.name)) crop.classList.add('selected');
-                else crop.classList.remove('selected');
+              cropSelectorList.querySelectorAll('li').forEach((li) => {
+                if (structure.crops.indexOf(li.dataset.name) !== -1) li.classList.add('selected');
+                else li.classList.remove('selected');
               });
             }
           });
@@ -324,7 +332,8 @@ export class AssetsService {
             if (structure && structure.value !== 'single') return;
             const li = cropSelectorList.querySelector('li:hover');
             if (!li) return;
-            cropSelectorList.querySelector('.selected')?.classList.remove('selected');
+            const currentSel = cropSelectorList.querySelector('.selected');
+            if (currentSel) currentSel.classList.remove('selected');
             li.classList.add('selected');
           });
           return;
@@ -332,18 +341,19 @@ export class AssetsService {
 
         // Default selection behavior (non-image or no smart crop selection)
         // eslint-disable-next-line no-underscore-dangle
-        const renditionLinks = asset?._links?.['http://ns.adobe.com/adobecloud/rel/rendition'] || [];
-        const videoLink = renditionLinks?.find((link) => link.href.endsWith('/play'))?.href;
+        const renditionLinks = (asset && asset._links && asset._links['http://ns.adobe.com/adobecloud/rel/rendition']) || [];
+        const videoLinkObj = renditionLinks.find((link) => link && link.href && link.href.endsWith('/play'));
+        const videoLink = videoLinkObj && videoLinkObj.href;
         let src;
         if (aemTierType === 'author') src = getAssetUrl(asset);
         else if (mimetype.startsWith('video/')) src = videoLink;
-        else src = renditionLinks?.[0]?.href?.split('?')[0];
+        else src = (renditionLinks[0] && renditionLinks[0].href && renditionLinks[0].href.split('?')[0]) || null;
         const payload = buildResultObject({ asset, src }, { org, repo, repoId, aemTierType, dmDeliveryEnabled, prodOrigin, injectLink, alt });
         emitResult(payload);
       };
 
       // Match original behavior: render once and reuse; if wrapper cleared, re-render
-      if (!initialized || assetSelectorWrapper.childElementCount === 0) {
+      if (!initialized || (assetSelectorWrapper && assetSelectorWrapper.childElementCount === 0)) {
         window.PureJSSelectors.renderAssetSelector(assetSelectorWrapper, {
           imsToken: imsToken,
           repositoryId: repoId,
@@ -363,11 +373,17 @@ export class AssetsService {
       return null;
     }
   }
-
 }
 
 function buildResultObject({ asset, src }, meta) {
-  const { org, repo, repoId, aemTierType, dmDeliveryEnabled, prodOrigin, injectLink, alt } = meta || {};
+  const org = meta && meta.org;
+  const repo = meta && meta.repo;
+  const repoId = meta && meta.repoId;
+  const aemTierType = meta && meta.aemTierType;
+  const dmDeliveryEnabled = meta && meta.dmDeliveryEnabled;
+  const prodOrigin = meta && meta.prodOrigin;
+  const injectLink = meta && meta.injectLink;
+  const alt = (meta && meta.alt) || null;
   return {
     src: src || null,
     org,
@@ -377,7 +393,7 @@ function buildResultObject({ asset, src }, meta) {
     dmDeliveryEnabled,
     prodOrigin,
     injectLink,
-    alt: alt || null,
+    alt,
     asset: {
       id: asset && asset['repo:id'],
       name: asset && asset.name,

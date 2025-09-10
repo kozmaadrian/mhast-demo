@@ -10,6 +10,7 @@ import { createSection } from './section-builder.js';
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId } from './path-utils.js';
 import { renderGroupContainer, renderPrimitivesIntoGroup } from '../renderers/group-renderer.js';
+import FormIcons from '../utils/icons.js';
 
 export default class GroupBuilder {
   /**
@@ -71,7 +72,10 @@ export default class GroupBuilder {
       label.className = CLASS.separatorLabel;
       const titleSpan = document.createElement('span');
       titleSpan.className = CLASS.groupTitle;
-      titleSpan.textContent = groupTitle;
+      // prepend icon
+      titleSpan.appendChild(FormIcons.renderIcon('section'));
+      titleSpan.appendChild(document.createTextNode(' '));
+      titleSpan.appendChild(document.createTextNode(groupTitle));
       label.appendChild(titleSpan);
       sep.appendChild(label);
       groupHeader.appendChild(sep);
@@ -133,7 +137,10 @@ export default class GroupBuilder {
           label.className = CLASS.separatorLabel;
           const titleSpan = document.createElement('span');
           titleSpan.className = CLASS.groupTitle;
-          titleSpan.textContent = groupTitle;
+          // prepend icon
+          titleSpan.appendChild(FormIcons.renderIcon('section'));
+          titleSpan.appendChild(document.createTextNode(' '));
+          titleSpan.appendChild(document.createTextNode(groupTitle));
           label.appendChild(titleSpan);
           sep.appendChild(label);
           groupContent.appendChild(sep);
@@ -243,7 +250,7 @@ export default class GroupBuilder {
 
         if (this.renderAllGroups && !isOptional && arrayUI) {
           const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
-          const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
+          const addBtn = arrayUI.querySelector?.('.form-content-add');
           if (itemsContainer && itemsContainer.children.length === 0 && addBtn) {
             try { addBtn.click(); } catch { /* noop */ }
           }

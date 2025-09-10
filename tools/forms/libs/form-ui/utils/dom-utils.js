@@ -1,6 +1,7 @@
 /**
  * DOM utilities for form-ui
  */
+import FormIcons from './icons.js';
 
 /**
  * Return the control element for a given input or container.
@@ -31,4 +32,23 @@ export function getDeepActiveElement() {
     // Ignore cross-origin or unexpected errors; fall back to current active
   }
   return active;
+}
+
+/**
+ * Create a standardized "Add" button used for placeholders and array adds.
+ * @param {string} labelText - Visible label text (e.g., "Add Item")
+ * @param {string} [path] - Optional data-path to set on the button
+ * @returns {HTMLButtonElement}
+ */
+export function createAddButton(labelText, path) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'form-content-add';
+  if (path) btn.dataset.path = path;
+  btn.textContent = '';
+  btn.appendChild(FormIcons.renderIcon('plus'));
+  const span = document.createElement('span');
+  span.textContent = labelText || 'Add';
+  btn.appendChild(span);
+  return btn;
 }

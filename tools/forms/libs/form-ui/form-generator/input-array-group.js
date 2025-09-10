@@ -1,4 +1,6 @@
 import FormIcons from '../utils/icons.js';
+import { UI_CLASS as CLASS } from '../constants.js';
+import { createAddButton } from '../utils/dom-utils.js';
 
 export default function createArrayGroupUI(generator, fieldPath, propSchema) {
   const itemsSchema = generator.derefNode(propSchema.items) || propSchema.items;
@@ -12,10 +14,7 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
   container.appendChild(itemsContainer);
 
   const baseTitle = generator.getSchemaTitle(propSchema, fieldPath.split('.').pop());
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'form-ui-array-add form-ui-placeholder-add';
-  addButton.innerHTML = `<span>+ Add '${baseTitle}' Item</span>`;
+  const addButton = createAddButton(`Add '${baseTitle}' Item`, fieldPath);
 
   const addItemAt = (index) => {
     const itemContainer = document.createElement('div');
@@ -30,7 +29,18 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
     itemTitleSep.className = 'form-ui-separator-text';
     const itemTitleLabel = document.createElement('div');
     itemTitleLabel.className = 'form-ui-separator-label';
-    itemTitleLabel.textContent = `${baseTitle} #${index + 1}`;
+    // Build: [icon] [title]
+    const titleSpan = document.createElement('span');
+    titleSpan.className = CLASS.groupTitle;
+    const iconTpl = document.createElement('template');
+    iconTpl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="#000000" viewBox="0 0 24 24" aria-hidden="true" role="img"><path fill-rule="evenodd" d="M3.81818182,11 L20.1818182,11 C21.1859723,11 22,11.8954305 22,13 L22,15 C22,16.1045695 21.1859723,17 20.1818182,17 L3.81818182,17 C2.81402773,17 2,16.1045695 2,15 L2,13 C2,11.8954305 2.81402773,11 3.81818182,11 Z M4,13 L4,15 L20,15 L20,13 L4,13 Z M3.81818182,3 L20.1818182,3 C21.1859723,3 22,3.8954305 22,5 L22,7 C22,8.1045695 21.1859723,9 20.1818182,9 L3.81818182,9 C2.81402773,9 2,8.1045695 2,7 L2,5 C2,3.8954305 2.81402773,3 3.81818182,3 Z M4,5 L4,7 L20,7 L20,5 L4,5 Z M2,19 L14,19 L14,21 L2,21 L2,19 Z"></path></svg>';
+    const iconEl = iconTpl.content.firstChild;
+    const textEl = document.createElement('span');
+    textEl.textContent = `${baseTitle} #${index + 1}`;
+    titleSpan.appendChild(iconEl);
+    titleSpan.appendChild(document.createTextNode(' '));
+    titleSpan.appendChild(textEl);
+    itemTitleLabel.appendChild(titleSpan);
     itemTitleSep.appendChild(itemTitleLabel);
     headerWrap.appendChild(itemTitleSep);
     const groupContent = document.createElement('div');

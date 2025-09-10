@@ -68,14 +68,15 @@
   margin-top: 16px;
 }
 
-/* Header wrapper holding title and actions in one row */
-.form-ui-array-item-header {
-  position: relative;
-}
 
-.form-ui-array-item-header>.form-ui-separator-text {
+
+.form-ui-array-item-header .form-ui-separator-text {
   display: block;
   margin-top: 0px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Array controls */
@@ -85,20 +86,18 @@
   flex-direction: column;
 }
 
-.form-ui-array-add,
 .form-ui-nav-item-add-title {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 12px;
+  margin: 7px 0px;
   padding: 6px 10px;
-  background: transparent;
-  color: #374151;
-  border: 1px dashed #d1d5db;
+  background: #ECF0FD;
+  color: #8c94a3;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
   cursor: pointer;
   align-self: flex-start;
-  /* bottom-right for primitive arrays */
 }
 
 .form-ui-nav-item-add-content .form-ui-nav-item-add-title {
@@ -106,23 +105,16 @@
   margin: 0px 0px 0px 10px;
 }
 
-/* For primitive arrays, align add button with the select/input right edge (account for delete icon) */
-.form-ui-array-container[data-primitive="true"] .form-ui-array-add {
-  margin-right: 40px;
-}
 
-.form-ui-array-add:hover {
-  background: #f3f4f6;
-}
 
 /* Disabled state visuals for add button */
-.form-ui-array-add[disabled] {
+.form-content-add[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-.form-ui-array-add.form-ui-placeholder-add[disabled] {
+.form-content-add.form-ui-placeholder-add[disabled] {
   border-color: #e5e7eb;
   color: #9ca3af;
 }
@@ -131,17 +123,18 @@
   position: relative;
   border: none;
   border-radius: 6px;
+  /* reserve space for actions */
 }
 
 .form-ui-array-item .form-ui-array-item-actions {
   position: absolute;
   top: 0;
-  right: -6px;
+  right: -35px;
   height: 32px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  z-index: 2;
+  justify-content: flex-end;
 }
 
 .form-ui-array-remove,
@@ -281,6 +274,7 @@
   gap: 4px;
 }
 
+/* Action: Remove (base) */
 .form-ui-remove {
   background: transparent;
   border: 1px solid #dfe1e6;
@@ -300,12 +294,13 @@
 
 .form-ui-remove:hover {
   background: #de350b;
-  color: white;
+  color: #fff;
 }
 
+/* Remove: confirm state */
 .form-ui-remove.confirm-state {
   background: #ff5630;
-  color: white;
+  color: #fff;
   border-color: #ff5630;
   font-weight: 600;
   position: relative;
@@ -322,7 +317,7 @@
   }
 
   50% {
-    transform: scale(1.05);
+    transform: scale(1.04);
   }
 
   100% {
@@ -546,7 +541,7 @@
 
 .form-ui-body {
   flex: 1;
-  padding: 16px;
+  padding: 16px 0px 16px 16px;
   overflow: visible;
   position: relative;
   /* Ensure absolute children (highlight overlay) are positioned relative to the body */
@@ -554,6 +549,34 @@
 
 .form-ui-field {
   margin-bottom: 24px;
+}
+
+.form-ui-field-row {
+  position: relative;
+  /* allow absolutely positioned actions */
+  display: block;
+  /* single column content; actions overlayed */
+  align-items: start;
+  gap: 8px;
+}
+
+
+
+.form-ui-field-actions {
+  position: absolute;
+  /* take out of flow */
+  top: 0;
+  right: -35px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+/* Vertical stacking for inputs that set it inline (asset-input) */
+.form-ui-field-actions .form-ui-replace-action svg {
+  display: block;
 }
 
 .form-ui-field:last-child {
@@ -580,6 +603,19 @@
   margin-top: 6px;
   margin-bottom: 0;
   line-height: 1.5;
+}
+
+/* Icon + text layout for picker label */
+.form-ui-picker .form-ui-description {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-ui-picker .form-ui-description svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .form-ui-input,
@@ -743,7 +779,7 @@
 .form-ui-array-item {
   display: flex;
   gap: 8px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   align-items: flex-start;
 }
 
@@ -775,10 +811,7 @@
   min-width: 36px;
 }
 
-.form-ui-array-add:hover {
-  background: transparent;
-  box-shadow: none;
-}
+
 
 .form-ui-array-remove:hover {
   background: #dc2626;
@@ -845,6 +878,7 @@
   top: 0;
   z-index: 1100;
   background: var(--form-ui-separator-bg, #fff);
+  max-width: 600px;
 }
 
 /* Clickable breadcrumb items */
@@ -911,12 +945,14 @@
 /* Nested Groups Styling */
 .form-ui-group {
   margin-bottom: 32px;
+  margin-top: 20px;
   background: transparent;
   border: none;
   border-radius: 0;
   position: relative;
   transition: all 0.3s ease;
   scroll-margin-top: var(--form-scroll-offset, 80px);
+  max-width: 600px;
 }
 
 .form-ui-group:last-child {
@@ -955,16 +991,28 @@
 .form-ui-group-header {
   padding: 0;
   background: transparent;
-  margin: 0 0 16px 0;
+  align-items: start;
 }
 
 .form-ui-group-title {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
   color: #111827;
   line-height: 1.25;
   letter-spacing: -0.025em;
+}
+
+/* Icon + text alignment for all titles we enhanced */
+.form-ui-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-ui-group-title svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 
@@ -1006,7 +1054,7 @@
   }
 
   .form-ui-group {
-    margin-bottom: 24px;
+    margin-bottom: 20px 0px;
   }
 
   .form-ui-group-content {
@@ -1098,6 +1146,7 @@
   color: #8c94a3;
   font-weight: 500;
 }
+
 
 /* Prepend a blue plus via CSS to Add entries */
 .form-ui-nav-item-add .form-ui-nav-item-add-title::before {
@@ -1375,32 +1424,35 @@
   transition: background 0.5s;
 }
 
-.form-ui-placeholder-add,
-.form-ui-array-add.form-ui-placeholder-add {
-  width: 100%;
+.form-content-add {
+  align-self: center;
+  /* width: 100%; */
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  min-height: 48px;
-  border: 2px dashed #d1d5db;
+  border: 2px solid #d1d5db;
   border-radius: 8px;
   color: #6b7280;
-  background: transparent;
+  background: #ECF0FD;
   text-align: center;
   cursor: pointer;
-  margin: 8px 0 16px;
   font-size: 12px;
   line-height: 1.4;
   font-weight: 500;
 }
 
-.form-ui-placeholder-add:hover,
-.form-ui-array-add.form-ui-placeholder-add:hover {
-  border-color: #93c5fd;
-  color: #374151;
-  background: #f8fafc;
+.form-ui-field>.form-ui-array-container>.form-content-add {
+  align-self: start;
+  padding: 4px 8px;
+}
+
+
+/* Center placeholder button when used directly under group content */
+.form-ui-group-content>.form-content-add {
+  display: flex;
+  margin: 20px auto 30px auto;
 }
 
 /* Picture input: dropzone styles */
@@ -1410,7 +1462,7 @@
   gap: 8px;
 }
 
-.form-ui-dropzone {
+.form-ui-picker {
   width: 100%;
   max-width: 600px;
   box-sizing: border-box;
@@ -1419,7 +1471,7 @@
   justify-content: center;
   text-align: center;
   padding: 20px;
-  min-height: 140px;
+  min-height: 84px;
   border: 2px dashed #d1d5db;
   border-radius: 10px;
   color: #6b7280;
@@ -1428,19 +1480,19 @@
   transition: all 0.15s ease-in-out;
 }
 
-.form-ui-dropzone:hover {
+.form-ui-picker:hover {
   border-color: #93c5fd;
   color: #374151;
   background: #f8fafc;
 }
 
-.form-ui-dropzone.drag-over {
+.form-ui-picker.drag-over {
   border-color: #3b82f6;
   background: rgba(59, 130, 246, 0.06);
   color: #111827;
 }
 
-.form-ui-dropzone:focus {
+.form-ui-picker:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
@@ -1458,7 +1510,6 @@
 .form-ui-preview-box {
   width: 100%;
   box-sizing: border-box;
-  min-height: 140px;
   padding: 0;
   display: block;
   border: none;
@@ -1467,50 +1518,82 @@
   position: relative;
 }
 
-/* Make preview row expand the full available width inside the preview box */
-.form-ui-preview-box .form-ui-upload-item {
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 0;
-  border-radius: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-/* Position a top-right remove action when present (non-array picture input) */
-.form-ui-preview-box>.form-ui-array-remove,
-.form-ui-preview-box>.form-ui-remove {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-}
-
-/* Make preview image large and use full width inside the preview box */
-.form-ui-preview-box .form-ui-upload-left {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: 100%;
+.form-ui-preview-box .form-ui-preview-item {
+  flex: 1 1 0;
+  min-width: 0;
+  background: #fff;
   border: 1px solid #e5e7eb;
   padding: 12px;
   border-radius: 10px;
+  display: grid;
+  grid-template-columns: 60px auto;
+  /* fixed 60x60 thumbnail */
+  gap: 12px;
+  align-items: start;
 }
 
-.form-ui-preview-box .form-ui-upload-thumb {
-  width: 100%;
-  height: 160px;
-  border: none;
+/* Remove buttons for single fields are rendered inside .form-ui-field-actions */
+
+/* Make preview image large and use full width inside the preview box */
+.form-ui-preview-box .form-ui-preview-media {
+  width: 60px;
+  height: 60px;
   border-radius: 8px;
-  background: transparent;
+  overflow: hidden;
 }
 
-.form-ui-preview-box .form-ui-upload-thumb img {
+.form-ui-preview-media-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-ui-preview-media-icon svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  stroke-width: 1.25;
+}
+
+.form-ui-preview-media-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.form-ui-preview-box .form-ui-preview-media img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* crop to square */
 }
+
+.form-ui-preview-box .form-ui-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-ui-preview-box .form-ui-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-ui-preview-box .form-ui-preview-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* trailing remove outside of bordered box (no absolute positioning) */
+
 
 .form-ui-preview-box .form-ui-upload-name {
   max-width: 100%;
@@ -1529,6 +1612,29 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+
+/* Normalize layout for remove button without altering its red hover styling */
+.form-ui-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #5e6c84;
+  transition: all 0.2s ease;
+}
+
+.form-ui-action:hover {
+  color: black;
 }
 
 /* Upload preview list */

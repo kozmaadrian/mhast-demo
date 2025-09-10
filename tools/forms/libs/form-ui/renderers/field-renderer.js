@@ -7,6 +7,7 @@ import getControlElement from '../utils/dom-utils.js';
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId, hyphenatePath } from '../form-generator/path-utils.js';
 import FormIcons from '../utils/icons.js';
+import { createAddButton } from '../utils/dom-utils.js';
 
 /**
  * Render a single field based on its schema and location in the model.
@@ -34,15 +35,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
       const insideArrayItem = /\[\d+\]/.test(fullPath);
       const shouldGate = (!formGenerator.renderAllGroups || insideArrayItem);
       if (shouldGate && !formGenerator.isOptionalGroupActive(fullPath)) {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'form-ui-placeholder-add';
-        placeholder.dataset.path = fullPath;
-        const title = formGenerator.getSchemaTitle(propSchema, key);
-        placeholder.textContent = '';
-        placeholder.appendChild(FormIcons.renderIcon('plus'));
-        const label = document.createElement('span');
-        label.textContent = `Add ${title}`;
-        placeholder.appendChild(label);
+        const placeholder = createAddButton(`Add ${formGenerator.getSchemaTitle(propSchema, key)} Item`, fullPath);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);
@@ -55,8 +48,6 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     groupContainer.id = pathToGroupId(fullPath);
     groupContainer.dataset.groupPath = fullPath;
     groupContainer.dataset.schemaPath = fullPath;
-    groupContainer.dataset.fieldPath = fullPath;
-    groupContainer.dataset.required = isRequired ? 'true' : 'false';
 
     const groupHeader = document.createElement('div');
     groupHeader.className = CLASS.groupHeader;
@@ -66,7 +57,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     label.className = CLASS.separatorLabel;
     const titleSpan = document.createElement('span');
     titleSpan.className = CLASS.groupTitle;
-    titleSpan.textContent = propSchema.title || formGenerator.formatLabel(key);
+    titleSpan.appendChild(FormIcons.renderIcon('section'));
+    titleSpan.appendChild(document.createTextNode(' '));
+    titleSpan.appendChild(document.createTextNode(propSchema.title || formGenerator.formatLabel(key)));
     label.appendChild(titleSpan);
     sep.appendChild(label);
     groupHeader.appendChild(sep);
@@ -80,15 +73,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     if (arrayUI && !isEmpty) {
       groupContent.appendChild(arrayUI);
     } else if (isEmpty) {
-      const placeholder = document.createElement('div');
-      placeholder.className = CLASS.placeholderAdd;
-      placeholder.dataset.path = fullPath;
-      const title = formGenerator.getSchemaTitle(propSchema, key);
-      placeholder.textContent = '';
-      placeholder.appendChild(FormIcons.renderIcon('plus'));
-      const label = document.createElement('span');
-      label.textContent = `Add ${title} Item`;
-      placeholder.appendChild(label);
+      const placeholder = createAddButton(`Add ${formGenerator.getSchemaTitle(propSchema, key)} Item`, fullPath);
       placeholder.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation();
         formGenerator.commandAddArrayItem(fullPath);
@@ -100,7 +85,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     if (formGenerator.renderAllGroups && isRequired && arrayUI) {
       const existing = formGenerator.model.getNestedValue(formGenerator.data, fullPath);
       const itemsContainer = arrayUI.querySelector?.('.form-ui-array-items');
-      const addBtn = arrayUI.querySelector?.('.form-ui-array-add');
+      const addBtn = arrayUI.querySelector?.('.form-content-add');
       if (Array.isArray(existing) && existing.length === 0 && itemsContainer && itemsContainer.children.length === 0 && addBtn) {
         try { addBtn.click(); } catch { /* noop */ }
       }
@@ -120,15 +105,7 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
       const isDirectChildOfArrayItem = /\[\d+\]$/.test(pathPrefix || '');
       const shouldGate = (!formGenerator.renderAllGroups || insideArrayItem) && !isDirectChildOfArrayItem;
       if (shouldGate && !formGenerator.isOptionalGroupActive(fullPath)) {
-        const placeholder = document.createElement('div');
-        placeholder.className = CLASS.placeholderAdd;
-        placeholder.dataset.path = fullPath;
-        const title = formGenerator.getSchemaTitle(propSchema, key);
-        placeholder.textContent = '';
-        placeholder.appendChild(FormIcons.renderIcon('plus'));
-        const label = document.createElement('span');
-        label.textContent = `Add ${title}`;
-        placeholder.appendChild(label);
+        const placeholder = createAddButton(`Add ${formGenerator.getSchemaTitle(propSchema, key)}`, fullPath);
         placeholder.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           formGenerator.commandActivateOptional(fullPath);
@@ -151,7 +128,9 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
     label.className = CLASS.separatorLabel;
     const titleSpan = document.createElement('span');
     titleSpan.className = CLASS.groupTitle;
-    titleSpan.textContent = propSchema.title || formGenerator.formatLabel(key);
+    titleSpan.appendChild(FormIcons.renderIcon('section'));
+    titleSpan.appendChild(document.createTextNode(' '));
+    titleSpan.appendChild(document.createTextNode(propSchema.title || formGenerator.formatLabel(key)));
     label.appendChild(titleSpan);
     sep.appendChild(label);
     groupHeader.appendChild(sep);
@@ -186,10 +165,27 @@ export function renderField(formGenerator, key, propSchema, isRequired = false, 
   }
   fieldContainer.appendChild(label);
 
-  // Field input
+  // Field input + generic actions wrapper (for single-value fields)
   const input = formGenerator.generateInput(fullPath, propSchema);
   if (input) {
-    fieldContainer.appendChild(input);
+    const isArrayContainer = !!(input && input.classList && input.classList.contains('form-ui-array-container'));
+    if (isArrayContainer) {
+      // For primitive arrays, per-item actions are rendered by InputFactory; do not add global actions wrapper
+      fieldContainer.appendChild(input);
+    } else {
+      const row = document.createElement('div');
+      row.className = 'form-ui-field-row';
+      const main = document.createElement('div');
+      main.className = 'form-ui-field-main';
+      const actions = document.createElement('div');
+      actions.className = 'form-ui-field-actions';
+      actions.dataset.actionsFor = fullPath;
+
+      main.appendChild(input);
+      row.appendChild(main);
+      row.appendChild(actions);
+      fieldContainer.appendChild(row);
+    }
 
     // If field is required, visually indicate on the input with a red border (not the label)
     if (isRequired) {

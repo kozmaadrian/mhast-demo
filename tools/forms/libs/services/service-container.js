@@ -19,6 +19,7 @@ import { LabelService } from './label-service.js';
 import { ValidationService } from './validation-service.js';
 import { ConfigService } from './config-service.js';
 import { AssetsService } from './assets-service/AssetsService.js';
+import { AuthService } from './auth-service.js';
 /**
  * ServiceContainer
  *
@@ -96,6 +97,13 @@ export class ServiceContainer {
       this._services.assets = new AssetsService(this._context);
     }
     return this._services.assets;
+  }
+
+  get auth() {
+    if (!this._services.auth) {
+      this._services.auth = new AuthService(this._context);
+    }
+    return this._services.auth;
   }
 
 }
