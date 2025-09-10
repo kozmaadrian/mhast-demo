@@ -177,6 +177,19 @@ export default class PictureInput extends BaseInput {
         statusEl.style.display = '';
         return;
       }
+      try {
+        const { authenticated } = await (assets.getAuthStatus?.() || Promise.resolve({ authenticated: true }));
+        if (!authenticated) {
+          statusEl.textContent = 'Sign in required to pick assets';
+          statusEl.style.display = '';
+          // attach a one-shot auth-required listener to clear message on success
+          const onAuthReady = () => { statusEl.style.display = 'none'; window.removeEventListener('da-asset-auth-ready', onAuthReady); };
+          window.addEventListener('da-asset-auth-ready', onAuthReady, { once: true });
+          // kick off sign-in flow
+          try { await assets.promptSignIn?.(); } catch {}
+          return;
+        }
+      } catch {}
       statusEl.textContent = 'Opening asset picker...';
       statusEl.style.display = '';
       let resolved = false;
@@ -206,7 +219,10 @@ export default class PictureInput extends BaseInput {
       };
       window.addEventListener('da-asset-selected', onSelected, { once: true });
       window.addEventListener('da-asset-cancelled', onCancelled, { once: true });
+      const onAuthRequired = () => { if (!resolved) { onCancelled(); } };
+      window.addEventListener('da-asset-auth-required', onAuthRequired, { once: true });
       try { await assets.openPicker(); } catch (e) { /* error already logged in service */ }
+      window.removeEventListener('da-asset-auth-required', onAuthRequired);
     };
 
     // Interactions: open DA asset picker on click/Enter/Space

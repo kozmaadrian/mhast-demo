@@ -4,7 +4,7 @@
  */
 
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
-import { DA_ORIGIN } from '../../../utils.js';
+import { DA_ORIGIN, DA_LIVE } from '../../../utils.js';
 
 const ASSET_SELECTOR_URL = 'https://experience.adobe.com/solutions/CQ-assets-selectors/assets/resources/assets-selectors.js';
 
@@ -29,6 +29,15 @@ async function loadStyleOnce(href) {
   link.href = href;
   link.dataset.href = href;
   document.head.appendChild(link);
+}
+
+function getNx() {
+  try {
+    const base = (DA_LIVE || '').replace(/\/$/, '');
+    return `${base}/nx`;
+  } catch {
+    return 'https://da.live/nx';
+  }
 }
 
 function ensureDialogRoot() {
@@ -119,24 +128,40 @@ async function getConfKey(owner, repo, key) {
 // ==== End: Config helpers ====
 
 export class AssetsService {
+  /** Check if IMS authentication is ready for the asset picker */
+  async getAuthStatus() {
+    try {
+      const { token } = await DA_SDK;
+      const authenticated = !!token;
+      return { authenticated };
+    } catch (e) {
+      return { authenticated: false, error: e };
+    }
+  }
+
+  /** Prompt IMS sign-in (non-blocking). */
+  async promptSignIn() {
+    try {
+      const mod = await import(`${getNx()}/utils/ims.js`);
+      const { loadIms, handleSignIn } = mod;
+      try { await loadIms(); } catch {}
+      handleSignIn();
+    } catch (e) {
+      // ignore
+    }
+  }
+
   /** Open asset picker and resolve with a selected asset URL (image rendition). */
   async openPicker() {
     try {
       // Align with da-assets.js: use IMS for token and repoId from config
-      let ims; let imsToken;
-      try {
-        const mod = await import('https://da.live/nx/utils/ims.js');
-        const { loadIms, handleSignIn } = mod;
-        ims = await loadIms();
-        if (ims.anonymous) handleSignIn();
-        imsToken = ims?.accessToken?.token || ims?.accessToken;
-      } catch (e) {
-        // Fallback to DA_SDK token if IMS module import fails
-        const { token } = await DA_SDK;
-        imsToken = token;
+      const { token, context } = await DA_SDK;
+      if (!token) {
+        try { window.dispatchEvent(new CustomEvent('da-asset-auth-required')); } catch {}
+        return null;
       }
+      const imsToken = token;
 
-      const { context } = await DA_SDK;
       const { org, repo } = context || {};
       if (!org || !repo || !imsToken) return null;
 
