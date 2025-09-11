@@ -1,5 +1,8 @@
+import { render } from 'da-lit';
 import BaseInput from './base-input.js';
-import FormIcons from '../utils/icons.js';
+import { ICONS } from '../utils/icon-urls.js';
+import { removeButtonTemplate } from '../templates/buttons.js';
+import { assetPreviewTemplate, replaceButtonTemplate, assetPickerWrapperTemplate } from '../templates/asset.js';
 
 // Module-relative URL for the generic file icon
 const FILE_ICON_URL = new URL('../../assets/file-icon.svg', import.meta.url).href;
@@ -32,76 +35,36 @@ export default class FileInput extends BaseInput {
     } catch { return false; }
   }
 
-  /** Shared remove button with confirm behavior, mounts to host when provided */
+  /** Shared remove button with confirm behavior via lit */
   createRemoveButton(onRemove) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'form-ui-remove';
-    btn.title = 'Remove item';
-    btn.textContent = '';
-    const trash = FormIcons.renderIcon('trash');
-    btn.appendChild(trash);
-    btn.addEventListener('click', () => {
-      if (btn.classList.contains('confirm-state')) {
-        if (btn.dataset.confirmTimeoutId) {
-          clearTimeout(Number(btn.dataset.confirmTimeoutId));
-          delete btn.dataset.confirmTimeoutId;
-        }
-        onRemove();
-      } else {
-        const originalHTML = btn.innerHTML;
-        const originalTitle = btn.title;
-        const originalClass = btn.className;
-        btn.textContent = '';
-        btn.appendChild(FormIcons.renderIcon('check'));
-        btn.title = 'Click to confirm removal';
-        btn.classList.add('confirm-state');
-        const timeout = setTimeout(() => {
-          if (btn) {
-            btn.innerHTML = originalHTML;
-            btn.title = originalTitle;
-            btn.className = originalClass;
-            delete btn.dataset.confirmTimeoutId;
+    let confirmState = false;
+    const mount = document.createElement('div');
+    const rerender = () => {
+      render(removeButtonTemplate({
+        confirm: confirmState,
+        onClick: (e) => {
+          e?.preventDefault?.();
+          e?.stopPropagation?.();
+          if (confirmState) {
+            onRemove();
+          } else {
+            confirmState = true;
+            rerender();
+            setTimeout(() => { confirmState = false; rerender(); }, 3000);
           }
-        }, 3000);
-        btn.dataset.confirmTimeoutId = String(timeout);
-      }
-    });
-    return btn;
+        },
+      }), mount);
+    };
+    rerender();
+    return mount.firstElementChild;
   }
 
   /** Hook: render preview for a selected item; may be overridden */
   renderPreview(previewsEl, actionsHost, { src, name }, onRemove) {
     previewsEl.innerHTML = '';
-    const box = document.createElement('div');
-    box.className = 'form-ui-preview-box';
-    const item = document.createElement('div');
-    item.className = 'form-ui-preview-item';
-
-    const media = document.createElement('div');
-    media.className = 'form-ui-preview-media';
-    if (this.isImageUrl(src)) {
-      const imgEl = document.createElement('img');
-      imgEl.alt = name || 'Image preview';
-      imgEl.src = src;
-      media.appendChild(imgEl);
-    } else {
-      const iconWrap = document.createElement('div');
-      iconWrap.className = 'form-ui-preview-media-icon';
-      const iconImg = document.createElement('img');
-      iconImg.src = FILE_ICON_URL;
-      iconImg.alt = name || 'File';
-      iconWrap.appendChild(iconImg);
-      media.appendChild(iconWrap);
-    }
-
-    const info = document.createElement('div');
-    info.className = 'form-ui-preview-info';
-    const header = document.createElement('div');
-    header.className = 'form-ui-preview-header';
-    const nameEl = document.createElement('p');
-    nameEl.className = 'form-ui-preview-title';
-    nameEl.textContent = name || '';
+    const previewMount = document.createElement('div');
+    render(assetPreviewTemplate({ src, name, fileIconUrl: FILE_ICON_URL, isImage: this.isImageUrl(src) }), previewMount);
+    const box = previewMount.firstElementChild;
 
     // Remove button mounted to actions host if provided
     const removeBtn = this.createRemoveButton(onRemove);
@@ -110,32 +73,15 @@ export default class FileInput extends BaseInput {
       // Stack actions vertically
       actionsHost.style.flexDirection = 'column';
       // Replace (icon button)
-      const replaceBtn = document.createElement('button');
-      replaceBtn.type = 'button';
-      replaceBtn.className = 'form-ui-action form-ui-replace-action';
-      replaceBtn.title = 'Replace';
-      replaceBtn.appendChild(FormIcons.renderIcon('replace'));
-      replaceBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try { if (typeof this._openPicker === 'function') this._openPicker(); } catch {}
-      });
-      actionsHost.appendChild(replaceBtn);
+      const replaceMount = document.createElement('div');
+      render(replaceButtonTemplate({ onClick: (e) => { e.preventDefault(); e.stopPropagation(); try { if (typeof this._openPicker === 'function') this._openPicker(); } catch {} } }), replaceMount);
+      actionsHost.appendChild(replaceMount.firstElementChild);
       // Remove
       actionsHost.appendChild(removeBtn);
     } else {
       removeBtn.classList.add('form-ui-preview-remove');
       box.appendChild(removeBtn);
     }
-
-    header.appendChild(nameEl);
-    info.appendChild(header);
-    item.appendChild(media);
-    item.appendChild(info);
-    
-    // (overlay removed)
-
-    box.appendChild(item);
     previewsEl.appendChild(box);
   }
 
@@ -149,21 +95,10 @@ export default class FileInput extends BaseInput {
     hidden.name = fieldPath;
     container.appendChild(hidden);
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'form-ui-picker';
-    wrapper.tabIndex = 0;
-    wrapper.setAttribute('role', 'button');
-    wrapper.setAttribute('aria-label', this.getWrapperLabel());
-    const labelEl = document.createElement('div');
-    labelEl.className = 'form-ui-description';
     const defaultText = this.getWrapperLabel();
-    const icon = FormIcons.renderIcon('replace');
-    const labelTextEl = document.createElement('span');
-    labelTextEl.className = 'form-ui-picker-label-text';
-    labelTextEl.textContent = defaultText;
-    labelEl.appendChild(icon);
-    labelEl.appendChild(document.createTextNode(' '));
-    labelEl.appendChild(labelTextEl);
+    const wrapperMount = document.createElement('div');
+    render(assetPickerWrapperTemplate({ ariaLabel: defaultText, labelText: defaultText }), wrapperMount);
+    const wrapper = wrapperMount.firstElementChild;
 
     const previews = document.createElement('div');
     previews.className = 'form-ui-upload-previews';
@@ -179,7 +114,7 @@ export default class FileInput extends BaseInput {
 
     let previewRefs = null;
 
-    const render = ({ src, name }) => {
+    const renderPreviewUI = ({ src, name }) => {
       const actionsHost = (() => {
         try {
           const main = container.parentElement;
@@ -212,7 +147,7 @@ export default class FileInput extends BaseInput {
           url = await backend.buildPreviewUrl(currentValue);
         }
         const name = (currentValue.split('/') && currentValue.split('/').pop ? currentValue.split('/').pop() : currentValue).replace(/^\./, '');
-        render({ src: url, name });
+        renderPreviewUI({ src: url, name });
       } catch {}
     };
 
@@ -236,7 +171,7 @@ export default class FileInput extends BaseInput {
         if (!selection) return;
         const valueUrl = this.mapSelectionToValue(selection);
         const name = (valueUrl && valueUrl.split('?')[0].split('/') && valueUrl.split('?')[0].split('/').pop ? valueUrl.split('?')[0].split('/').pop() : 'File');
-        render({ src: valueUrl, name });
+        renderPreviewUI({ src: valueUrl, name });
         setValueAndNotify(valueUrl);
       };
       const onCancelled = () => {
@@ -256,11 +191,13 @@ export default class FileInput extends BaseInput {
       const isAuth = !!authenticated;
       if (!isAuth) {
         wrapper.setAttribute('aria-disabled', 'true');
-        labelTextEl.textContent = 'Sign in required to pick assets';
+        const lt = wrapper.querySelector('.form-ui-picker-label-text');
+        if (lt) lt.textContent = 'Sign in required to pick assets';
         wrapper.title = 'Sign in required to pick assets';
       } else {
         wrapper.removeAttribute('aria-disabled');
-        labelTextEl.textContent = defaultText;
+        const lt = wrapper.querySelector('.form-ui-picker-label-text');
+        if (lt) lt.textContent = defaultText;
         wrapper.removeAttribute('title');
       }
     };
@@ -269,7 +206,6 @@ export default class FileInput extends BaseInput {
     const authSvc = this.services && this.services.auth;
     if (authSvc && authSvc.getStatus) authSvc.getStatus().then((st) => updateAuthUI(st && st.authenticated));
 
-    wrapper.appendChild(labelEl);
     container.appendChild(wrapper);
     container.appendChild(previews);
 

@@ -15,6 +15,7 @@ export default class FormBreadcrumb {
 
     const contentBreadcrumb = document.createElement('div');
     contentBreadcrumb.className = 'form-content-breadcrumb';
+    // Pre-render active indicator container if needed later
     headerEl.appendChild(contentBreadcrumb);
     this.el = contentBreadcrumb;
 
@@ -37,7 +38,7 @@ export default class FormBreadcrumb {
     this.el = el || null;
   }
 
-  update(activeGroupId) {
+  async update(activeGroupId) {
     const bc = this.el;
     if (!bc) return;
 
@@ -61,10 +62,13 @@ export default class FormBreadcrumb {
     };
 
     bc.innerHTML = '';
+    // ESM dynamic imports
+    const { render } = await import('da-lit');
+    const { breadcrumbItemTemplate, breadcrumbSeparatorTemplate } = await import('../templates/nav.js');
     const separator = () => {
-      const s = document.createElement('span');
-      s.textContent = ' › ';
-      return s;
+      const mount = document.createElement('span');
+      render(breadcrumbSeparatorTemplate(), mount);
+      return mount.firstElementChild;
     };
     const tokens = String(schemaPath)
       .split('.')
@@ -80,43 +84,44 @@ export default class FormBreadcrumb {
 
       const addCrumb = (text, dataset) => {
         if (!text) return;
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'form-ui-breadcrumb-item';
-        el.textContent = text;
-        Object.entries(dataset || {}).forEach(([k, v]) => { if (v != null) el.dataset[k] = v; });
-        el.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          const path = el.dataset.path;
-          const gid = el.dataset.groupId;
-          if (gid) {
-            this.formGenerator.navigation.navigateToGroup(gid);
-            return;
-          }
-          if (path) {
-            const isActive = this.formGenerator.isOptionalGroupActive(path);
-            if (!isActive) {
-              this.formGenerator.commandActivateOptional(path);
-              requestAnimationFrame(() => {
-                const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
-                if (Array.isArray(value) && value.length > 0) {
-                  const id = this.formGenerator.arrayItemId(path, 0);
-                  this.formGenerator.navigation.navigateToGroup(id);
-                } else {
-                  const target = this.formGenerator.navigation.resolveFirstDescendantGroupPath(path) || path;
-                  const gid2 = this.formGenerator.pathToGroupId(target);
-                  this.formGenerator.navigation.navigateToGroup(gid2);
-                }
-                this.formGenerator.validation.validateAllFields();
-              });
-            } else {
-              const target = this.formGenerator.navigation.resolveFirstDescendantGroupPath(path) || path;
-              const gid2 = this.formGenerator.pathToGroupId(target);
-              this.formGenerator.navigation.navigateToGroup(gid2);
+        const mount = document.createElement('span');
+        render(breadcrumbItemTemplate({
+          text,
+          path: dataset?.path ?? null,
+          groupId: dataset?.groupId ?? null,
+          onClick: (e) => {
+            e.preventDefault(); e.stopPropagation();
+            const path = dataset?.path;
+            const gid = dataset?.groupId;
+            if (gid) {
+              this.formGenerator.navigation.navigateToGroup(gid);
+              return;
             }
-          }
-        });
-        bc.appendChild(el);
+            if (path) {
+              const isActive = this.formGenerator.isOptionalGroupActive(path);
+              if (!isActive) {
+                this.formGenerator.commandActivateOptional(path);
+                requestAnimationFrame(() => {
+                  const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, path);
+                  if (Array.isArray(value) && value.length > 0) {
+                    const id = this.formGenerator.arrayItemId(path, 0);
+                    this.formGenerator.navigation.navigateToGroup(id);
+                  } else {
+                    const target = this.formGenerator.navigation.resolveFirstDescendantGroupPath(path) || path;
+                    const gid2 = this.formGenerator.pathToGroupId(target);
+                    this.formGenerator.navigation.navigateToGroup(gid2);
+                  }
+                  this.formGenerator.validation.validateAllFields();
+                });
+              } else {
+                const target = this.formGenerator.navigation.resolveFirstDescendantGroupPath(path) || path;
+                const gid2 = this.formGenerator.pathToGroupId(target);
+                this.formGenerator.navigation.navigateToGroup(gid2);
+              }
+            }
+          },
+        }), mount);
+        bc.appendChild(mount.firstElementChild);
       };
 
       if (Array.isArray(label) && label.length > 0) {

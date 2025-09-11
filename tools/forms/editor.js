@@ -7,7 +7,10 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
-const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
+const formContentStyles = await getStyle((new URL('./libs/form-ui/form-ui.content.css', import.meta.url)).href);
+const formGroupsStyles = await getStyle((new URL('./libs/form-ui/form-ui.groups.css', import.meta.url)).href);
+const formInputsStyles = await getStyle((new URL('./libs/form-ui/form-ui.inputs.css', import.meta.url)).href);
+const formNavigationStyles = await getStyle((new URL('./libs/form-ui/form-ui.navigation.css', import.meta.url)).href);
 
 /**
  * FormsEditor
@@ -54,7 +57,7 @@ class FormsEditor extends LitElement {
   /** Lifecycle: attach styles, initialize services, and bootstrap the UI. */
   async connectedCallback() {
     super.connectedCallback();
-    this.shadowRoot.adoptedStyleSheets = [style, formStyles];
+    this.shadowRoot.adoptedStyleSheets = [style, formContentStyles, formGroupsStyles, formInputsStyles, formNavigationStyles];
 
     // init DA SDK context
     const { context } = await DA_SDK;
@@ -181,7 +184,7 @@ class FormsEditor extends LitElement {
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { renderAllGroups: true, showNavConnectors: this._showNavConnectors },
+          ui: { showNavConnectors: this._showNavConnectors },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);

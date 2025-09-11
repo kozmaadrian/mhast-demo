@@ -8,9 +8,7 @@
  *   data,
  *   onChange,
  *   onRemove,
- *   ui: {
- *     // renderAllGroups is supported; other legacy UI toggles were removed
- *   }
+ *   ui: {}
  * });
  * api.updateData(next); api.destroy();
  */
@@ -39,9 +37,7 @@ function instantiateGenerator(context, schema, controls) {
   let generator;
   let formEl;
   try {
-    generator = new FormGenerator(context, schema, {
-      renderAllGroups: !!controls.renderAllGroups
-    });
+    generator = new FormGenerator(context, schema, {});
     formEl = generator.generateForm();
   } catch (e) {
     console.error('[mountFormUI] failed to create/generate form:', e);
@@ -112,7 +108,7 @@ function wireNavigationClicks(sidebar, generator) {
  * @param {object} options.schema - JSON Schema describing the form
  * @param {object} [options.data] - Initial data to hydrate the form
  * @param {(nextData: object) => void} [options.onChange] - Callback invoked on any data change
- * @param {{renderAllGroups?: boolean}} [options.ui] - UI flags; currently only `renderAllGroups`
+ * @param {{}} [options.ui]
  * @returns {{
  *   updateData(next: object): void,
  *   updateSchema(nextSchema: object): void,
@@ -161,9 +157,7 @@ export function mountFormUI(context, {
   function updateSchema(nextSchema) {
     const dataSnapshot = generator.data;
     generator.destroy();
-    const newGen = new FormGenerator(nextSchema, {
-      renderAllGroups: !!controls.renderAllGroups,
-    });
+    const newGen = new FormGenerator(nextSchema, {});
     const newForm = newGen.generateForm();
     // Replace current form and update references
     if (formEl.parentNode === host) {

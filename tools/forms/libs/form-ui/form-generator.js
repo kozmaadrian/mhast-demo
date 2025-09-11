@@ -32,7 +32,7 @@ import createArrayGroupUI from './form-generator/input-array-group.js';
  * the UI, data model, and feature modules (navigation, validation) in sync.
  *
  * Usage:
- * - Construct with `context`, `schema`, and `{ renderAllGroups?: boolean }`
+ * - Construct with `context`, `schema`
  * - Call `generateForm()` to get the root DOM element
  * - Use command helpers for structural changes (activate optional, add/remove/reorder items)
  * - Use `mountFormUI` for a batteries-included mounting and lifecycle wrapper
@@ -41,7 +41,7 @@ export default class FormGenerator {
   /**
    * @param {object} context - Shared services and configuration
    * @param {object} schema - JSON Schema to render
-   * @param {{renderAllGroups?: boolean}} [options]
+   * @param {{}} [options]
    */
   constructor(context, schema, options = {}) {
     
@@ -49,7 +49,7 @@ export default class FormGenerator {
     this.context = context;
     this.services = context.services;
     this.schema = schema;
-    this.renderAllGroups = !!options.renderAllGroups;
+    this.renderAllGroups = true;
     // Data model
     this.model = new FormModel(this.context, this.schema);
     this.data = this._getBaseJSON(this.schema);
@@ -576,11 +576,9 @@ export default class FormGenerator {
   /** Normalize a schema node (resolve $ref, choose primary type when type is array). */
   normalizeSchema(node) { return this.services.schema.normalizeSchema(this.schema, node); }
 
-  /** Get the base JSON structure according to `renderAllGroups` mode. */
+  /** Get the base JSON structure. */
   _getBaseJSON(schemaNode) {
-    return this.renderAllGroups
-      ? this.model.generateBaseJSON(schemaNode)
-      : this.model.generateSparseBaseJSON(schemaNode);
+    return this.model.generateBaseJSON(schemaNode);
   }
 
   /**

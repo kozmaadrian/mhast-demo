@@ -1,3 +1,4 @@
+import { html, render, nothing } from 'da-lit';
 import BaseInput from './base-input.js';
 
 /**
@@ -16,15 +17,21 @@ export default class TextInput extends BaseInput {
 
   /** Create a text-like input bound to `fieldPath` with schema hints. */
   create(fieldPath, propSchema, format) {
-    const input = document.createElement('input');
-    input.type = this.getInputType(format);
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default) input.value = propSchema.default;
-    if (propSchema.placeholder) input.placeholder = propSchema.placeholder;
-    if (propSchema.pattern) input.pattern = propSchema.pattern;
-    if (propSchema.minLength) input.minLength = propSchema.minLength;
-    if (propSchema.maxLength) input.maxLength = propSchema.maxLength;
+    const type = this.getInputType(format);
+    const mount = document.createElement('div');
+    render(html`
+      <input
+        class="form-ui-input"
+        name=${fieldPath}
+        type=${type}
+        .value=${propSchema.default || ''}
+        placeholder=${propSchema.placeholder || ''}
+        pattern=${propSchema.pattern || nothing}
+        minlength=${propSchema.minLength || nothing}
+        maxlength=${propSchema.maxLength || nothing}
+      />
+    `, mount);
+    const input = mount.firstElementChild;
     this.attachCommonEvents(input, fieldPath, propSchema);
     return input;
   }

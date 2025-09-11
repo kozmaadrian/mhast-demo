@@ -5,24 +5,14 @@
  */
 import { UI_CLASS as CLASS } from '../constants.js';
 import { mapFieldsToGroups, ensureGroupRegistry } from './mapping.js';
+import { render } from 'da-lit';
+import { formShellTemplate } from '../templates/form.js';
 
 export function generateForm(self) {
-  const container = document.createElement('div');
-  container.className = CLASS.container;
-
-  const header = document.createElement('div');
-  header.className = CLASS.header;
-  header.innerHTML = `
-      <div class="${CLASS.titleContainer}">
-        <span class="${CLASS.title}">${self.schema.title || 'Form'}</span>
-      </div>
-    `;
-  container.appendChild(header);
-
-  const body = document.createElement('div');
-  body.className = CLASS.body;
-  // Use full-page scroll; do not set a custom scroll container here
-  try { body.style.position = 'relative'; } catch {}
+  const mount = document.createElement('div');
+  render(formShellTemplate({ title: self.schema.title || 'Form' }), mount);
+  const container = mount.firstElementChild;
+  const body = container.querySelector(`.${CLASS.body}`);
 
   const rootSchema = self.normalizeSchema(self.schema);
   if (rootSchema.type === 'object' && rootSchema.properties) {
@@ -35,13 +25,6 @@ export function generateForm(self) {
     );
     self.ensureGroupRegistry();
   }
-
-  container.appendChild(body);
-
-  const footer = document.createElement('div');
-  footer.className = CLASS.footer;
-  footer.innerHTML = `<div class="${CLASS.validation}"></div>`;
-  container.appendChild(footer);
 
   self.container = container;
   self.highlightOverlay.attach(self.container);

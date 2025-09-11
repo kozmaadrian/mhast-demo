@@ -32,6 +32,8 @@ export class LocalSchemaService {
       await tryAdd('llrc.schema.json', 'LLRC');
       await tryAdd('test.schema.json', 'test');
       await tryAdd('inputs.schema.json', 'Inputs');
+      await tryAdd('appsBanner.schema.json', 'appsBanner');
+      await tryAdd('appsBanner1.schema.json', 'appsBanner1');
     }
 
     if (Array.isArray(explicitList) && explicitList.length > 0) {

@@ -1,3 +1,4 @@
+import { html, render, nothing } from 'da-lit';
 import BaseInput from './base-input.js';
 
 /**
@@ -9,14 +10,19 @@ export default class NumberInput extends BaseInput {
   constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a numeric input honoring min/max/step schema constraints. */
   create(fieldPath, propSchema) {
-    const input = document.createElement('input');
-    input.type = (propSchema.type === 'integer') ? 'number' : 'number';
-    input.name = fieldPath;
-    input.className = 'form-ui-input';
-    if (propSchema.default !== undefined) input.value = propSchema.default;
-    if (propSchema.minimum !== undefined) input.min = propSchema.minimum;
-    if (propSchema.maximum !== undefined) input.max = propSchema.maximum;
-    if (propSchema.type === 'integer') input.step = '1';
+    const mount = document.createElement('div');
+    render(html`
+      <input
+        class="form-ui-input"
+        type="number"
+        name=${fieldPath}
+        .value=${propSchema.default ?? ''}
+        min=${propSchema.minimum ?? ''}
+        max=${propSchema.maximum ?? ''}
+        step=${propSchema.type === 'integer' ? '1' : nothing}
+      />
+    `, mount);
+    const input = mount.firstElementChild;
     this.attachCommonEvents(input, fieldPath, propSchema);
     return input;
   }

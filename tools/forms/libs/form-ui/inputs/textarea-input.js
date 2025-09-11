@@ -1,3 +1,4 @@
+import { html, render } from 'da-lit';
 import BaseInput from './base-input.js';
 
 /**
@@ -9,12 +10,16 @@ export default class TextareaInput extends BaseInput {
   constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a textarea with optional placeholder/default. */
   create(fieldPath, propSchema) {
-    const textarea = document.createElement('textarea');
-    textarea.name = fieldPath;
-    textarea.className = 'form-ui-textarea';
-    textarea.rows = 3;
-    if (propSchema.default) textarea.value = propSchema.default;
-    if (propSchema.placeholder) textarea.placeholder = propSchema.placeholder;
+    const mount = document.createElement('div');
+    render(html`
+      <textarea
+        name=${fieldPath}
+        class="form-ui-textarea"
+        rows="3"
+        placeholder=${propSchema.placeholder || ''}
+      >${propSchema.default || ''}</textarea>
+    `, mount);
+    const textarea = mount.firstElementChild;
     this.attachCommonEvents(textarea, fieldPath, propSchema);
     return textarea;
   }
