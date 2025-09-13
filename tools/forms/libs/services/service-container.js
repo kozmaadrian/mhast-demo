@@ -17,6 +17,7 @@ import { StorageService } from './storage-service.js';
 import { DaService } from './da-service.js';
 import { LabelService } from './label-service.js';
 import { ValidationService } from './validation-service.js';
+import { FormModelService } from './form-model-service.js';
 import { ConfigService } from './config-service.js';
 import { AssetsService } from './assets-service/AssetsService.js';
 import { AuthService } from './auth-service.js';
@@ -83,6 +84,13 @@ export class ServiceContainer {
       this._services.validation = new ValidationService();
     }
     return this._services.validation;
+  }
+
+  get formModel() {
+    if (!this._services.formModel) {
+      this._services.formModel = new FormModelService(this._context);
+    }
+    return this._services.formModel;
   }
 
   get config() {

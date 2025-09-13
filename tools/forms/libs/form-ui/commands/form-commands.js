@@ -65,7 +65,6 @@ export default function createFormCommands(generator) {
     resetAll() {
       const base = generator.generateBaseJSON(generator.schema);
       generator.data = base;
-      generator.activeOptionalGroups = new Set();
       generator.rebuildBody();
       generator.validation.validateAllFields();
     },

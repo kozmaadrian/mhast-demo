@@ -148,7 +148,7 @@ export default class FormValidation {
     return !error;
   }
 
-  // getValidationError removed: logic moved to ValidationService
+  // Validation logic centralized in ValidationService
 
   /**
    * Set or clear inline error state for an input element.
@@ -246,7 +246,7 @@ export default class FormValidation {
       } else {
         nav.classList.remove('has-error');
         if (badgeEl) badgeEl.remove();
-        // Also remove any legacy triangle icons if present
+        // Remove any previous error indicator icon if present
         const existingIcon = titleEl.querySelector('.error-indicator');
         if (existingIcon) existingIcon.remove();
       }

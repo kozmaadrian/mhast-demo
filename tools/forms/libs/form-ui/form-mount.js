@@ -157,7 +157,7 @@ export function mountFormUI(context, {
   function updateSchema(nextSchema) {
     const dataSnapshot = generator.data;
     generator.destroy();
-    const newGen = new FormGenerator(nextSchema, {});
+    const newGen = new FormGenerator(context, nextSchema, {});
     const newForm = newGen.generateForm();
     // Replace current form and update references
     if (formEl.parentNode === host) {

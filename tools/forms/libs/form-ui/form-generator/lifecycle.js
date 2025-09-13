@@ -14,12 +14,12 @@ export function generateForm(self) {
   const container = mount.firstElementChild;
   const body = container.querySelector(`.${CLASS.body}`);
 
-  const rootSchema = self.normalizeSchema(self.schema);
-  if (rootSchema.type === 'object' && rootSchema.properties) {
-    self.groupElements = self.groupBuilder.build(
+  // Build content from the FormModel tree to keep UI aligned with navigation
+  const modelRoot = self.formModel;
+  if (modelRoot) {
+    self.groupElements = self.groupBuilder.buildFromModel(
       body,
-      rootSchema,
-      [],
+      modelRoot,
       [],
       new Map(),
     );
@@ -58,12 +58,11 @@ export function rebuildBody(self) {
   if (breadcrumbEl) {
     body.appendChild(breadcrumbEl);
   }
-  const rootSchema = self.normalizeSchema(self.schema);
-  if (rootSchema?.type === 'object' && rootSchema.properties) {
-    self.groupElements = self.groupBuilder.buildInline(
+  const modelRoot = self.formModel;
+  if (modelRoot) {
+    self.groupElements = self.groupBuilder.buildFromModel(
       body,
-      rootSchema,
-      [],
+      modelRoot,
       [],
       new Map(),
     );
