@@ -12,7 +12,10 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
   const container = containerMount.firstElementChild;
   const itemsContainer = container.querySelector(`.${CLASS.arrayItems}`) || container.querySelector('.form-ui-array-items');
 
-  const baseTitle = generator.getSchemaTitle(propSchema, fieldPath.split('.').pop());
+  // Use the title of the ITEMS schema (object) for per-item labels so it
+  // matches navigation (e.g., "NUJ - Questionnaire Answer #1") rather than
+  // the array property title (e.g., "Answer List")
+  const baseTitle = generator.getSchemaTitle(normItemsSchema, fieldPath.split('.').pop());
   // Create add button via template to simplify DOM assembly
   const addBtnMount = document.createElement('div');
   const onAddClick = (event) => {

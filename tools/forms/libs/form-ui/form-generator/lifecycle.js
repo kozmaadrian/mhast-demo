@@ -13,6 +13,12 @@ export function generateForm(self) {
   render(formShellTemplate({ title: self.schema.title || 'Form' }), mount);
   const container = mount.firstElementChild;
   const body = container.querySelector(`.${CLASS.body}`);
+  // Compute sticky header height for scroll offset
+  try {
+    const header = container.querySelector('.form-ui-header');
+    const extra = 32; // add a bit more room so titles are not hidden
+    self._headerOffset = header ? (header.offsetHeight + extra) : extra;
+  } catch {}
 
   // Build content from the FormModel tree to keep UI aligned with navigation
   const modelRoot = self.formModel;
@@ -30,6 +36,12 @@ export function generateForm(self) {
   self.highlightOverlay.attach(self.container);
 
   requestAnimationFrame(() => {
+    // Recompute header offset after layout settles
+    try {
+      const header = container.querySelector('.form-ui-header');
+      const extra = 32;
+      self._headerOffset = header ? (header.offsetHeight + extra) : (self._headerOffset || extra);
+    } catch {}
     mapFieldsToGroups(self);
     ensureGroupRegistry(self);
     self.validation.validateAllFields();

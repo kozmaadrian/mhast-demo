@@ -328,6 +328,8 @@ export default class FormNavigation {
   generateNavigationTree() {
     if (!this.formGenerator.navigationTree) return;
 
+    console.log('Form Model', this.formGenerator.formModel);
+
     const treeEl = this.formGenerator.navigationTree;
     const prevScrollTop = treeEl.scrollTop;
 

@@ -26,8 +26,10 @@ export function buildFlatNavFromModel(formGenerator, modelNode, level = 0, optio
   if (modelNode.type === 'object') {
     const hasPrimitives = formGenerator.hasPrimitiveFields(norm);
     const hasChildren = !!(norm && norm.properties && Object.keys(norm.properties).length > 0);
-    const titleKey = dottedPath === 'root' ? 'Form' : (dottedPath.split('.').pop() || '');
-    const title = dottedPath === 'root' ? 'Form' : schemaSvc.getTitleAtPointer(formGenerator.schema, pointer, titleKey);
+    const titleKey = dottedPath === 'root' ? '' : (dottedPath.split('.').pop() || '');
+    const title = dottedPath === 'root'
+      ? (schemaSvc.getTitleAtPointer(formGenerator.schema, '#', '') || 'Form')
+      : schemaSvc.getTitleAtPointer(formGenerator.schema, pointer, titleKey);
 
     if (!suppressSelf) {
       if (hasPrimitives) {

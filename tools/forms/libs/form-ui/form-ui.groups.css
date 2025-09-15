@@ -51,6 +51,11 @@
   overflow: hidden
 }
 
+/* Anchor array item action buttons (absolute) to the header container */
+.form-ui-array-item-header {
+  position: relative;
+}
+
 .form-ui-section {
   margin-bottom: 24px;
   scroll-margin-top: var(--form-scroll-offset, 80px)
