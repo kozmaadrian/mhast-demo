@@ -263,6 +263,9 @@
   --tree-offset: 18px;
   --tree-thickness: 1px;
   --tree-style: dotted;
+  /* Sticky parents config */
+  --nav-sticky-step: 24px;
+  --nav-sticky-bg: #fff;
   margin: 0;
   padding: 0;
   list-style: none
@@ -313,7 +316,58 @@
 .form-nav-tree .form-ui-nav-item-content {
   padding-left: 0;
   border: none;
-  background: transparent
+  /* Solid backdrop so scrolled items do not show through sticky headers */
+  background: #fff;
+  /* baseline stacking for non-sticky rows; sticky rows override */
+  z-index: 0
+}
+
+/* CSS-only sticky parents like IDE JSON inspectors */
+.form-navigation-tree {
+  position: relative;
+}
+
+/* Sticky parents disabled by default; enable by adding .sticky-parents on .form-navigation-tree */
+.form-navigation-tree.sticky-parents .form-nav-tree .form-ui-nav-item-content {
+  position: sticky;
+  top: calc(var(--nav-level, 0) * var(--nav-sticky-step));
+  /* ensure ancestors sit above deeper levels, but below connectors/dots */
+  z-index: calc(50 - var(--nav-level, 0));
+  background: var(--nav-sticky-bg);
+}
+
+/* Keep tree connectors and dots visible above sticky backgrounds */
+.form-nav-tree li::before {
+  z-index: 55
+}
+
+.form-nav-tree li::after {
+  z-index: 60
+}
+
+/* Render the dot on the sticky row so it stays pinned with it */
+.form-navigation-tree.sticky-parents .form-nav-tree .form-ui-nav-item-content::before {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: var(--tree-clr);
+  left: 0;
+  /* aligns to the tree offset due to li padding */
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 65
+}
+
+/* Hide the li-based dot to avoid duplication; keep lines */
+.form-navigation-tree.sticky-parents .form-nav-tree li::after {
+  display: none
+}
+
+/* No dot for the root item */
+.form-nav-tree li[data-group-id="form-group-root"]>.form-ui-nav-item-content::before {
+  display: none
 }
 
 .form-nav-tree {
@@ -332,9 +386,7 @@
   background-color: var(--tree-clr-active)
 }
 
-.form-nav-tree li:hover li>.form-ui-nav-item-content {
-  background: transparent !important
-}
+
 
 .form-ui-nav-item-title {
   font-size: 13px;

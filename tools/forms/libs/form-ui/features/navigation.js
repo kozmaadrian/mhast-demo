@@ -327,10 +327,12 @@ export default class FormNavigation {
    */
   generateNavigationTree() {
     if (!this.formGenerator.navigationTree) return;
-
-    console.log('Form Model', this.formGenerator.formModel);
-
     const treeEl = this.formGenerator.navigationTree;
+    
+    // Toggle sticky-parents behavior from config (off by default)
+    const enableSticky = !!(this.context?.config?.navigation?.stickyParents);
+    treeEl.classList.toggle('sticky-parents', enableSticky);
+
     const prevScrollTop = treeEl.scrollTop;
 
     this.formGenerator.navigationTree.innerHTML = '';
