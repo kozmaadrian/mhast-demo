@@ -419,11 +419,7 @@
   color: #4d7bff
 }
 
-.form-ui-nav-item .error-badge {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
+.error-badge {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -434,6 +430,20 @@
   line-height: 18px;
   text-align: center;
   font-weight: 600
+}
+
+.form-ui-nav-item .error-badge {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%)
+}
+
+/* Header badge should share visual style but not absolute positioning */
+.form-side-panel-header .error-badge {
+  display: inline-block;
+  position: static;
+  transform: none
 }
 
 .form-ui-nav-item-content {

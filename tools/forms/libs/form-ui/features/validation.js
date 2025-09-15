@@ -29,6 +29,44 @@ export default class FormValidation {
   }
 
   /**
+   * Scroll to and focus the first invalid control across the entire form.
+   * Falls back to the first group-level error if no field-level errors exist.
+   */
+  scrollToFirstErrorAcrossForm() {
+    // Prefer first field-level error in render/insertion order
+    let targetFieldPath = null;
+    for (const fieldPath of this.formGenerator.fieldElements.keys()) {
+      if (this.formGenerator.fieldErrors.has(fieldPath)) { targetFieldPath = fieldPath; break; }
+    }
+
+    if (targetFieldPath) {
+      const groupId = this.formGenerator.fieldToGroup.get(targetFieldPath) || null;
+      if (groupId) {
+        try { this.formGenerator.navigation.navigateToGroup(groupId); } catch {}
+      }
+      const el = this.formGenerator.fieldElements.get(targetFieldPath)
+        || this.formGenerator.container.querySelector(`[name="${targetFieldPath}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        try { el.focus({ preventScroll: true }); } catch {}
+        if (groupId) {
+          try { this.formGenerator.navigation.updateActiveGroup(groupId); } catch {}
+        }
+        try { this.formGenerator._programmaticScrollUntil = Date.now() + 1500; } catch {}
+      }
+      return;
+    }
+
+    // Fallback: first group-level error (e.g., empty required array)
+    const firstGroup = this.formGenerator.groupErrors.keys().next();
+    if (!firstGroup.done) {
+      const gid = firstGroup.value;
+      try { this.formGenerator.navigation.navigateToGroup(gid); } catch {}
+      try { this.formGenerator._programmaticScrollUntil = Date.now() + 1500; } catch {}
+    }
+  }
+
+  /**
    * Scroll to and focus the first invalid control within a given group.
    * Uses generator maps to resolve the field element efficiently.
    * @param {string} groupId - Target group DOM id
@@ -251,5 +289,33 @@ export default class FormValidation {
         if (existingIcon) existingIcon.remove();
       }
     });
+
+    // Update header-level aggregated error badge next to the "Navigation" title
+    try {
+      const totalErrors = (this.formGenerator.fieldErrors?.size || 0) + (this.formGenerator.groupErrors?.size || 0);
+      const panelMain = this.formGenerator.navigationTree.closest('.form-side-panel-main');
+      const header = panelMain ? panelMain.querySelector('.form-side-panel-header') : null;
+      const titleContainer = header ? header.querySelector('.form-side-panel-title-container') : null;
+      if (titleContainer) {
+        let headerBadge = titleContainer.querySelector('.error-badge');
+        if (totalErrors > 0) {
+          if (!headerBadge) {
+            headerBadge = document.createElement('span');
+            headerBadge.className = 'error-badge';
+            titleContainer.appendChild(headerBadge);
+          }
+          headerBadge.textContent = String(totalErrors);
+          headerBadge.setAttribute('aria-label', `${totalErrors} validation error${totalErrors === 1 ? '' : 's'}`);
+          headerBadge.setAttribute('role', 'button');
+          headerBadge.setAttribute('tabindex', '0');
+          headerBadge.title = 'Jump to first error in the form';
+          const onActivate = (ev) => { ev.preventDefault(); ev.stopPropagation(); this.scrollToFirstErrorAcrossForm(); };
+          headerBadge.onclick = onActivate;
+          headerBadge.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') onActivate(e); };
+        } else if (headerBadge) {
+          headerBadge.remove();
+        }
+      }
+    } catch {}
   }
 }
