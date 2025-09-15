@@ -17,6 +17,8 @@ export function attachContentClick(nav) {
     const groupId = clickedGroup.id;
     if (!groupId) return;
     // Highlight group (also scrolls nav item into view) and update active state
+    // Set a short programmatic window to avoid hover/scrollspy fighting with our scroll
+    try { nav.formGenerator._programmaticScrollUntil = Date.now() + 800; } catch {}
     nav.formGenerator.highlightFormGroup(groupId);
     nav.updateActiveGroup(groupId);
   };

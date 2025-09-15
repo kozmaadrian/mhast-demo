@@ -5,7 +5,8 @@ import { UI_CLASS as CLASS } from '../../../constants.js';
  * @param {import('../../navigation.js').default} nav
  * @returns {() => void} cleanup
  */
-export function enableHoverSync(nav) {
+export function enableHoverSync(nav, enabled = false) {
+  if (!enabled) return () => {};
   if (!nav.formGenerator.container || !nav.formGenerator.navigationTree) return () => {};
 
   const groups = nav.formGenerator.container.querySelectorAll(`.${CLASS.group}, .${CLASS.arrayItem}[id]`);
@@ -13,6 +14,9 @@ export function enableHoverSync(nav) {
     const group = e.currentTarget;
     const groupId = group.id;
     if (!groupId) return;
+    // During programmatic navigation scroll, skip hover updates to avoid fighting the scroll
+    const until = nav.formGenerator?._programmaticScrollUntil || 0;
+    if (until && Date.now() <= until) return;
     nav.updateNavigationActiveState(groupId);
   };
   groups.forEach((g) => {

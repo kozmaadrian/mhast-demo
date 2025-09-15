@@ -341,9 +341,9 @@ export default class FormNavigation {
 
     this.setupNavigationHandlers();
     this.attachDragHandlers();
-    // Externalized sync modules
+    // Externalized sync modules (hover opt-in via param)
     try { this._hoverCleanup?.(); } catch {}
-    this._hoverCleanup = enableHoverSync(this);
+    this._hoverCleanup = enableHoverSync(this, false);
     try { this._scrollCleanup?.(); } catch {}
     this._scrollCleanup = enableScrollSync(this);
 
