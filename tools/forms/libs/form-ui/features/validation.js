@@ -4,6 +4,7 @@
  */
 
 import { pathToGroupId } from '../form-generator/path-utils.js';
+import { pointerToInputName } from '../form-model/path-utils.js';
 
 /**
  * FormValidation
@@ -133,24 +134,65 @@ export default class FormValidation {
    * and refreshes the navigation error markers.
    */
   validateAllFields() {
-    // Validate visible inputs first
-    this.formGenerator.fieldSchemas.forEach((schema, fieldPath) => {
-      const inputEl = this.formGenerator.fieldElements.get(fieldPath) || this.formGenerator.container.querySelector(`[name="${fieldPath}"]`);
-      if (inputEl) this.validateField(fieldPath, schema, inputEl, true); // Skip marker refresh during batch
-    });
+    // Rebuild field errors from scratch using the FormModel (schema + data driven)
+    const schemaSvc = this.formGenerator.services.schema;
+    const normalize = (node) => this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {});
+
+    const primitives = [];
+    const walk = (modelNode) => {
+      if (!modelNode) return;
+      const dottedPath = modelNode.dataPath ? pointerToInputName(modelNode.dataPath) : '';
+      const pointer = modelNode.schemaPointer || '#';
+      const effective = schemaSvc.getEffectiveNodeAtPointer(this.formGenerator.schema, pointer) || {};
+
+      if (modelNode.type === 'object') {
+        const props = effective?.properties || {};
+        const requiredSet = new Set(Array.isArray(effective?.required) ? effective.required : []);
+        for (const [key, propSchema] of Object.entries(props)) {
+          const eff = normalize(propSchema);
+          const primary = Array.isArray(eff.type) ? (eff.type.find((t) => t !== 'null') || eff.type[0]) : eff.type;
+          if (primary === 'object' || primary === 'array') continue;
+          const fieldPath = dottedPath ? `${dottedPath}.${key}` : key;
+          primitives.push({ fieldPath, propSchema: eff, isRequired: requiredSet.has(key) });
+        }
+        if (modelNode.children) {
+          Object.values(modelNode.children).forEach((child) => walk(child));
+        }
+        return;
+      }
+
+      if (modelNode.type === 'array') {
+        if (Array.isArray(modelNode.items)) modelNode.items.forEach((child) => walk(child));
+        return;
+      }
+    };
+
+    // Walk from root
+    try { walk(this.formGenerator.formModel); } catch {}
+
+    // Clear and recompute fieldErrors
+    this.formGenerator.fieldErrors.clear();
+    for (const { fieldPath, propSchema, isRequired } of primitives) {
+      const inputEl = this.formGenerator.fieldElements.get(fieldPath)
+        || this.formGenerator.container.querySelector(`[name="${fieldPath}"]`);
+      const value = this.formGenerator.model.getNestedValue(this.formGenerator.data, fieldPath);
+      const error = this.validationService.getValidationError(value, propSchema, { required: !!isRequired });
+      if (inputEl) this.setFieldError(inputEl, error);
+      if (error) this.formGenerator.fieldErrors.set(fieldPath, error);
+    }
 
     // Data-driven: mark only required arrays-of-objects that are empty
-    const paths = this.validationService.getEmptyRequiredArrayPaths(
+    const emptyRequiredArrays = this.validationService.getEmptyRequiredArrayPaths(
       this.formGenerator.schema,
       this.formGenerator.data,
       {
-        normalize: (node) => this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {}),
+        normalize,
         getValue: (obj, path) => this.formGenerator.model.getNestedValue(obj, path),
       }
     );
     // Maintain group-level errors in a dedicated map
     this.formGenerator.groupErrors.clear();
-    paths.forEach((p) => {
+    emptyRequiredArrays.forEach((p) => {
       this.formGenerator.groupErrors.set(pathToGroupId(p), 'Required list is empty.');
     });
     // Update sidebar markers after all validation is complete
@@ -291,8 +333,9 @@ export default class FormValidation {
     });
 
     // Update header-level aggregated error badge next to the "Navigation" title
+    let totalErrors = 0;
     try {
-      const totalErrors = (this.formGenerator.fieldErrors?.size || 0) + (this.formGenerator.groupErrors?.size || 0);
+      totalErrors = (this.formGenerator.fieldErrors?.size || 0) + (this.formGenerator.groupErrors?.size || 0);
       const panelMain = this.formGenerator.navigationTree.closest('.form-side-panel-main');
       const header = panelMain ? panelMain.querySelector('.form-side-panel-header') : null;
       const titleContainer = header ? header.querySelector('.form-side-panel-title-container') : null;
@@ -315,6 +358,19 @@ export default class FormValidation {
         } else if (headerBadge) {
           headerBadge.remove();
         }
+      }
+    } catch {}
+
+    // Emit validation state event for hosts (composed to cross shadow DOM)
+    try {
+      const root = this.formGenerator?.container;
+      if (root) {
+        const evt = new CustomEvent('form-validation-state', {
+          detail: { totalErrors },
+          bubbles: true,
+          composed: true,
+        });
+        root.dispatchEvent(evt);
       }
     } catch {}
   }

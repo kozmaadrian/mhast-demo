@@ -149,6 +149,17 @@ export function mountFormUI(context, {
   // expose API continues below
   /** Replace current form data with `next` and re-render inputs. */
   function updateData(next) { generator.loadData(next || {}); }
+  /** Return whether current form has validation errors. */
+  function hasValidationErrors() {
+    try {
+      return (generator.fieldErrors?.size || 0) + (generator.groupErrors?.size || 0) > 0;
+    } catch { return false; }
+  }
+  /** Get the current total validation error count. */
+  function getValidationErrorCount() {
+    try { return (generator.fieldErrors?.size || 0) + (generator.groupErrors?.size || 0); }
+    catch { return 0; }
+  }
   /**
    * Replace the current schema and rebuild the form while preserving current data.
    * Useful for hot-reloading or switching between schemas.
@@ -196,6 +207,8 @@ export function mountFormUI(context, {
     updateSchema,
     navigateTo,
     getData,
+    hasValidationErrors,
+    getValidationErrorCount,
     destroy,
   };
 }

@@ -55,6 +55,8 @@ export default function createFormCommands(generator) {
       generator.updateData();
       generator.model.removeArrayItem(generator.data, arrayPath, index);
       generator.rebuildBody();
+      // Clear stale errors that may reference removed item indices
+      try { generator.validation.pruneStaleFieldErrors(); } catch {}
       generator.validation.validateAllFields();
     },
 
