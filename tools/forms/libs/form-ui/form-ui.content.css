@@ -12,16 +12,16 @@
 .form-ui-container {
   border: none;
   border-radius: 8px;
-  margin: 25px 0;
   background: white !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+  box-shadow: rgb(181 181 181) 0 0 20px;
   font-family: var(--spectrum-font-family-base, system-ui, -apple-system, sans-serif);
-  padding: 16px;
+  padding: 48px;
+  padding-right: 55px;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   min-height: 200px;
-  position: relative
+  position: relative;
 }
 
 .form-ui-header {
@@ -43,7 +43,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding-top: 6px
+  padding-top: 12px
 }
 
 .form-ui-title {
@@ -56,7 +56,6 @@
 
 .form-ui-body {
   flex: 1;
-  padding: 16px 0px 16px 16px;
   overflow: visible;
   position: relative;
   scroll-behavior: smooth
@@ -74,20 +73,19 @@
   box-sizing: border-box
 }
 
-.code-block-form {
+.form-ui-host {
   position: relative;
-  display: flow-root
+  display: flow-root;
+  flex: 0 0 700px;
 }
 
-.code-block-form .form-ui-container {
+.form-ui-container {
   margin: 0;
-  border-radius: 0
 }
 
 .form-ui-header .form-content-breadcrumb {
   display: block;
   width: 100%;
-  padding: 12px 0px 16px 0px;
   font-size: 12px;
   color: var(--form-ui-separator-text-color, #666);
   line-height: 1.3;
@@ -113,20 +111,15 @@
   text-decoration: underline
 }
 
-.code-block-form .form-ui-header {
+.form-ui-header {
   display: flex;
-  margin-bottom: 16px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb
 }
 
 .form-container-wrapper {
-  display: grid;
-  grid-template-columns: 1fr 0px;
-  align-items: start
-}
-
-.form-container-wrapper .code-block-form {
-  min-width: 0
+  display: flex;
+  gap: 20px;
 }
 
 .form-ui-footer {

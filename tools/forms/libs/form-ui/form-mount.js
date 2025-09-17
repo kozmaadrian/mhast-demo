@@ -27,7 +27,7 @@ function createWrapperAndHost(mount, ui) {
   wrapper.className = 'form-container-wrapper';
 
   const host = document.createElement('div');
-  host.className = 'code-block-form';
+  host.className = 'form-ui-host';
   wrapper.appendChild(host);
 
   return { controls, showNavConnectors, wrapper, host };

@@ -8,7 +8,7 @@ export const formShellTemplate = ({ title = 'Form' } = {}) => html`
         <span class="${CLASS.title}">${title}</span>
       </div>
     </div>
-    <div class="${CLASS.body}" style="position: relative;"></div>
+    <div class="${CLASS.body}"></div>
     <div class="${CLASS.footer}">
       <div class="${CLASS.validation}"></div>
     </div>

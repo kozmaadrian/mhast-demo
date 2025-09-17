@@ -1,7 +1,7 @@
 import { html } from 'da-lit';
 
 export const sidebarTemplate = () => html`
-  <div class="form-side-panel form-inline-panel">
+  <div class="form-side-panel">
     <div class="form-side-panel-main">
       <div class="form-side-panel-header">
         <div class="form-side-panel-title-container">

@@ -210,7 +210,7 @@ All UI actions call these commands, which: `updateData()` → mutate JSON via `F
 
 ### Positioning and visuals (CSS)
 
-- `.form-side-panel.form-inline-panel` is sticky and right-aligned (negative right margin). The panel limits height to the viewport and enables internal scrolling for the navigation tree. Auto-floating is disabled; it stays inline.
+- `.form-side-panel` is sticky and right-aligned (negative right margin). The panel limits height to the viewport and enables internal scrolling for the navigation tree. Auto-floating is disabled; it stays inline.
 - `.form-ui-highlight-overlay` is an absolute 2px bar placed along the left edge of the form container; `HighlightOverlay` computes top/height.
 - Smooth scrolling to groups is enabled via `.form-ui-body { scroll-behavior: smooth; }`.
 - Add placeholders: optional groups and array add-actions share a unified placeholder style (`.form-ui-placeholder-add`), full-width and hover-highlighted; disabled buttons show reduced opacity and not-allowed cursor.

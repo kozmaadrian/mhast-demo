@@ -125,7 +125,6 @@
 .form-ui-input,
 .form-ui-select {
   width: 100%;
-  max-width: 600px;
   height: 30px;
   padding: 0 8px;
   border: 1px solid #d1d5db;
@@ -174,7 +173,6 @@
 
 .form-ui-textarea {
   width: 100%;
-  max-width: 600px;
   padding: 8px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -387,7 +385,6 @@
 
 .form-ui-picker {
   width: 100%;
-  max-width: 600px;
   box-sizing: border-box;
   display: flex;
   align-items: center;

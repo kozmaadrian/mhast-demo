@@ -10,7 +10,7 @@
   position: absolute;
   top: 50%;
   width: 45%;
-  height: 1px;
+  height: 2px;
   background: linear-gradient(to right, transparent, var(--form-ui-separator-color, #ccc))
 }
 
@@ -39,7 +39,7 @@
 
 .form-ui-array-item>.form-ui-separator-text {
   display: block;
-  margin-top: 16px
+  margin-top: 25px
 }
 
 .form-ui-array-item-header .form-ui-separator-text {
@@ -82,7 +82,6 @@
   position: relative;
   transition: all .3s ease;
   scroll-margin-top: var(--form-scroll-offset, 80px);
-  max-width: 600px;
   box-shadow: none;
   overflow: visible;
   z-index: 2
