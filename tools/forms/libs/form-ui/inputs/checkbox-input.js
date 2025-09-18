@@ -1,3 +1,4 @@
+import { html, render } from 'da-lit';
 import BaseInput from './base-input.js';
 
 /**
@@ -9,22 +10,18 @@ export default class CheckboxInput extends BaseInput {
   constructor(context, handlers = {}) { super(context, handlers); }
   /** Create a checkbox input bound to `fieldPath` with schema defaults. */
   create(fieldPath, propSchema) {
-    const container = document.createElement('div');
-    container.className = 'form-ui-checkbox-container';
-
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.name = fieldPath;
-    input.className = 'form-ui-checkbox';
-    input.checked = propSchema.default || false;
-
-    const label = document.createElement('label');
-    label.appendChild(input);
     const fieldName = fieldPath.split('.').pop();
-    label.appendChild(document.createTextNode(` ${propSchema.title || this.formatLabel(fieldName)}`));
-
-    container.appendChild(label);
-
+    const mount = document.createElement('div');
+    render(html`
+      <div class="form-ui-checkbox-container">
+        <label>
+          <input type="checkbox" name=${fieldPath} class="form-ui-checkbox" ?checked=${propSchema.default || false} />
+          ${' '}${propSchema.title || this.formatLabel(fieldName)}
+        </label>
+      </div>
+    `, mount);
+    const container = mount.firstElementChild;
+    const input = container.querySelector('input.form-ui-checkbox');
     this.attachCommonEvents(input, fieldPath, propSchema);
     return container;
   }

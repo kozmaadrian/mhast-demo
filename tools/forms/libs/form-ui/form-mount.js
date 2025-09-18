@@ -8,9 +8,7 @@
  *   data,
  *   onChange,
  *   onRemove,
- *   ui: {
- *     // renderAllGroups is supported; other legacy UI toggles were removed
- *   }
+ *   ui: {}
  * });
  * api.updateData(next); api.destroy();
  */
@@ -29,7 +27,7 @@ function createWrapperAndHost(mount, ui) {
   wrapper.className = 'form-container-wrapper';
 
   const host = document.createElement('div');
-  host.className = 'code-block-form';
+  host.className = 'form-ui-host';
   wrapper.appendChild(host);
 
   return { controls, showNavConnectors, wrapper, host };
@@ -39,9 +37,7 @@ function instantiateGenerator(context, schema, controls) {
   let generator;
   let formEl;
   try {
-    generator = new FormGenerator(context, schema, {
-      renderAllGroups: !!controls.renderAllGroups
-    });
+    generator = new FormGenerator(context, schema, {});
     formEl = generator.generateForm();
   } catch (e) {
     console.error('[mountFormUI] failed to create/generate form:', e);
@@ -112,7 +108,7 @@ function wireNavigationClicks(sidebar, generator) {
  * @param {object} options.schema - JSON Schema describing the form
  * @param {object} [options.data] - Initial data to hydrate the form
  * @param {(nextData: object) => void} [options.onChange] - Callback invoked on any data change
- * @param {{renderAllGroups?: boolean}} [options.ui] - UI flags; currently only `renderAllGroups`
+ * @param {{}} [options.ui]
  * @returns {{
  *   updateData(next: object): void,
  *   updateSchema(nextSchema: object): void,
@@ -153,6 +149,17 @@ export function mountFormUI(context, {
   // expose API continues below
   /** Replace current form data with `next` and re-render inputs. */
   function updateData(next) { generator.loadData(next || {}); }
+  /** Return whether current form has validation errors. */
+  function hasValidationErrors() {
+    try {
+      return (generator.fieldErrors?.size || 0) + (generator.groupErrors?.size || 0) > 0;
+    } catch { return false; }
+  }
+  /** Get the current total validation error count. */
+  function getValidationErrorCount() {
+    try { return (generator.fieldErrors?.size || 0) + (generator.groupErrors?.size || 0); }
+    catch { return 0; }
+  }
   /**
    * Replace the current schema and rebuild the form while preserving current data.
    * Useful for hot-reloading or switching between schemas.
@@ -161,9 +168,7 @@ export function mountFormUI(context, {
   function updateSchema(nextSchema) {
     const dataSnapshot = generator.data;
     generator.destroy();
-    const newGen = new FormGenerator(nextSchema, {
-      renderAllGroups: !!controls.renderAllGroups,
-    });
+    const newGen = new FormGenerator(context, nextSchema, {});
     const newForm = newGen.generateForm();
     // Replace current form and update references
     if (formEl.parentNode === host) {
@@ -202,6 +207,8 @@ export function mountFormUI(context, {
     updateSchema,
     navigateTo,
     getData,
+    hasValidationErrors,
+    getValidationErrorCount,
     destroy,
   };
 }

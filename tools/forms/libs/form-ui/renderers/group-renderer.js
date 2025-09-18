@@ -1,5 +1,7 @@
+import { render } from 'da-lit';
 import { UI_CLASS as CLASS } from '../constants.js';
 import { pathToGroupId } from '../form-generator/path-utils.js';
+import { groupTemplate } from '../templates/group.js';
 
 /**
  * group-renderer
@@ -15,36 +17,12 @@ export function renderGroupContainer({
 }) {
   const groupPath = schemaPath.length > 0 ? schemaPath.join('.') : 'root';
   const groupId = pathToGroupId(groupPath);
-  const frag = document.createDocumentFragment();
-  const groupContainer = document.createElement('div');
-  groupContainer.className = CLASS.group;
-  groupContainer.id = groupId;
-  groupContainer.dataset.groupPath = breadcrumbPath.join(' > ');
-  groupContainer.dataset.schemaPath = groupPath;
-
-  if (addHeader && breadcrumbPath.length > 0) {
-    const groupHeader = document.createElement('div');
-    groupHeader.className = CLASS.groupHeader;
-    const sep = document.createElement('div');
-    sep.className = CLASS.separatorText;
-    const label = document.createElement('div');
-    label.className = CLASS.separatorLabel;
-    const titleSpan = document.createElement('span');
-    titleSpan.className = CLASS.groupTitle;
-    titleSpan.textContent = title || (breadcrumbPath[breadcrumbPath.length - 1] || '');
-    label.appendChild(titleSpan);
-    sep.appendChild(label);
-    groupHeader.appendChild(sep);
-    groupContainer.appendChild(groupHeader);
-  }
-
-  const groupContent = document.createElement('div');
-  groupContent.className = CLASS.groupContent;
-  groupContainer.appendChild(groupContent);
-  frag.appendChild(groupContainer);
-  container.appendChild(frag);
-
-  return { groupId, element: groupContainer, contentEl: groupContent };
+  const mount = document.createElement('div');
+  render(groupTemplate({ id: groupId, breadcrumbPath, schemaPath, title, addHeader, content: '' }), mount);
+  const groupContainer = mount.firstElementChild;
+  container.appendChild(groupContainer);
+  const contentEl = groupContainer.querySelector(`.${CLASS.groupContent}`);
+  return { groupId, element: groupContainer, contentEl };
 }
 
 export function renderPrimitivesIntoGroup({
@@ -83,5 +61,4 @@ export function renderArrayGroup({
 }
 
 export default { renderGroupContainer, renderPrimitivesIntoGroup, renderArrayGroup };
-
 

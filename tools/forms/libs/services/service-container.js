@@ -17,7 +17,10 @@ import { StorageService } from './storage-service.js';
 import { DaService } from './da-service.js';
 import { LabelService } from './label-service.js';
 import { ValidationService } from './validation-service.js';
+import { FormUiModelService } from './form-ui-model-service.js';
 import { ConfigService } from './config-service.js';
+import { AssetsService } from './assets-service/AssetsService.js';
+import { AuthService } from './auth-service.js';
 /**
  * ServiceContainer
  *
@@ -83,11 +86,32 @@ export class ServiceContainer {
     return this._services.validation;
   }
 
+  get formUiModel() {
+    if (!this._services.formUiModel) {
+      this._services.formUiModel = new FormUiModelService(this._context);
+    }
+    return this._services.formUiModel;
+  }
+
   get config() {
     if (!this._services.config) {
       this._services.config = new ConfigService();
     }
     return this._services.config;
+  }
+
+  get assets() {
+    if (!this._services.assets) {
+      this._services.assets = new AssetsService(this._context);
+    }
+    return this._services.assets;
+  }
+
+  get auth() {
+    if (!this._services.auth) {
+      this._services.auth = new AuthService(this._context);
+    }
+    return this._services.auth;
   }
 
 }

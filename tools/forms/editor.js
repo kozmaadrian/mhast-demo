@@ -7,7 +7,10 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
-const formStyles = await getStyle((new URL('./libs/form-ui/form-ui.css', import.meta.url)).href);
+const formContentStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.content.css', import.meta.url)).href);
+const formGroupsStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.groups.css', import.meta.url)).href);
+const formInputsStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.inputs.css', import.meta.url)).href);
+const formNavigationStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.navigation.css', import.meta.url)).href);
 
 /**
  * FormsEditor
@@ -54,7 +57,7 @@ class FormsEditor extends LitElement {
   /** Lifecycle: attach styles, initialize services, and bootstrap the UI. */
   async connectedCallback() {
     super.connectedCallback();
-    this.shadowRoot.adoptedStyleSheets = [style, formStyles];
+    this.shadowRoot.adoptedStyleSheets = [style, formContentStyles, formGroupsStyles, formInputsStyles, formNavigationStyles];
 
     // init DA SDK context
     const { context } = await DA_SDK;
@@ -96,6 +99,9 @@ class FormsEditor extends LitElement {
 
     this.addEventListener('editor-save', this._handleSave);
     this.addEventListener('editor-preview-publish', this._handlePreviewPublish);
+
+    // Ensure toast component is available
+    try { await import('./components/toast/toast.js'); } catch {}
   }
 
   /** Fetch and parse the page document into editor state. */
@@ -181,7 +187,7 @@ class FormsEditor extends LitElement {
           mount: mountEl,
           schema,
           data: dataToUse,
-          ui: { renderAllGroups: true, showNavConnectors: this._showNavConnectors },
+          ui: { showNavConnectors: this._showNavConnectors },
           onChange: (next) => {
             // Sync live changes back to pageData.formData (debounced)
             this._onFormChangeDebounced(next);
@@ -195,6 +201,15 @@ class FormsEditor extends LitElement {
             }
           },
         });
+
+        // Listen to validation state events to toggle actions and shortcuts
+        const onValidationState = (e) => {
+          const total = e?.detail?.totalErrors || 0;
+          this._setActionsDisabled(total > 0);
+        };
+        try { mountEl.removeEventListener('form-validation-state', this._onValidationState); } catch {}
+        this._onValidationState = onValidationState;
+        mountEl.addEventListener('form-validation-state', onValidationState);
         
       } else {
         this._formApi.updateSchema(schema);
@@ -227,6 +242,7 @@ class FormsEditor extends LitElement {
     this._formApi = null;
     this._disableDialogFocusTrap();
     window.removeEventListener('keydown', this._onGlobalKeydown);
+    try { this.renderRoot?.querySelector('#form-root')?.removeEventListener('form-validation-state', this._onValidationState); } catch {}
     super.disconnectedCallback();
   }
 
@@ -238,6 +254,7 @@ class FormsEditor extends LitElement {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (mod && e.key.toLowerCase() === 's') {
         e.preventDefault();
+        // Allow save via shortcut even if there are validation errors (testing)
         this._emitSave();
       }
     };
@@ -358,6 +375,21 @@ class FormsEditor extends LitElement {
         location.classList.remove('is-sending');
       }
     }
+  }
+
+  /** Enable/disable title action buttons based on validation state. */
+  _setActionsDisabled(disabled) {
+    try {
+      const title = this.renderRoot?.querySelector('da-title');
+      if (!title) return;
+      const root = title.shadowRoot;
+      if (!root) return;
+      // Reflect error state on the component, avoid disabling action buttons directly
+      title.hasErrors = !!disabled;
+      // Color the send button when errors exist
+      const send = root.querySelector('.da-title-action-send');
+      if (send) send.classList.toggle('is-error', !!disabled);
+    } catch {}
   }
 
   /** Save handler: serialize current form to DA. */

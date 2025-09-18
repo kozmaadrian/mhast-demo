@@ -5,9 +5,11 @@
  * Schema properties, and wires standardized events via injected handlers.
  */
 
-import FormIcons from './utils/icons.js';
+import { render } from 'da-lit';
 import { UI_CLASS as CLASS, DATA } from './constants.js';
 import { registry as createRegistry } from './inputs/index.js';
+import { addButtonTemplate, removeButtonTemplate } from './templates/buttons.js';
+import { actionsContainerTemplate } from './templates/actions.js';
 
 export default class InputFactory {
   /**
@@ -50,10 +52,11 @@ export default class InputFactory {
           return this._registry.get('string').create(fieldPath, propSchema, 'date-time');
         case 'time':
           return this._registry.get('string').create(fieldPath, propSchema, 'time');
+        case 'file':
+          return this._registry.get('asset').create(fieldPath, propSchema);
         case 'image':
         case 'picture':
-          // Picture: dedicated upload widget that stores resource path string
-          return this._registry.get('picture')?.create(fieldPath, propSchema) || this._registry.get('string').create(fieldPath, propSchema, 'uri');
+          return this._registry.get('asset')?.create(fieldPath, propSchema);
         case 'color':
           return this._registry.get('string').create(fieldPath, propSchema, 'color');
         default:
@@ -92,75 +95,52 @@ export default class InputFactory {
     itemsContainer.className = CLASS.arrayItems;
     container.appendChild(itemsContainer);
 
-    const addButton = document.createElement('button');
-    addButton.type = 'button';
-    addButton.className = CLASS.arrayAdd;
-    const lastToken = fieldPath.split('.').pop();
-    const baseTitle = propSchema?.title || this.services.label.formatLabel(lastToken);
-    addButton.textContent = '';
-    addButton.appendChild(FormIcons.renderIcon('plus'));
-    const labelSpan = document.createElement('span');
-    labelSpan.textContent = `Add`;
-    addButton.appendChild(labelSpan);
-    // Determine if items are primitives (vs objects)
-    const itemsSchema = propSchema.items || {};
-    const isPrimitiveItems = !(itemsSchema && (itemsSchema.type === 'object' || (Array.isArray(itemsSchema.type) && itemsSchema.type.includes('object'))));
-
-    addButton.addEventListener('click', (event) => {
+    const addBtnMount = document.createElement('div');
+    const onAddFocus = (e) => this.onFocus(fieldPath, propSchema, e.target);
+    render(addButtonTemplate({ label: 'Add', path: fieldPath, onClick: (event) => {
       event.preventDefault();
       event.stopPropagation();
       if (isPrimitiveItems) {
-        // Render one pending blank item (UI-only) and disable add until it is filled
         const currentLength = itemsContainer.querySelectorAll('.form-ui-array-item').length;
         const itemContainer = document.createElement('div');
         itemContainer.className = CLASS.arrayItem;
         const itemIndexName = `${fieldPath}[${currentLength}]`;
         const itemInput = this.create(itemIndexName, propSchema.items || { type: 'string' });
-        const removeButton = document.createElement('button');
-        removeButton.type = 'button';
-        removeButton.className = CLASS.remove;
-        removeButton.title = 'Remove item';
-        removeButton.textContent = '';
-        removeButton.appendChild(FormIcons.renderIcon('trash'));
-        removeButton.addEventListener('click', () => {
-          if (removeButton.classList.contains('confirm-state')) {
-            if (removeButton.dataset.confirmTimeoutId) {
-              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
-              delete removeButton.dataset.confirmTimeoutId;
-            }
-            itemContainer.remove();
-            addButton.disabled = false;
-            // Reindex names after removal of pending; keep existing stable
-            Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
-              el.querySelectorAll('[name]').forEach((inputEl) => {
-                inputEl.name = inputEl.name.replace(/\[[0-9]+\]$/, `[${idx}]`);
+
+        let confirmState = false;
+        const removeMount = document.createElement('div');
+        const rerenderRemove = () => {
+          render(removeButtonTemplate({ confirm: confirmState, onClick: () => {
+            if (confirmState) {
+              itemContainer.remove();
+              addButton.disabled = false;
+              Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).forEach((el, idx) => {
+                el.querySelectorAll('[name]').forEach((inputEl) => {
+                  inputEl.name = inputEl.name.replace(/\[[0-9]+\]$/, `[${idx}]`);
+                });
               });
-            });
-            this.onInputOrChange(fieldPath, propSchema, addButton);
-          } else {
-            const originalHTML = removeButton.innerHTML;
-            const originalTitle = removeButton.title;
-            const originalClass = removeButton.className;
-            removeButton.textContent = '';
-            removeButton.appendChild(FormIcons.renderIcon('check'));
-            removeButton.title = 'Click to confirm removal';
-            removeButton.classList.add('confirm-state');
-            const timeout = setTimeout(() => {
-              if (removeButton) {
-                removeButton.innerHTML = originalHTML;
-                removeButton.title = originalTitle;
-                removeButton.className = originalClass;
-                delete removeButton.dataset.confirmTimeoutId;
-              }
-            }, 3000);
-            removeButton.dataset.confirmTimeoutId = String(timeout);
-          }
-        });
-        itemContainer.appendChild(itemInput);
-        itemContainer.appendChild(removeButton);
+              this.onInputOrChange(fieldPath, propSchema, addButton);
+            } else {
+              confirmState = true;
+              rerenderRemove();
+              setTimeout(() => { confirmState = false; rerenderRemove(); }, 3000);
+            }
+          }}), removeMount);
+        };
+        rerenderRemove();
+
+        const row = document.createElement('div');
+        row.className = 'form-ui-field-row';
+        const main = document.createElement('div');
+        main.className = 'form-ui-field-main';
+        const actionsHost = document.createElement('div');
+        render(actionsContainerTemplate({ forPath: fieldPath, content: removeMount.firstElementChild }), actionsHost);
+        main.appendChild(itemInput);
+        row.appendChild(main);
+        row.appendChild(actionsHost.firstElementChild);
+        itemContainer.appendChild(row);
         itemsContainer.appendChild(itemContainer);
 
-        // Disable add until value is provided
         addButton.disabled = true;
         const ctrl = itemContainer.querySelector('input, select, textarea');
         const updateAddDisabled = () => {
@@ -175,12 +155,13 @@ export default class InputFactory {
         if (ctrl) ['input', 'change'].forEach((evt) => ctrl.addEventListener(evt, updateAddDisabled));
         updateAddDisabled();
       } else {
-        // Arrays of objects: delegate to central command so JSON is source of truth
         this.onArrayAdd(fieldPath, propSchema);
       }
-    });
-
-    addButton.addEventListener('focus', (e) => this.onFocus(fieldPath, propSchema, e.target));
+    }, onFocus: onAddFocus }), addBtnMount);
+    const addButton = addBtnMount.firstElementChild;
+    // Determine if items are primitives (vs objects)
+    const itemsSchema = propSchema.items || {};
+    const isPrimitiveItems = !(itemsSchema && (itemsSchema.type === 'object' || (Array.isArray(itemsSchema.type) && itemsSchema.type.includes('object'))));
     container.appendChild(addButton);
 
     // Mark as primitive array when items are not objects
@@ -198,12 +179,21 @@ export default class InputFactory {
           if (inputEl.type === 'checkbox') inputEl.checked = Boolean(value);
           else inputEl.value = String(value);
         }
-        const removeButton = document.createElement('button');
-        removeButton.type = 'button';
-        removeButton.className = CLASS.remove;
-        removeButton.title = 'Remove item';
-        removeButton.textContent = '';
-        removeButton.appendChild(FormIcons.renderIcon('trash'));
+        let confirmState = false;
+        const removeMount = document.createElement('div');
+        const rerenderRemove = () => {
+          render(removeButtonTemplate({ confirm: confirmState, onClick: () => {
+            if (confirmState) {
+              const idx = Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).indexOf(itemContainer);
+              this.onArrayRemove(fieldPath, idx < 0 ? 0 : idx);
+            } else {
+              confirmState = true;
+              rerenderRemove();
+              setTimeout(() => { confirmState = false; rerenderRemove(); }, 3000);
+            }
+          }}), removeMount);
+        };
+        rerenderRemove();
         const toggleRemoveVisibility = () => {
           const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
           const ctrl = itemContainer.querySelector('input, select, textarea');
@@ -213,42 +203,22 @@ export default class InputFactory {
             else if (ctrl.type === 'checkbox') isBlank = !ctrl.checked;
             else isBlank = (ctrl.value === '' || ctrl.value == null);
           }
-          if (total <= 1 && isBlank) removeButton.style.visibility = 'hidden';
-          else removeButton.style.visibility = 'visible';
+          const btn = removeMount.firstElementChild;
+          if (btn) btn.style.visibility = (total <= 1 && isBlank) ? 'hidden' : 'visible';
         };
         if (inputEl && inputEl.addEventListener) {
           ['input', 'change'].forEach((evt) => inputEl.addEventListener(evt, toggleRemoveVisibility));
         }
-        removeButton.addEventListener('click', () => {
-          if (removeButton.classList.contains('confirm-state')) {
-            if (removeButton.dataset.confirmTimeoutId) {
-              clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
-              delete removeButton.dataset.confirmTimeoutId;
-            }
-            // Delegate removal to central command which rebuilds UI
-            const idx = Array.from(itemsContainer.querySelectorAll('.form-ui-array-item')).indexOf(itemContainer);
-            this.onArrayRemove(fieldPath, idx < 0 ? 0 : idx);
-          } else {
-            const originalHTML = removeButton.innerHTML;
-            const originalTitle = removeButton.title;
-            const originalClass = removeButton.className;
-            removeButton.textContent = '';
-            removeButton.appendChild(FormIcons.renderIcon('check'));
-            removeButton.title = 'Click to confirm removal';
-            removeButton.classList.add('confirm-state');
-            const timeout = setTimeout(() => {
-              if (removeButton) {
-                removeButton.innerHTML = originalHTML;
-                removeButton.title = originalTitle;
-                removeButton.className = originalClass;
-                delete removeButton.dataset.confirmTimeoutId;
-              }
-            }, 3000);
-            removeButton.dataset.confirmTimeoutId = String(timeout);
-          }
-        });
-        itemContainer.appendChild(itemInput);
-        itemContainer.appendChild(removeButton);
+        const row = document.createElement('div');
+        row.className = 'form-ui-field-row';
+        const main = document.createElement('div');
+        main.className = 'form-ui-field-main';
+        const actionsHost = document.createElement('div');
+        main.appendChild(itemInput);
+        render(actionsContainerTemplate({ forPath: fieldPath, content: removeMount.firstElementChild }), actionsHost);
+        row.appendChild(main);
+        row.appendChild(actionsHost.firstElementChild);
+        itemContainer.appendChild(row);
         itemsContainer.appendChild(itemContainer);
         toggleRemoveVisibility();
       });
@@ -257,12 +227,20 @@ export default class InputFactory {
       const itemContainer = document.createElement('div');
       itemContainer.className = CLASS.arrayItem;
       const itemInput = this.create(`${fieldPath}[0]`, propSchema.items || { type: 'string' });
-      const removeButton = document.createElement('button');
-      removeButton.type = 'button';
-      removeButton.className = CLASS.remove;
-      removeButton.title = 'Remove item';
-      removeButton.textContent = '';
-      removeButton.appendChild(FormIcons.renderIcon('trash'));
+      let confirmState = false;
+      const removeMount = document.createElement('div');
+      const rerenderRemove = () => {
+        render(removeButtonTemplate({ confirm: confirmState, onClick: () => {
+          if (confirmState) {
+            this.onArrayRemove(fieldPath, 0);
+          } else {
+            confirmState = true;
+            rerenderRemove();
+            setTimeout(() => { confirmState = false; rerenderRemove(); }, 3000);
+          }
+        }}), removeMount);
+      };
+      rerenderRemove();
       const toggleRemoveVisibility = () => {
         const total = itemsContainer.querySelectorAll('.form-ui-array-item').length;
         const ctrl = itemContainer.querySelector('input, select, textarea');
@@ -272,38 +250,19 @@ export default class InputFactory {
           else if (ctrl.type === 'checkbox') isBlank = !ctrl.checked;
           else isBlank = (ctrl.value === '' || ctrl.value == null);
         }
-        if (total <= 1 && isBlank) removeButton.style.visibility = 'hidden';
-        else removeButton.style.visibility = 'visible';
+        const btn = removeMount.firstElementChild;
+        if (btn) btn.style.visibility = (total <= 1 && isBlank) ? 'hidden' : 'visible';
       };
-      removeButton.addEventListener('click', () => {
-        // Confirm, then delegate to central remove so JSON becomes [] and UI rebuilds
-        if (removeButton.classList.contains('confirm-state')) {
-          if (removeButton.dataset.confirmTimeoutId) {
-            clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
-            delete removeButton.dataset.confirmTimeoutId;
-          }
-          this.onArrayRemove(fieldPath, 0);
-        } else {
-          const originalHTML = removeButton.innerHTML;
-          const originalTitle = removeButton.title;
-          const originalClass = removeButton.className;
-          removeButton.textContent = '';
-          removeButton.appendChild(FormIcons.renderIcon('check'));
-          removeButton.title = 'Click to confirm removal';
-          removeButton.classList.add('confirm-state');
-          const timeout = setTimeout(() => {
-            if (removeButton) {
-              removeButton.innerHTML = originalHTML;
-              removeButton.title = originalTitle;
-              removeButton.className = originalClass;
-              delete removeButton.dataset.confirmTimeoutId;
-            }
-          }, 3000);
-          removeButton.dataset.confirmTimeoutId = String(timeout);
-        }
-      });
-      itemContainer.appendChild(itemInput);
-      itemContainer.appendChild(removeButton);
+      const row = document.createElement('div');
+      row.className = 'form-ui-field-row';
+      const main = document.createElement('div');
+      main.className = 'form-ui-field-main';
+      main.appendChild(itemInput);
+      const actionsHost = document.createElement('div');
+      render(actionsContainerTemplate({ forPath: fieldPath, content: removeMount.firstElementChild }), actionsHost);
+      row.appendChild(main);
+      row.appendChild(actionsHost.firstElementChild);
+      itemContainer.appendChild(row);
       itemsContainer.appendChild(itemContainer);
       const ctrl = itemContainer.querySelector('input, select, textarea');
       if (ctrl && ctrl.addEventListener) {

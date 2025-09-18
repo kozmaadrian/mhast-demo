@@ -1,5 +1,7 @@
 import { hyphenatePath } from './path-utils.js';
 import { UI_CLASS as CLASS } from '../constants.js';
+import { render } from 'da-lit';
+import { sectionTemplate } from '../templates/section.js';
 
 /**
  * Section builder
@@ -15,18 +17,9 @@ import { UI_CLASS as CLASS } from '../constants.js';
  */
 export function createSection(childrenHost, titleText, schemaPathDot, breadcrumbPath) {
   const sectionId = `form-section-${hyphenatePath(schemaPathDot)}`;
-  const sectionContainer = document.createElement('div');
-  sectionContainer.className = CLASS.section || 'form-ui-section';
-  sectionContainer.id = sectionId;
-  sectionContainer.dataset.sectionPath = (breadcrumbPath || []).join(' > ');
-
-  const sectionHeader = document.createElement('div');
-  sectionHeader.className = CLASS.sectionHeader || 'form-ui-section-header';
-  const sectionTitle = document.createElement('h2');
-  sectionTitle.className = CLASS.sectionTitle || 'form-ui-section-title';
-  sectionTitle.textContent = titleText || '';
-  sectionHeader.appendChild(sectionTitle);
-  sectionContainer.appendChild(sectionHeader);
+  const mount = document.createElement('div');
+  render(sectionTemplate({ id: sectionId, title: titleText, sectionPath: (breadcrumbPath || []).join(' > ') }), mount);
+  const sectionContainer = mount.firstElementChild;
   childrenHost.appendChild(sectionContainer);
 
   return { sectionId, element: sectionContainer };

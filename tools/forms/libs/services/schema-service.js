@@ -17,6 +17,71 @@ export class SchemaService {
     this._normalizeCache = new WeakMap();
   }
 
+  /** Resolve a JSON Pointer (local) against the provided root schema. */
+  resolvePointer(rootSchema, pointer) {
+    if (typeof pointer !== 'string') return null;
+    if (pointer === '#' || pointer === '') return rootSchema;
+    const p = pointer.startsWith('#') ? pointer.slice(1) : pointer;
+    const parts = String(p).replace(/^\//, '').split('/').map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+    let current = rootSchema;
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return null;
+      }
+    }
+    return current;
+  }
+
+  /**
+   * Resolve a JSON Pointer while transparently traversing through $ref nodes.
+   * This behaves as if all $ref were inlined at read time.
+   * Returns the EFFECTIVE node (not cloned) or null if not found.
+   */
+  resolvePointerWithRefs(rootSchema, pointer) {
+    if (typeof pointer !== 'string') return null;
+    if (pointer === '#' || pointer === '') return rootSchema;
+    const p = pointer.startsWith('#') ? pointer.slice(1) : pointer;
+    const parts = String(p).replace(/^\//, '').split('/').map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+    let current = rootSchema;
+    for (let i = 0; i < parts.length; i += 1) {
+      const token = parts[i];
+      // If the current node is a $ref container, dereference it before continuing
+      if (current && typeof current === 'object' && current.$ref) {
+        current = this.derefNode(rootSchema, current) || current;
+      }
+      if (!current || typeof current !== 'object') return null;
+      if (!(token in current)) return null;
+      current = current[token];
+    }
+    // Final deref to return effective node
+    if (current && typeof current === 'object' && current.$ref) {
+      current = this.derefNode(rootSchema, current) || current;
+    }
+    return current;
+  }
+
+  /** Return a normalized (deref + primary type) node at pointer, following $ref along the path. */
+  getEffectiveNodeAtPointer(rootSchema, pointer) {
+    const node = this.resolvePointerWithRefs(rootSchema, pointer);
+    return this.normalizeSchema(rootSchema, node);
+  }
+
+  /** Get node title at pointer, following $ref along the path; fallback to provided key when missing. */
+  getTitleAtPointer(rootSchema, pointer, fallbackKey) {
+    const node = this.getEffectiveNodeAtPointer(rootSchema, pointer);
+    return this.getSchemaTitle(rootSchema, node, fallbackKey);
+  }
+
+  /** Return normalized items schema at array node pointer, following $ref. */
+  getArrayItemsAtPointer(rootSchema, pointer) {
+    const node = this.getEffectiveNodeAtPointer(rootSchema, pointer);
+    if (!node || node.type !== 'array') return null;
+    const items = this.derefNode(rootSchema, node.items) || node.items;
+    return this.normalizeSchema(rootSchema, items);
+  }
+
   /** Resolve a $ref within the same document; returns a merged effective node. */
   derefNode(rootSchema, node) {
     if (!node || typeof node !== 'object' || !node.$ref || typeof node.$ref !== 'string') return node;

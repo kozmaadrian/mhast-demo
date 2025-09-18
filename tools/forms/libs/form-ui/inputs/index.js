@@ -3,6 +3,7 @@ import TextareaInput from './textarea-input.js';
 import SelectInput from './select-input.js';
 import NumberInput from './number-input.js';
 import CheckboxInput from './checkbox-input.js';
+import AssetInput from './asset-input.js';
 import PictureInput from './picture-input.js';
 
 export function registry(context, handlers) {
@@ -13,7 +14,8 @@ export function registry(context, handlers) {
     ['number', new NumberInput(context, handlers)],
     ['integer', new NumberInput(context, handlers)],
     ['boolean', new CheckboxInput(context, handlers)],
-    ['picture', new PictureInput(context, handlers)],
+    ['asset', new AssetInput(context, handlers)],
+    ['picture', new PictureInput(context, handlers)]
   ]);
 }
 

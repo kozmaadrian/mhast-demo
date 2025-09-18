@@ -55,6 +55,8 @@ export default function createFormCommands(generator) {
       generator.updateData();
       generator.model.removeArrayItem(generator.data, arrayPath, index);
       generator.rebuildBody();
+      // Clear stale errors that may reference removed item indices
+      try { generator.validation.pruneStaleFieldErrors(); } catch {}
       generator.validation.validateAllFields();
     },
 
@@ -63,11 +65,8 @@ export default function createFormCommands(generator) {
     },
 
     resetAll() {
-      const base = generator.renderAllGroups
-        ? generator.generateBaseJSON(generator.schema)
-        : generator.model.generateBaseJSON(generator.schema);
+      const base = generator.generateBaseJSON(generator.schema);
       generator.data = base;
-      generator.activeOptionalGroups = new Set();
       generator.rebuildBody();
       generator.validation.validateAllFields();
     },

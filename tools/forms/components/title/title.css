@@ -32,6 +32,22 @@ h1 {
   color: #FFF;
 }
 
+/* Disabled buttons: visual treatment and cursor */
+.con-button[disabled],
+.con-button.is-disabled {
+  background: #e5e7eb;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.con-button.blue[disabled],
+.con-button.blue.is-disabled {
+  background: #cbd5e1;
+  border-color: #cbd5e1;
+  color: #ffffff;
+}
+
 .da-title-inner {
   max-width: var(--grid-container-width);
   margin: 0 auto;
@@ -97,6 +113,12 @@ h1 {
   background: #EFEFEF;
 }
 
+/* Prevent opening actions menu when form has errors */
+.da-title-inner:host([hasErrors]) .da-title-actions.is-open,
+.da-title-inner.has-errors .da-title-actions.is-open {
+  background: transparent;
+}
+
 .da-title-actions.is-open .da-title-action {
   display: unset;
 }
@@ -137,6 +159,12 @@ h1 {
 
 .da-title-action-send.is-error {
   background-color: var(--s2-red);
+}
+
+/* Stronger red variant to match header error badge (#ef4444) */
+.da-title-action-send.is-error {
+  background-color: rgb(239, 68, 68);
+  border-color: rgb(239, 68, 68);
 }
 
 @keyframes animated-background {

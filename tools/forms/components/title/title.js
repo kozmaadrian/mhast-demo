@@ -16,6 +16,7 @@ export default class DaTitle extends LitElement {
     _actionsVis: {},
     _status: { state: true },
     _fixedActions: { state: true },
+    hasErrors: { type: Boolean },
   };
 
   /** Adopt the shared stylesheet when the element is attached. */
@@ -48,6 +49,16 @@ export default class DaTitle extends LitElement {
     const sendBtn = this.shadowRoot.querySelector(".da-title-action-send-icon");
 
     if (action === "preview" || action === "publish") {
+      // If form has validation errors, show a toast instead of dispatching
+      if (this.hasErrors) {
+        let toast = document.querySelector('da-toast');
+        if (!toast) {
+          toast = document.createElement('da-toast');
+          document.body.appendChild(toast);
+        }
+        try { toast.show('Form has validation errors. Please fix them before continuing.', { variant: 'error' }); } catch {}
+        return;
+      }
       let myEvent = new CustomEvent("editor-preview-publish", {
         detail: { action, location: sendBtn },
         bubbles: true,
@@ -60,6 +71,27 @@ export default class DaTitle extends LitElement {
   /** Toggle visibility of the action controls. */
   toggleActions() {
     this._actionsVis = !this._actionsVis;
+  }
+
+  /** Handle send button click: if errors exist, show toast; otherwise toggle actions. */
+  onSendClick = () => {
+    if (this.hasErrors) {
+      let toast = document.querySelector('da-toast');
+      if (!toast) {
+        toast = document.createElement('da-toast');
+        document.body.appendChild(toast);
+      }
+      try { toast.show('Please correct the highlighted errors before continuing.', { variant: 'error' }); } catch {}
+      return;
+    }
+    this.toggleActions();
+  }
+
+  /** Close actions if error state becomes true. */
+  updated(changed) {
+    if (changed.has('hasErrors') && this.hasErrors) {
+      this._actionsVis = false;
+    }
   }
 
   /** Render the title header and action buttons. */
@@ -96,7 +128,7 @@ export default class DaTitle extends LitElement {
               Publish
             </button>
             <button
-              @click=${this.toggleActions}
+              @click=${this.onSendClick}
               class="con-button blue da-title-action-send"
               aria-label="Send"
             >

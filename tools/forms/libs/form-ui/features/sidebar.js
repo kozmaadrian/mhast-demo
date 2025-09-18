@@ -1,6 +1,8 @@
 /**
  * Form Sidebar Component (navigation-only)
  */
+import { render } from 'da-lit';
+import { sidebarTemplate } from '../templates/sidebar.js';
 
 /**
  * FormSidebar
@@ -18,34 +20,13 @@ export default class FormSidebar {
     this.onNavigationClick = null;
   }
 
-  /** Create and return the sidebar DOM element. */
+  /** Create and return the sidebar DOM element using a template. */
   createElement() {
-    this.element = document.createElement('div');
-    // Default to inline panel by class so no conversion is needed in mount
-    this.element.className = 'form-side-panel form-inline-panel';
-    const main = document.createElement('div');
-    main.className = 'form-side-panel-main';
-    const header = document.createElement('div');
-    header.className = 'form-side-panel-header';
-    const titleWrap = document.createElement('div');
-    titleWrap.className = 'form-side-panel-title-container';
-    const title = document.createElement('span');
-    title.className = 'form-side-panel-title';
-    title.textContent = 'Navigation';
-    titleWrap.appendChild(title);
-    header.appendChild(titleWrap);
-    const content = document.createElement('div');
-    content.className = 'form-side-panel-content';
-    const tree = document.createElement('div');
-    tree.className = 'form-navigation-tree';
-    content.appendChild(tree);
-    main.appendChild(header);
-    main.appendChild(content);
-    this.element.appendChild(main);
-
+    const mount = document.createElement('div');
+    render(sidebarTemplate(), mount);
+    this.element = mount.firstElementChild;
     this.navigationTree = this.element.querySelector('.form-navigation-tree');
     this.setupEventHandlers();
-
     return this.element;
   }
 

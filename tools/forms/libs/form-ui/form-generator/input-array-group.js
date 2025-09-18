@@ -1,90 +1,24 @@
-import FormIcons from '../utils/icons.js';
+import { render } from 'da-lit';
+import { UI_CLASS as CLASS } from '../constants.js';
+import { arrayContainerTemplate, arrayItemTemplate, arrayAddButtonTemplate, removeButtonTemplate } from '../templates/array.js';
 
 export default function createArrayGroupUI(generator, fieldPath, propSchema) {
   const itemsSchema = generator.derefNode(propSchema.items) || propSchema.items;
   const normItemsSchema = generator.normalizeSchema(itemsSchema) || itemsSchema || {};
-  const container = document.createElement('div');
-  container.className = 'form-ui-array-container';
-  container.dataset.field = fieldPath;
 
-  const itemsContainer = document.createElement('div');
-  itemsContainer.className = 'form-ui-array-items';
-  container.appendChild(itemsContainer);
+  // Create container using template
+  const containerMount = document.createElement('div');
+  render(arrayContainerTemplate({ fieldPath, items: '' }), containerMount);
+  const container = containerMount.firstElementChild;
+  const itemsContainer = container.querySelector(`.${CLASS.arrayItems}`) || container.querySelector('.form-ui-array-items');
 
-  const baseTitle = generator.getSchemaTitle(propSchema, fieldPath.split('.').pop());
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'form-ui-array-add form-ui-placeholder-add';
-  addButton.innerHTML = `<span>+ Add '${baseTitle}' Item</span>`;
-
-  const addItemAt = (index) => {
-    const itemContainer = document.createElement('div');
-    itemContainer.className = 'form-ui-array-item';
-    itemContainer.id = generator.arrayItemId(fieldPath, index);
-    // Schema path for this array item (schema/data-driven breadcrumb)
-    const pathPrefix = `${fieldPath}[${index}]`;
-    itemContainer.dataset.schemaPath = pathPrefix;
-    const headerWrap = document.createElement('div');
-    headerWrap.className = 'form-ui-array-item-header';
-    const itemTitleSep = document.createElement('div');
-    itemTitleSep.className = 'form-ui-separator-text';
-    const itemTitleLabel = document.createElement('div');
-    itemTitleLabel.className = 'form-ui-separator-label';
-    itemTitleLabel.textContent = `${baseTitle} #${index + 1}`;
-    itemTitleSep.appendChild(itemTitleLabel);
-    headerWrap.appendChild(itemTitleSep);
-    const groupContent = document.createElement('div');
-    groupContent.className = 'form-ui-group-content';
-    groupContent.appendChild(headerWrap);
-    generator.generateObjectFields(
-      groupContent,
-      normItemsSchema.properties || {},
-      normItemsSchema.required || [],
-      pathPrefix,
-    );
-    itemContainer.appendChild(groupContent);
-    const actions = document.createElement('div');
-    actions.className = 'form-ui-array-item-actions';
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'form-ui-remove';
-    removeButton.title = 'Remove item';
-    removeButton.textContent = '';
-    removeButton.appendChild(FormIcons.renderIcon('trash'));
-    removeButton.addEventListener('click', () => {
-      if (removeButton.classList.contains('confirm-state')) {
-        if (removeButton.dataset.confirmTimeoutId) {
-          clearTimeout(Number(removeButton.dataset.confirmTimeoutId));
-          delete removeButton.dataset.confirmTimeoutId;
-        }
-        generator.commandRemoveArrayItem(fieldPath, index);
-        requestAnimationFrame(() => generator.validation.validateAllFields());
-      } else {
-        const originalHTML = removeButton.innerHTML;
-        const originalTitle = removeButton.title;
-        const originalClass = removeButton.className;
-        removeButton.innerHTML = '✓';
-        removeButton.title = 'Click to confirm removal';
-        removeButton.classList.add('confirm-state');
-        const timeout = setTimeout(() => {
-          if (removeButton) {
-            removeButton.innerHTML = originalHTML;
-            removeButton.title = originalTitle;
-            removeButton.className = originalClass;
-            delete removeButton.dataset.confirmTimeoutId;
-          }
-        }, 3000);
-        removeButton.dataset.confirmTimeoutId = String(timeout);
-      }
-    });
-    actions.appendChild(removeButton);
-    headerWrap.appendChild(actions);
-    itemsContainer.appendChild(itemContainer);
-    generator.ensureGroupRegistry();
-    // Mapping is handled in lifecycle.rebuildBody → mapping.mapFieldsToGroups
-  };
-
-  addButton.addEventListener('click', (event) => {
+  // Use the title of the ITEMS schema (object) for per-item labels so it
+  // matches navigation (e.g., "NUJ - Questionnaire Answer #1") rather than
+  // the array property title (e.g., "Answer List")
+  const baseTitle = generator.getSchemaTitle(normItemsSchema, fieldPath.split('.').pop());
+  // Create add button via template to simplify DOM assembly
+  const addBtnMount = document.createElement('div');
+  const onAddClick = (event) => {
     event.preventDefault();
     event.stopPropagation();
     generator.commandAddArrayItem(fieldPath);
@@ -96,8 +30,53 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
       if (el && el.id) generator.navigation.navigateToGroup(el.id);
       generator.validation.validateAllFields();
     });
-  });
-  addButton.addEventListener('focus', (e) => generator.navigation.highlightActiveGroup?.(e.target));
+  };
+  const onAddFocus = (e) => generator.navigation.highlightActiveGroup?.(e.target);
+  render(arrayAddButtonTemplate({ label: `Add '${baseTitle}' Item`, path: fieldPath, onClick: onAddClick, onFocus: onAddFocus }), addBtnMount);
+  const addButton = addBtnMount.firstElementChild;
+
+  const addItemAt = (index) => {
+    const itemId = generator.arrayItemId(fieldPath, index);
+    const pathPrefix = `${fieldPath}[${index}]`;
+
+    // Build inner content DOM for this item (fields) without extra wrapper div
+    const contentHost = document.createDocumentFragment();
+    generator.generateObjectFields(
+      contentHost,
+      normItemsSchema.properties || {},
+      normItemsSchema.required || [],
+      pathPrefix,
+    );
+
+    // Remove button state managed locally per-item
+    let confirmState = false;
+    const removeMount = document.createElement('div');
+    const reRenderRemove = () => {
+      render(removeButtonTemplate({ confirm: confirmState, onClick: (ev) => {
+        ev?.preventDefault?.();
+        ev?.stopPropagation?.();
+        if (confirmState) {
+          generator.commandRemoveArrayItem(fieldPath, index);
+          requestAnimationFrame(() => generator.validation.validateAllFields());
+        } else {
+          confirmState = true;
+          reRenderRemove();
+          setTimeout(() => { confirmState = false; reRenderRemove(); }, 3000);
+        }
+      }}), removeMount);
+    };
+    reRenderRemove();
+
+    const mount = document.createElement('div');
+    render(arrayItemTemplate({ id: itemId, title: `${baseTitle} #${index + 1}`, content: contentHost, removeButton: removeMount.firstElementChild }), mount);
+    const itemContainer = mount.firstElementChild;
+    itemContainer.dataset.schemaPath = pathPrefix;
+
+    itemsContainer.appendChild(itemContainer);
+    generator.ensureGroupRegistry();
+    // Mapping is handled in lifecycle.rebuildBody → mapping.mapFieldsToGroups
+  };
+
   container.appendChild(addButton);
 
   const existing = generator.model.getNestedValue(generator.data, fieldPath);
@@ -107,5 +86,4 @@ export default function createArrayGroupUI(generator, fieldPath, propSchema) {
 
   return container;
 }
-
 
