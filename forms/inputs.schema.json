@@ -76,6 +76,21 @@
       "title": "Image URL",
       "x-semantic-type": "image"
     },
+    "fileUrl": {
+      "type": "string",
+      "format": "uri",
+      "title": "File URL",
+      "x-semantic-type": "file"
+    },
+    "imageUrls": {
+      "type": "array",
+      "title": "Image URLs (multiple)",
+      "items": {
+        "type": "string",
+        "format": "uri",
+        "x-semantic-type": "image"
+      }
+    },
     "referenceUser": {
       "type": "string",
       "title": "Reference: User",
