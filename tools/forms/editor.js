@@ -7,10 +7,10 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { DA_LIVE, MHAST_LIVE } from "./utils.js";
 
 const style = await getStyle(import.meta.url);
-const formContentStyles = await getStyle((new URL('./libs/form-ui/form-ui.content.css', import.meta.url)).href);
-const formGroupsStyles = await getStyle((new URL('./libs/form-ui/form-ui.groups.css', import.meta.url)).href);
-const formInputsStyles = await getStyle((new URL('./libs/form-ui/form-ui.inputs.css', import.meta.url)).href);
-const formNavigationStyles = await getStyle((new URL('./libs/form-ui/form-ui.navigation.css', import.meta.url)).href);
+const formContentStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.content.css', import.meta.url)).href);
+const formGroupsStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.groups.css', import.meta.url)).href);
+const formInputsStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.inputs.css', import.meta.url)).href);
+const formNavigationStyles = await getStyle((new URL('./libs/form-ui/styles/form-ui.navigation.css', import.meta.url)).href);
 
 /**
  * FormsEditor

@@ -6,7 +6,7 @@
  * - Orchestrate schema→DOM rendering (header/body/footer)
  * - Build sections and groups via GroupBuilder
  * - Create controls via InputFactory and wire events
- * - Maintain data via FormModel
+ * - Maintain data via FormUiModel
  * - Plug features: Navigation, Validation
  * - Expose maps/refs for features:
  *   groupElements, fieldSchemas, fieldElements, fieldToGroup, navigationTree
@@ -54,7 +54,7 @@ export default class FormGenerator {
     this.model = new FormDataModel(this.context, this.schema);
     this.data = this._getBaseJSON(this.schema);
     // Derived groups model (read-only)
-    this.formModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
+    this.formUiModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
     this.listeners = new Set();
     this.groupCounter = 0;
     this.groupElements = new Map();
@@ -180,8 +180,8 @@ export default class FormGenerator {
 
   /** Rebuild the form body while preserving current state and references. */
   rebuildBody() {
-    // Recompute the read-only FormModel before rebuilding UI
-    this.formModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
+    // Recompute the read-only FormUiModel before rebuilding UI
+    this.formUiModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
     return lifecycleRebuildBody(this);
   }
 
@@ -225,9 +225,9 @@ export default class FormGenerator {
     return lifecycleGenerateForm(this);
   }
 
-  /** Return the latest read-only FormModel tree. */
-  getFormModel() {
-    return this.formModel;
+  /** Return the latest read-only FormUiModel tree. */
+  getFormUiModel() {
+    return this.formUiModel;
   }
 
   /**
@@ -450,7 +450,7 @@ export default class FormGenerator {
     this.model.prunePrimitiveArrays(this.schema, '', this.data);
 
     // Keep derived model in sync for features relying on it
-    this.formModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
+    this.formUiModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
 
     // Notify listeners
     this.listeners.forEach((listener) => listener(this.data));
@@ -482,7 +482,7 @@ export default class FormGenerator {
     this.data = this.deepMerge(baseStructure, data || {});
 
     // Keep derived model in sync for features relying on it
-    this.formModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
+    this.formUiModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
 
     if (!this.container) return;
 
@@ -563,7 +563,7 @@ export default class FormGenerator {
       // Ensure internal data is updated for listeners
       const base = this._getBaseJSON(this.schema);
       this.data = this.model.deepMerge(base, data || {});
-      this.formModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
+      this.formUiModel = this.services.formUiModel.createFormUiModel({ schema: this.schema, data: this.data });
       return true;
     } catch (error) {
       // Keep behavior but avoid noisy console in lints; consumers can handle return value

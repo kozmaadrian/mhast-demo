@@ -20,10 +20,10 @@ export function generateForm(self) {
     self._headerOffset = header ? (header.offsetHeight + extra) : extra;
   } catch {}
 
-  // Build content from the FormModel tree to keep UI aligned with navigation
-  const modelRoot = self.formModel;
+  // Build content from the FormUiModel tree to keep UI aligned with navigation
+  const modelRoot = self.formUiModel;
   if (modelRoot) {
-    self.groupElements = self.groupBuilder.buildFromModel(
+    self.groupElements = self.groupBuilder.buildFormUiModel(
       body,
       modelRoot,
       [],
@@ -70,9 +70,9 @@ export function rebuildBody(self) {
   if (breadcrumbEl) {
     body.appendChild(breadcrumbEl);
   }
-  const modelRoot = self.formModel;
+  const modelRoot = self.formUiModel;
   if (modelRoot) {
-    self.groupElements = self.groupBuilder.buildFromModel(
+    self.groupElements = self.groupBuilder.buildFormUiModel(
       body,
       modelRoot,
       [],

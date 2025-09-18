@@ -43,11 +43,11 @@ flowchart LR
 
 - FormNodeView: `schema`, `data` (source-of-truth for ProseMirror content when serializing). Delegates UI to the mount factory.
 - mountFormUI (factory): Owns DOM wrapper and sidebar placement. Exposes API: `updateData`, `updateSchema`, `navigateTo`, `getData`, `destroy`.
-- FormGenerator: `schema`, `dataModel` (FormDataModel), `data`, `formModel` (read‑only groups tree), `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `inputFactory`, `groupBuilder`, `highlightOverlay`.
+- FormGenerator: `schema`, `dataModel` (FormDataModel), `data`, `formUiModel` (read‑only groups tree), `listeners`, `groupElements`, `navigationTree`, `fieldErrors`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `inputFactory`, `groupBuilder`, `highlightOverlay`.
 - FormDataModel: pure data helpers: `generateBaseJSON`, `get/ setNestedValue`, `deepMerge`, `getInputValue`, array ops.
 - FormUiModelService: exposed via `services.formUiModel.createFormUiModel({ schema, data })`; no internal state.
 - FormSidebar: `element`, `navigationTree`.
-- Navigation (feature): depends on `FormGenerator`; derives items by traversing `formModel`.
+- Navigation (feature): depends on `FormGenerator`; derives items by traversing `formUiModel`.
 - Validation (feature): depends on `FormGenerator`; derives `groupIdsWithErrors` from `fieldErrors`.
 - HighlightOverlay: `container`, `overlay`.
 
@@ -73,7 +73,7 @@ flowchart LR
    - Builds header, body, footer
    - `GroupBuilder.build(root)` creates groups/sections and maps `groupElements`
    - Attaches `HighlightOverlay`
-   - After a tick: `navigation.mapFieldsToGroups()`, `ensureGroupRegistry()`, derive `formModel` via `services.formModel.createFormModel`, `navigation.generateNavigationTree()`, `validation.validateAllFields()`, then `updateData()` emits initial data
+   - After a tick: `navigation.mapFieldsToGroups()`, `ensureGroupRegistry()`, derive `formUiModel` via `services.formUiModel.createFormUiModel`, `navigation.generateNavigationTree()`, `validation.validateAllFields()`, then `updateData()` emits initial data
    - State: `data`, `groupElements`, `fieldSchemas`, `fieldElements`, `fieldToGroup`, `fieldErrors`
 
 Stacktrace (key calls):
@@ -86,14 +86,14 @@ Stacktrace (key calls):
 1) mountFormUI creates `FormSidebar` and inserts it inline under the header
 2) generator.navigationTree = sidebar.getNavigationTree()
 3) requestAnimationFrame → `Navigation.generateNavigationTree()`
-   - Builds items by traversing the read‑only `formModel` (includes nested object children under array items). Array items are draggable for reordering.
+   - Builds items by traversing the read‑only `formUiModel` (includes nested object children under array items). Array items are draggable for reordering.
    - Adds section titles, Add-items for inactive optional `$ref`/array groups, and group items
    - Calls `Validation.refreshNavigationErrorMarkers()`
    - Enables hover and scroll sync
    - The inline sidebar panel limits height to the viewport and enables internal scrolling for large trees. Auto-floating is disabled; the panel stays inline.
 
 Stacktrace:
-- mountFormUI → sidebar.createElement → assign `navigationTree` → derive `formModel` → Navigation.generateNavigationTree (model‑driven) → Validation.refreshNavigationErrorMarkers
+- mountFormUI → sidebar.createElement → assign `navigationTree` → derive `formUiModel` → Navigation.generateNavigationTree (model‑driven) → Validation.refreshNavigationErrorMarkers
 
 State involved:
 - FormGenerator: `groupElements`, `fieldToGroup`, `fieldErrors`, `navigationTree`
@@ -137,11 +137,11 @@ State involved:
    - Then listeners are notified (NodeView subscribed via `onChange`) and ProseMirror is updated
 
 Stacktrace:
-- DOM input event → InputFactory.onInputOrChange → FormGenerator.updateData → FormDataModel.generateBaseJSON → FormDataModel.deepMerge → FormDataModel.setNestedValue (per input) → derive formModel → Validation.validateField → Validation.refreshNavigationErrorMarkers (if needed) → listeners (NodeView.updateContent)
+- DOM input event → InputFactory.onInputOrChange → FormGenerator.updateData → FormDataModel.generateBaseJSON → FormDataModel.deepMerge → FormDataModel.setNestedValue (per input) → derive formUiModel → Validation.validateField → Validation.refreshNavigationErrorMarkers (if needed) → listeners (NodeView.updateContent)
 
 State involved:
 - FormGenerator: `data`, `fieldSchemas`, `fieldElements`, `fieldErrors`, `listeners`
-- FormModel: pure helpers
+- FormUiModel: pure helpers
 
 ---
 
@@ -160,7 +160,7 @@ Stacktrace:
 - Sidebar click → Navigation.onTreeClick → FormGenerator.onActivateOptionalGroup → FormGenerator.rebuildBody → GroupBuilder.buildInline → Navigation.mapFieldsToGroups → FormGenerator.ensureGroupRegistry → FormGenerator.loadData → Navigation.generateNavigationTree → Validation.validateAllFields
 
 State involved:
-- FormGenerator: `data`, `formModel`, `groupElements`, `fieldSchemas`, `fieldElements`, `fieldToGroup`
+- FormGenerator: `data`, `formUiModel`, `groupElements`, `fieldSchemas`, `fieldElements`, `fieldToGroup`
 
 ---
 
@@ -192,7 +192,7 @@ State involved:
   - The Add button is disabled until the last rendered item has a non-empty value.
   - Delete for the single blank item is hidden using `visibility: hidden` to keep layout stable; two‑step confirmation on other items.
   - On data collection, empty strings are pruned; an empty array serializes as `[]`.
-  - Add/remove are data-first via `FormModel` through generator wiring.
+  - Add/remove are data-first via `FormUiModel` through generator wiring.
 - Arrays of objects: rendered as nested `form-ui-group` with an internal array UI; nav item points to this group. Nested object children within an array item are listed under the item in the sidebar. Add/remove/reorder are data-first via command API.
 
 ---
@@ -215,7 +215,7 @@ State involved:
 
 ## Data-first rules for all flows
 
-- Always: `updateData()` → mutate JSON via `FormModel` or command API → `rebuildBody()` → regenerate navigation → `validateAllFields()`.
+- Always: `updateData()` → mutate JSON via `FormUiModel` or command API → `rebuildBody()` → regenerate navigation → `validateAllFields()`.
 - Derive navigation items and counts from JSON (not DOM), and use path→ID helpers.
 - Keep optional nested objects under array items inactive by default (unless required or data exists).
 

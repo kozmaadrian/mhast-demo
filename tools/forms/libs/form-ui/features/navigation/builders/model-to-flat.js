@@ -4,7 +4,7 @@ import { pointerToInputName } from '../../../form-model/path-utils.js';
 import { hyphenatePath } from '../../../form-generator/path-utils.js';
 
 /**
- * Build flat nav item elements by traversing the read-only FormModel tree.
+ * Build flat nav item elements by traversing the read-only FormUiModel tree.
  * Pure: does not mutate controller; returns an array of HTMLElements.
  *
  * @param {import('../../../form-generator.js').default} formGenerator
@@ -13,7 +13,7 @@ import { hyphenatePath } from '../../../form-generator/path-utils.js';
  * @param {{ suppressSelf?: boolean }} options
  * @returns {HTMLElement[]}
  */
-export function buildFlatNavFromModel(formGenerator, modelNode, level = 0, options = {}) {
+export function buildFlatNavFormUiModel(formGenerator, modelNode, level = 0, options = {}) {
   const { suppressSelf = false } = options;
   const items = [];
   if (!modelNode) return items;
@@ -48,7 +48,7 @@ export function buildFlatNavFromModel(formGenerator, modelNode, level = 0, optio
     if (modelNode.children) {
       const nextLevelForChildren = suppressSelf ? level : (level + 1);
       Object.values(modelNode.children).forEach((child) => {
-        const childItems = buildFlatNavFromModel(formGenerator, child, nextLevelForChildren);
+        const childItems = buildFlatNavFormUiModel(formGenerator, child, nextLevelForChildren);
         if (childItems && childItems.length) items.push(...childItems);
       });
     }
@@ -87,7 +87,7 @@ export function buildFlatNavFromModel(formGenerator, modelNode, level = 0, optio
       const itemNav = mount.firstElementChild;
       items.push(itemNav);
 
-      const childItems = buildFlatNavFromModel(formGenerator, child, level + 2, { suppressSelf: true });
+      const childItems = buildFlatNavFormUiModel(formGenerator, child, level + 2, { suppressSelf: true });
       if (childItems && childItems.length) items.push(...childItems);
     }
 
@@ -104,6 +104,6 @@ export function buildFlatNavFromModel(formGenerator, modelNode, level = 0, optio
   return items;
 }
 
-export default { buildFlatNavFromModel };
+export default { buildFlatNavFormUiModel };
 
 

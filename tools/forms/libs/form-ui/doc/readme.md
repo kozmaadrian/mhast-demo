@@ -94,7 +94,7 @@ Key APIs:
    - Dynamic updates: `rebuildBody()` uses `GroupBuilder.buildInline()` to rebuild the body in-place (e.g., after activating optional `$ref`/array groups), preserving schema order.
    - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` at the property position.
    - `InputFactory` creates controls and wires input/change/focus/blur to update data, validate, and highlight group.
-   - `FormModel` maintains data shape and nested setting logic.
+   - `FormUiModel` maintains data shape and nested setting logic.
 - `Navigation.generateNavigationTree()` renders from the read‑only Form UI Model tree (`services.formUiModel.createFormUiModel`). It mirrors groups/sections in the sidebar in the same property order and includes nested object children under array items.
    - `Validation.validateAllFields()` runs after render and nav rebuild so required/invalid states are visible on load. It also runs after optional group activation and after array‑item add.
 
@@ -130,7 +130,7 @@ Key APIs:
 
 ### How the sidebar is built (model-driven, ordered, drag to reorder)
 
-- Navigation traverses the read‑only FormModel tree using `features/navigation/builders/model-to-flat.js` to produce a flat list, then `builders/nested-list.js` renders the nested UL/LI tree.
+- Navigation traverses the read‑only FormUiModel tree using `features/navigation/builders/model-to-flat.js` to produce a flat list, then `builders/nested-list.js` renders the nested UL/LI tree.
 - If an object level contains primitives, a single group item is emitted for that level; otherwise a section title is emitted and children are recursed.
 - Arrays of objects emit one group item for the array and, when active, one item per existing array entry. An Add control is shown when `activatable` is present.
 - Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
@@ -142,7 +142,7 @@ Key APIs:
 
 1) Delegated click handler in `features/navigation.js` catches clicks on `.form-ui-nav-item.form-ui-nav-item-add`.
 2) It reads `data-array-path` from the clicked item and calls `FormGenerator.commandAddArrayItem(arrayPath)`.
-3) The generator mutates JSON via `FormDataModel.pushArrayItem`, rebuilds the form body (`rebuildBody()`), regenerates navigation from the FormModel, and validates on the next frame.
+3) The generator mutates JSON via `FormDataModel.pushArrayItem`, rebuilds the form body (`rebuildBody()`), regenerates navigation from the FormUiModel, and validates on the next frame.
 4) Navigation then scrolls to the newly added item.
 
 ### Rendering strategy: renderAllGroups
@@ -162,7 +162,7 @@ Key APIs:
 
 - `data: object` (FormGenerator): current JSON payload. Updated via `updateData()` and mutation commands.
 - `FormDataModel`: data helpers: base JSON, nested set/get, deep merge, array ops.
-- `formModel` (read‑only groups tree): derived via `services.formUiModel.createFormUiModel({ schema, data })`. Used by navigation and features.
+- `formUiModel` (read‑only groups tree): derived via `services.formUiModel.createFormUiModel({ schema, data })`. Used by navigation and features.
 - `groupElements: Map<groupId, { element, path, title, isSection }>` (FormGenerator): rebuilt on each render and used by navigation, hover/scroll sync, validation, and scrollspy.
 - `fieldSchemas`, `fieldElements`, `fieldErrors` (FormGenerator): typing and validation state per field.
 - `fieldToGroup: Map<fieldPath, groupId>` (FormGenerator): links fields to their group container for navigation and error mapping.
@@ -268,7 +268,7 @@ You can generate API documentation with any JSDoc tooling if desired; the code c
 ### Common pitfalls (avoid these)
 
 - Triggering DOM clicks to create items (causes loops); mutate data then rebuild instead.
-- Counting DOM nodes to derive array sizes; read from JSON (`FormModel.getNestedValue`).
+- Counting DOM nodes to derive array sizes; read from JSON (`FormUiModel.getNestedValue`).
 - Auto-including optional nested objects under array items on add; keep defaults minimal.
 - Updating IDs/paths by ad-hoc regex in multiple places; use the centralized helpers.
 
@@ -285,7 +285,7 @@ There is no raw JSON mode UI in the current implementation. The form view is the
 ### Testing suggestions
 
 - Snapshot the generated DOM for a representative schema (see `html-structure.html`) to guard IDs/classes and group/section layout.
-- Unit test `FormModel` (deepMerge, setNestedValue) and `GroupBuilder` (ID formation and section vs group decisions).
+- Unit test `FormUiModel` (deepMerge, setNestedValue) and `GroupBuilder` (ID formation and section vs group decisions).
 - Unit test `InputFactory` required flag propagation and focus/blur highlighting hooks.
 
 ### Troubleshooting

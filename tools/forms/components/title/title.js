@@ -81,7 +81,7 @@ export default class DaTitle extends LitElement {
         toast = document.createElement('da-toast');
         document.body.appendChild(toast);
       }
-      try { toast.show('Form has validation errors. Please fix them before continuing.', { variant: 'error' }); } catch {}
+      try { toast.show('Please correct the highlighted errors before continuing.', { variant: 'error' }); } catch {}
       return;
     }
     this.toggleActions();

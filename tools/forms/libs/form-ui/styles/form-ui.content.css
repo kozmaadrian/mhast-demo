@@ -35,7 +35,11 @@
   border-radius: 0;
   position: sticky;
   top: 0;
-  z-index: 1100
+  z-index: 1100;
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  margin: 0px -55px 0px -48px;
+  padding: 0px 55px 16px 48px;
 }
 
 .form-ui-title-container {
@@ -99,7 +103,7 @@
 }
 
 .form-ui-breadcrumb-item {
-  padding-top: 6px;
+  padding: 6px 0px 0px 0px;
   appearance: none;
   border: none;
   background: transparent;
@@ -109,13 +113,6 @@
 
 .form-ui-breadcrumb-item:hover {
   text-decoration: underline
-}
-
-.form-ui-header {
-  display: flex;
-  border-bottom: 1px solid #e5e7eb;
-  margin: 0px -37px 0px -34px;
-  padding: 0px 37px 16px 34px;
 }
 
 .form-container-wrapper {

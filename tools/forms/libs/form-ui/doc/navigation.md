@@ -1,6 +1,6 @@
 # Form UI Navigation: Model‑Driven Generation – Detailed Flow
 
-This document explains how the sidebar navigation is generated from the read‑only FormModel tree (derived from `(schema, data)`), keeping it perfectly in sync with content built by `GroupBuilder`. The previous schema+data traversal (`generateNavigationItems`) has been replaced by a model‑driven builder.
+This document explains how the sidebar navigation is generated from the read‑only FormUiModel tree (derived from `(schema, data)`), keeping it perfectly in sync with content built by `GroupBuilder`. The previous schema+data traversal (`generateNavigationItems`) has been replaced by a model‑driven builder.
 
 ## Goals and guarantees
 
@@ -16,17 +16,17 @@ This document explains how the sidebar navigation is generated from the read‑o
 
 ## Inputs and helpers
 
-- `modelNode`: current node from the FormModel (root or any child).
+- `modelNode`: current node from the FormUiModel (root or any child).
 - `level`: indentation level used for CSS variables and nested list construction.
 - Primary builders:
-- `features/navigation/builders/model-to-flat.buildFlatNavFromModel(formGenerator, modelNode, level)` → HTMLElement[]
+- `features/navigation/builders/model-to-flat.buildFlatNavFormUiModel(formGenerator, modelNode, level)` → HTMLElement[]
 - `features/navigation/builders/nested-list.buildNestedList(nodes)` → nested UL/LI tree
 - Helpers:
   - `pointerToInputName(pointer)` to convert JSON Pointer from model (`node.dataPath`) into dotted path used for IDs and labels
   - `formGenerator.pathToGroupId(path)`, `formGenerator.arrayItemId(path, index)` – stable DOM IDs
   - Schema titles resolved via SchemaService at `node.schemaPointer`
 
-## High‑level algorithm (depth‑first over FormModel)
+## High‑level algorithm (depth‑first over FormUiModel)
 
 1) Inspect `modelNode.type`. If neither `object` nor `array`, return empty list.
 
@@ -55,12 +55,12 @@ This “one node per object” rule is what prevents duplicates like emitting bo
 ## Special considerations
 
 - `$ref` and `oneOf`: resolved by SchemaService when computing titles and `hasPrimitives` at the node’s `schemaPointer`.
-- Optional gating: driven by the FormModel. Optional arrays expose `activatable` until they contain at least one item; required arrays are always `isActive: true`.
+- Optional gating: driven by the FormUiModel. Optional arrays expose `activatable` until they contain at least one item; required arrays are always `isActive: true`.
 - Root handling: the artificial root emits only its children; the root group itself is not duplicated as a separate nav item beyond the shell header.
 
 ## Building the nested tree from the flat list
 
-`buildFlatNavFromModel()` returns a flat array of nodes with `dataset.level`. `buildNestedList(nodes)` converts this into the UL/LI structure used by the sidebar tree:
+`buildFlatNavFormUiModel()` returns a flat array of nodes with `dataset.level`. `buildNestedList(nodes)` converts this into the UL/LI structure used by the sidebar tree:
 
 1) Initialize a stack with a root frame `{ level: 0, children: [] }`.
 2) For each node:
@@ -92,7 +92,7 @@ Use these to compare nav generation with content building when troubleshooting m
 
 - `appsBanner1` (array → item containing `appsBanner`):
   - nav: `bannerList` → item `#1` → `itemList` → item `#1` → grandchildren …
-  - Depth‑first recursion over the FormModel ensures grandchildren like `iconSeparator` render under `bannerList[0].itemList[0]`, matching content.
+  - Depth‑first recursion over the FormUiModel ensures grandchildren like `iconSeparator` render under `bannerList[0].itemList[0]`, matching content.
 
 ## Why this mirrors GroupBuilder.build()
 
@@ -109,7 +109,7 @@ By enforcing “one node per object” and recursing into array items, navigatio
 Below is an ASCII decision diagram that shows the precise choices the model‑driven builder makes at each step. It mirrors the decisions in `GroupBuilder.build()` so nav == content.
 
 ```
-start ──► node = modelNode (from FormModel)
+start ──► node = modelNode (from FormUiModel)
            │
            ├─ if node.type ∉ {object,array} → return []
            │
@@ -128,7 +128,7 @@ start ──► node = modelNode (from FormModel)
            │     │      └─ emit SECTION(navSectionTitle) for dottedPath
            │     │
            │     └─ for each child in node.children (schema order)
-           │            └─ RECURSE buildFlatNavFromModel(child, level + 1)
+           │            └─ RECURSE buildFlatNavFormUiModel(child, level + 1)
            │
            └─ else (node.type == 'array')
                  │
@@ -139,7 +139,7 @@ start ──► node = modelNode (from FormModel)
                  │
                  └─ for i, item in enumerate(node.items || [])
                         ├─ emit ARRAY-ITEM(navItem) for `${dottedPath}[i]` (id = arrayItemId(dottedPath,i))
-                        └─ RECURSE buildFlatNavFromModel(item, level + 2) with suppressSelf=true
+                        └─ RECURSE buildFlatNavFormUiModel(item, level + 2) with suppressSelf=true
 ```
 
 Key emission rules:

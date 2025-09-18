@@ -54,7 +54,7 @@ class AssetPickerHost {
   }
 
   async show({ selectorConfig, meta, helpers, callbacks }) {
-    await loadStyleOnce(new URL('../templates/asset-picker/asset-picker.css', import.meta.url).href);
+    await loadStyleOnce(new URL('../styles/asset-picker.css', import.meta.url).href);
     if (!scriptsLoaded) {
       await loadScriptOnce(ASSET_SELECTOR_URL);
       scriptsLoaded = true;

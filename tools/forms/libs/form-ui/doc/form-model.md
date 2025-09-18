@@ -1,4 +1,4 @@
-### FormModel Service
+### FormUiModel Service
 
 A precise, implementation-oriented specification of a service that derives a normalized, precomputed UI model from JSON Schema + JSON data. Both the form UI and the navigation render from this one source of truth to stay perfectly in sync.
 
@@ -22,7 +22,7 @@ Terminology note: In code and services this is referred to as the “Form UI Mod
 - **In scope**: Groups (objects, arrays whose items resolve to objects), activation state, required flags at group keys, data paths, basic trace metadata.
 - **Out of scope**: Field-level enumeration (primitives and arrays-of-primitives). Validation logic. UI layout details. Mutation APIs. Persistence.
 
-Rendering of primitive fields (including arrays-of-primitives) is handled directly from schema + data by the UI layer. The FormModel exposes a `hasPrimitives` hint at group level only.
+Rendering of primitive fields (including arrays-of-primitives) is handled directly from schema + data by the UI layer. The FormUiModel exposes a `hasPrimitives` hint at group level only.
 
 ---
 
@@ -45,12 +45,12 @@ Rendering of primitive fields (including arrays-of-primitives) is handled direct
  * - type, properties, items, required, $defs/definitions, $ref
  */
 
-/** @typedef {'object'|'array'} FormModelNodeType */
+/** @typedef {'object'|'array'} FormUiModelNodeType */
 
 /**
- * @typedef {Object} FormModelNode
+ * @typedef {Object} FormUiModelNode
  * @property {string} key                         property name or array index (string). '$root' at the root
- * @property {FormModelNodeType} type             'object' | 'array' (array = array-of-objects)
+ * @property {FormUiModelNodeType} type             'object' | 'array' (array = array-of-objects)
  * @property {string} dataPath                    JSON Pointer into data, e.g. '/profile/phones/0'
  * @property {string} schemaPointer               JSON Pointer into the resolved schema node
  * @property {string=} originalRef                original $ref value if this node originated from a $ref
@@ -58,11 +58,11 @@ Rendering of primitive fields (including arrays-of-primitives) is handled direct
  * @property {true=} isActive                     present only when active (arrays: required or data.length > 0)
  * @property {boolean=} activatable               present only for optional arrays that are currently empty/inactive
  * @property {boolean=} hasPrimitives             this group contains primitive fields or arrays-of-primitives
- * @property {Object<string, FormModelNode>=} children   for objects: map of group-children
- * @property {FormModelNode[]=} items             for arrays: one node per existing item (0..n)
+ * @property {Object<string, FormUiModelNode>=} children   for objects: map of group-children
+ * @property {FormUiModelNode[]=} items             for arrays: one node per existing item (0..n)
  */
 
-/** @typedef {FormModelNode} FormModel */
+/** @typedef {FormUiModelNode} FormUiModel */
 ```
 
 ### Core (lean) node shape for rendering
@@ -93,12 +93,12 @@ The core shape uses the same field names as the full shape, with an optional `me
 
 ```js
 /**
- * Build a derived FormModel from schema + current data (read‑only groups tree).
+ * Build a derived FormUiModel from schema + current data (read‑only groups tree).
  * Accessed via the injected service container in the app:
  *   services.formUiModel.createFormUiModel({ schema, data }, { freeze })
  * @param {{ schema: any, data?: any }} input
  * @param {{ freeze?: boolean }} [options]
- * @returns {FormModel}
+ * @returns {FormUiModel}
  */
 function createFormUiModel(input, options) {}
 ```
@@ -132,7 +132,7 @@ When `data` is not provided, synthesize defaults from the schema:
 - Arrays-of-objects: default to `[]` unless required-by-parent rules dictate otherwise. Required arrays are still `[]` but considered active.
 - Primitives and arrays-of-primitives: left to the UI. However, the group’s `hasPrimitives` flag is computed so UI knows to render fields inside the active group.
 
-Note: The exact primitive defaulting strategy is intentionally left to the UI/field layer; the FormModel only guarantees group structure and activation flags.
+Note: The exact primitive defaulting strategy is intentionally left to the UI/field layer; the FormUiModel only guarantees group structure and activation flags.
 
 ---
 
@@ -281,9 +281,9 @@ Derived groups-only model:
 
 ## Integration Guidance
 
-- **Navigation**: Render directly from the FormModel root. For arrays with `activatable`, render an explicit "Activate" affordance. For arrays with `isActive`, render items and an Add control. Removal is not provided in navigation.
+- **Navigation**: Render directly from the FormUiModel root. For arrays with `activatable`, render an explicit "Activate" affordance. For arrays with `isActive`, render items and an Add control. Removal is not provided in navigation.
 - **Form UI**: Render only nodes with `isActive`. Objects and primitive fields under them become visible when ancestor arrays are active. Provide both Add and Remove controls; removal is available only in the form UI. Required flags inform validation but not visibility, except for arrays as specified above.
-- **Update flow**: Treat the FormModel as read-only. When user actions occur (activate an array, add/remove items), mutate the data accordingly, then recompute the FormModel and rerender.
+- **Update flow**: Treat the FormUiModel as read-only. When user actions occur (activate an array, add/remove items), mutate the data accordingly, then recompute the FormUiModel and rerender.
 
 ---
 
@@ -326,6 +326,6 @@ Derived groups-only model:
 
 ## Summary
 
-The FormModel service centralizes and standardizes interpretation of schema + data into a deterministic, read-only groups tree with clear activation semantics. Arrays-of-objects are the only visibility gates, optional arrays are hidden until activated, and required arrays are always visible. Using this single, precomputed model keeps the form UI and navigation consistent and greatly simplifies implementation.
+The FormUiModel service centralizes and standardizes interpretation of schema + data into a deterministic, read-only groups tree with clear activation semantics. Arrays-of-objects are the only visibility gates, optional arrays are hidden until activated, and required arrays are always visible. Using this single, precomputed model keeps the form UI and navigation consistent and greatly simplifies implementation.
 
 

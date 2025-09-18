@@ -37,7 +37,7 @@ export default class GroupBuilder {
     this.generateObjectFields = generateObjectFields;
     this.generateInput = generateInput;
     this.generateField = generateField;
-    // Activation driven by FormModel
+    // Activation driven by FormUiModel
     this.isOptionalGroupActive = () => true;
     this.onActivateOptionalGroup = () => {};
     this.refreshNavigation = refreshNavigation;
@@ -51,15 +51,15 @@ export default class GroupBuilder {
   }
 
   /**
-   * Build UI from a FormModel node (read-only), resolving primitive fields from schema pointers.
+   * Build UI from a FormUiModel node (read-only), resolving primitive fields from schema pointers.
    * @param {HTMLElement} container
-   * @param {object} modelNode - FormModel node
+   * @param {object} modelNode - FormUiModel node
    * @param {string[]} [breadcrumbPath=[]]
    * @param {Map} [outMap=new Map()]
    * @param {number} [depth=0]
    * @returns {Map}
    */
-  buildFromModel(container, modelNode, breadcrumbPath = [], outMap = new Map(), depth = 0) {
+  buildFormUiModel(container, modelNode, breadcrumbPath = [], outMap = new Map(), depth = 0) {
     if (!modelNode || depth > this._maxDepth) return outMap;
 
     const pointer = modelNode.schemaPointer || '#';
@@ -114,7 +114,7 @@ export default class GroupBuilder {
       if (modelNode.children) {
         Object.values(modelNode.children).forEach((child) => {
           const nextBreadcrumb = [...currentBreadcrumb, title];
-          this.buildFromModel(childrenHost, child, nextBreadcrumb, outMap, depth + 1);
+          this.buildFormUiModel(childrenHost, child, nextBreadcrumb, outMap, depth + 1);
         });
       }
       return outMap;

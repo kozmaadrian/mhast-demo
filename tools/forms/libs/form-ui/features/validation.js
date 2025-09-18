@@ -134,7 +134,7 @@ export default class FormValidation {
    * and refreshes the navigation error markers.
    */
   validateAllFields() {
-    // Rebuild field errors from scratch using the FormModel (schema + data driven)
+    // Rebuild field errors from scratch using the FormUiModel (schema + data driven)
     const schemaSvc = this.formGenerator.services.schema;
     const normalize = (node) => this.formGenerator.normalizeSchema(this.formGenerator.derefNode(node) || node || {});
 
@@ -168,7 +168,7 @@ export default class FormValidation {
     };
 
     // Walk from root
-    try { walk(this.formGenerator.formModel); } catch {}
+    try { walk(this.formGenerator.formUiModel); } catch {}
 
     // Clear and recompute fieldErrors
     this.formGenerator.fieldErrors.clear();
@@ -351,7 +351,7 @@ export default class FormValidation {
           headerBadge.setAttribute('aria-label', `${totalErrors} validation error${totalErrors === 1 ? '' : 's'}`);
           headerBadge.setAttribute('role', 'button');
           headerBadge.setAttribute('tabindex', '0');
-          headerBadge.title = 'Jump to first error in the form';
+          headerBadge.title = 'Click to jump to first error in the form';
           const onActivate = (ev) => { ev.preventDefault(); ev.stopPropagation(); this.scrollToFirstErrorAcrossForm(); };
           headerBadge.onclick = onActivate;
           headerBadge.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') onActivate(e); };

@@ -11,7 +11,7 @@ import { breadcrumbItemTemplate, breadcrumbSeparatorTemplate } from '../template
 import { createTreeClickHandler } from './navigation/handlers/click.js';
 import { enableHoverSync } from './navigation/sync/hover.js';
 import { enableScrollSync } from './navigation/sync/scrollspy.js';
-import { buildFlatNavFromModel } from './navigation/builders/model-to-flat.js';
+import { buildFlatNavFormUiModel } from './navigation/builders/model-to-flat.js';
 import { buildNestedList } from './navigation/builders/nested-list.js';
 import { attachDragHandlers as attachDragHandlersExternal } from './navigation/handlers/drag.js';
 import { attachContentClick } from './navigation/handlers/content-click.js';
@@ -337,7 +337,7 @@ export default class FormNavigation {
 
     this.formGenerator.navigationTree.innerHTML = '';
 
-    const flatItems = buildFlatNavFromModel(this.formGenerator, this.formGenerator.formModel, 0);
+    const flatItems = buildFlatNavFormUiModel(this.formGenerator, this.formGenerator.formUiModel, 0);
     const nested = buildNestedList(flatItems);
     this.formGenerator.navigationTree.appendChild(nested);
 
