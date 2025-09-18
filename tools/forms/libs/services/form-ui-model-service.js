@@ -1,10 +1,10 @@
 /**
- * FormModelService
+ * FormUiModelService
  *
  * Derives a read-only groups model from (schema, data). Field-level details are
  * resolved by consumers via SchemaService using the emitted schemaPointer.
  */
-export class FormModelService {
+export class FormUiModelService {
   /**
    * @param {object} context - Global app context with service container
    */
@@ -14,12 +14,12 @@ export class FormModelService {
   }
 
   /**
-   * Build a FormModel (groups-only) from schema + data.
+   * Build a Form UI Model (groups-only) from schema + data.
    * @param {{ schema: any, data: any }} input
    * @param {{ freeze?: boolean }} [options]
    * @returns {object} root model node
    */
-  createFormModel(input, options = {}) {
+  createFormUiModel(input, options = {}) {
     const { schema, data } = input || {};
     const { freeze = false } = options;
     const schemaSvc = this._schema;
@@ -173,3 +173,5 @@ export class FormModelService {
     return root;
   }
 }
+
+

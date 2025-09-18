@@ -9,7 +9,7 @@ flowchart LR
   PM[FormNodeView core/form-nodeview.js]
   MOUNT[FormMount core/form-mount.js]
   FG[FormGenerator core/form-generator.js]
-  FM[FormModel core/form-model.js]
+  FM[Form UI Model services/form-ui-model-service.js]
   IF[InputFactory core/input-factory.js]
   GB[GroupBuilder core/form-generator/group-builder.js]
   HO[HighlightOverlay features/highlight-overlay.js]
@@ -39,7 +39,7 @@ flowchart LR
 
 - **Single source of truth**: Schema (shape, labels, validation) + JSON data (mutable app state).
 - **Render from schema+data only**: Form content and sidebar/navigation must be derived from the schema and current data; avoid DOM-driven structure.
-- **Mutations go through commands**: All add/remove/reorder/activate/reset use `FormGenerator` commands which mutate JSON via `FormModel`, then rebuild and validate.
+- **Mutations go through commands**: All add/remove/reorder/activate/reset use `FormGenerator` commands which mutate JSON via `FormDataModel`, then rebuild and validate.
 - **Arrays-of-objects defaults are minimal**: When adding an item, include primitives, arrays, and required nested objects. Optional nested objects (e.g., `link`) are omitted until explicitly activated or data exists.
 - **`renderAllGroups` nuance**: Even when true, optional object children inside array items remain gated (to avoid overwhelming new items) unless required or present in data.
 - **Navigation is schema+data-driven**: Sidebar item counts and child listings come from data (no DOM counting). IDs use path→ID helpers. Sidebar scroll position is preserved across re-renders.
@@ -48,7 +48,8 @@ flowchart LR
 - **Primitive arrays are pruned**: Empty strings are removed when collecting data; an empty primitive array serializes as `[]`, not `[""]`.
 
 Key APIs:
-- `FormModel`: `generateBaseJSON`, `get/setNestedValue`, `deepMerge`, `pushArrayItem`, `removeArrayItem`, `reorderArray`, `ensureObjectAtPath`.
+- `FormDataModel`: `generateBaseJSON`, `get/setNestedValue`, `deepMerge`, `pushArrayItem`, `removeArrayItem`, `reorderArray`, `ensureObjectAtPath`.
+- `services.formUiModel.createFormUiModel({ schema, data })` → returns read‑only groups tree used by navigation and features.
 - `FormGenerator`: `commandActivateOptional`, `commandAddArrayItem`, `commandRemoveArrayItem`, `commandReorderArrayItem`, `commandResetAll`, plus `pathToGroupId`, `arrayItemId`.
 
 ### Directory roles
@@ -61,7 +62,7 @@ Key APIs:
   - `core/form-generator/schema-utils.js`: schema deref/normalization/title/base JSON helpers (pure, cycle-safe).
   - `core/form-generator/input-array-group.js`: arrays-of-objects rendering logic (factored from generator).
   - `core/form-generator/placeholders.js`: creates unified “Add …” placeholder blocks.
-  - `core/form-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
+  - `core/form-data-model.js`: pure data helpers (base JSON from schema, deep merge, nested set, input coercion).
   - `core/input-factory.js`: composes input subclasses and creates inputs for schema types; attaches standard events.
   - `core/inputs/base-input.js`, `core/inputs/{text,textarea,select,number,checkbox}-input.js`: individual input implementations.
   - `core/form-generator/group-builder.js`: builds `.form-ui-section` and `.form-ui-group` recursively with stable IDs.
@@ -94,7 +95,7 @@ Key APIs:
    - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` at the property position.
    - `InputFactory` creates controls and wires input/change/focus/blur to update data, validate, and highlight group.
    - `FormModel` maintains data shape and nested setting logic.
-   - `Navigation.generateNavigationTree()` mirrors groups/sections in the sidebar in the same property order, placing optional inactive `$ref`/array groups as in-place “Add …” items. It includes nested object children under array items.
+- `Navigation.generateNavigationTree()` renders from the read‑only Form UI Model tree (`services.formUiModel.createFormUiModel`). It mirrors groups/sections in the sidebar in the same property order and includes nested object children under array items.
    - `Validation.validateAllFields()` runs after render and nav rebuild so required/invalid states are visible on load. It also runs after optional group activation and after array‑item add.
 
 4) Sync back to ProseMirror and breadcrumb
@@ -127,31 +128,22 @@ Key APIs:
   - Arrays of objects (including `$ref` items) render as their own nested `form-ui-group` inline at the property position.
   - Optional `$ref` objects and arrays-of-objects are skipped in content until activated; required ones always render.
 
-### How the sidebar is built (ordered, in-place Add, drag to reorder)
+### How the sidebar is built (model-driven, ordered, drag to reorder)
 
-- `Navigation.generateNavigationItems(schema, path, level)` iterates `properties` in declaration order and mirrors the structure:
-  - If the current level contains primitive fields, it adds a nav item for the current group (`form-group-…`).
-  - Primitive child properties are not individually listed in the nav; they belong to the parent group.
-  - For each child property in order:
-    - Optional inactive `$ref` or arrays-of-objects: render an in-place, indented “Add <Title>” item with `data-group-id="form-optional-…"`.
-    - Active arrays-of-objects: render a clickable group item (`data-group-id="form-group-…"`), then one item per existing array entry. For each array item, nested object children (e.g., `link`, `dataRef`, `questionnaire`) are included under the item.
-    - Object types: if they have no primitives but have children, render a section header (`form-section-…`) at the same indentation; then recurse into children.
+- Navigation traverses the read‑only FormModel tree using `features/navigation/builders/model-to-flat.js` to produce a flat list, then `builders/nested-list.js` renders the nested UL/LI tree.
+- If an object level contains primitives, a single group item is emitted for that level; otherwise a section title is emitted and children are recursed.
+- Arrays of objects emit one group item for the array and, when active, one item per existing array entry. An Add control is shown when `activatable` is present.
 - Indentation is controlled by `data-level` and the CSS custom property `--nav-level` on `.form-ui-nav-item-content`.
 - Error badges are applied post-render by Validation; the indicator is positioned on the right and doesn’t interfere with clicks.
-- Scroll position: `Navigation.generateNavigationTree()` preserves sidebar `scrollTop` across re-renders.
+- Scroll position is preserved across re-renders.
 - Array items in navigation support drag-and-drop reordering; drag the item to reorder, which delegates to generator commands.
 
 ### What happens when clicking “+ Add …” in the sidebar
 
 1) Delegated click handler in `features/navigation.js` catches clicks on `.form-ui-nav-item.form-ui-nav-item-add`.
-2) It derives the schema path from `data-group-id` (`form-optional-…`) and resolves the corresponding node from the root schema.
-3) `FormGenerator.commandActivateOptional(path)` (central command) is used to activate and seed data:
-   - Adds `path` to `activeOptionalGroups`.
-   - Seeds `data` at that path based on type:
-     - Object → base object tree (arrays initialized to `[]`). Optional nested objects are omitted unless required or already present in data. This applies even when `renderAllGroups` is true for children inside array items.
-     - Array → initializes `[]`. For arrays-of-objects, if the array is empty, the first item is auto-added (data-first) using a default object that includes primitives/arrays and required nested objects only.
-   - Emits updated `data`, rebuilds the form body (`rebuildBody()`), regenerates navigation, and validates.
-4) Navigation then scrolls to the activated group or the first array item.
+2) It reads `data-array-path` from the clicked item and calls `FormGenerator.commandAddArrayItem(arrayPath)`.
+3) The generator mutates JSON via `FormDataModel.pushArrayItem`, rebuilds the form body (`rebuildBody()`), regenerates navigation from the FormModel, and validates on the next frame.
+4) Navigation then scrolls to the newly added item.
 
 ### Rendering strategy: renderAllGroups
 
@@ -168,11 +160,9 @@ Key APIs:
 
 ### State tracking (form content and sidebar)
 
-- `activeOptionalGroups: Set<string>` (FormGenerator): activated optional groups (object or array). Inactive optional groups remain hidden in content and appear as “Add …” in the sidebar.
-- `data: object` (FormGenerator): current JSON payload. Updated via `updateData()` and via `onActivateOptionalGroup()` when seeding new groups.
-- `FormModel.generateBaseJSON(schema)`: initial data tree for any object node. Arrays always exist as `[]`; optional objects are created only when required or activated.
-- `FormModel.setNestedValue(obj, path, value)`: supports dot and bracket notation (e.g., `array[0].prop`). Creates objects/arrays as needed.
-- `FormModel.deepMerge(base, incoming)`: preserves keys present in `incoming` while merging into existing state to avoid losing dynamically added optional branches.
+- `data: object` (FormGenerator): current JSON payload. Updated via `updateData()` and mutation commands.
+- `FormDataModel`: data helpers: base JSON, nested set/get, deep merge, array ops.
+- `formModel` (read‑only groups tree): derived via `services.formUiModel.createFormUiModel({ schema, data })`. Used by navigation and features.
 - `groupElements: Map<groupId, { element, path, title, isSection }>` (FormGenerator): rebuilt on each render and used by navigation, hover/scroll sync, validation, and scrollspy.
 - `fieldSchemas`, `fieldElements`, `fieldErrors` (FormGenerator): typing and validation state per field.
 - `fieldToGroup: Map<fieldPath, groupId>` (FormGenerator): links fields to their group container for navigation and error mapping.
@@ -184,7 +174,7 @@ Key APIs:
 - Array fields always exist in the JSON (`[]`) even when empty. With `renderAllGroups: true`, optional arrays are also present as empty arrays by default.
 - Inputs inside array items are named using bracketed indices (e.g., `tutorialList[0].title`) so `updateData()` can map them back correctly.
 - Removing an item reindexes subsequent UI inputs; state is re-collected on next `updateData()`.
-- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container. Adding/removing/reordering is data-first (mutations via `FormModel`), then the UI rebuilds.
+- Arrays of objects render as nested groups; their nav items are clickable and scroll to the array’s group container. Adding/removing/reordering is data-first (mutations via `FormDataModel`), then the UI rebuilds.
 - Arrays of primitives render via `InputFactory.createArrayInput()` as a compact repeatable input list.
   - When empty, one blank input is rendered by default.
   - The Add button is disabled until the last rendered item has a non-empty value.
@@ -194,7 +184,7 @@ Key APIs:
 
 #### Data-first mutation API
 
-- `FormModel` exposes centralized mutations used by the generator and UI handlers:
+- `FormDataModel` exposes centralized mutations used by the generator and UI handlers:
   - `pushArrayItem(data, arrayPath, newItem)`
   - `removeArrayItem(data, arrayPath, index)`
   - `reorderArray(data, arrayPath, fromIndex, toIndex)`
@@ -206,7 +196,7 @@ Key APIs:
   - `commandReorderArrayItem(arrayPath, fromIndex, toIndex)`
   - `commandResetAll()`
 
-All UI actions call these commands, which: `updateData()` → mutate JSON via `FormModel` → `rebuildBody()` → validate.
+All UI actions call these commands, which: `updateData()` → mutate JSON via `FormDataModel` → `rebuildBody()` → validate.
 
 ### Positioning and visuals (CSS)
 
@@ -305,7 +295,7 @@ There is no raw JSON mode UI in the current implementation. The form view is the
 
 ### File map
 
-- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-generator/path-utils.js`, `core/form-generator/schema-utils.js`, `core/form-generator/input-array-group.js`, `core/form-generator/placeholders.js`, `core/form-model.js`, `core/input-factory.js`, `core/inputs/*`, `core/form-generator/group-builder.js`
+- Core: `core/form-nodeview.js`, `core/form-mount.js`, `core/form-generator.js`, `core/form-generator/path-utils.js`, `core/form-generator/schema-utils.js`, `core/form-generator/input-array-group.js`, `core/form-generator/placeholders.js`, `core/form-data-model.js`, `core/input-factory.js`, `core/inputs/*`, `core/form-generator/group-builder.js`
 - Features: `features/navigation.js`, `features/validation.js`, `features/highlight-overlay.js`
 - Components: `components/sidebar.js`
 - Utils: `utils/schema-loader.js`, `utils/icons.js`
