@@ -10,12 +10,13 @@
 }
 
 .form-ui-container {
+  margin: 0;
   border: none;
   border-radius: 8px;
   background: white !important;
   box-shadow: rgb(181 181 181) 0 0 20px;
   font-family: var(--spectrum-font-family-base, system-ui, -apple-system, sans-serif);
-  padding: 48px;
+  padding: 30px 48px 48px 48px;
   padding-right: 55px;
   display: block !important;
   visibility: visible !important;
@@ -73,18 +74,10 @@
   display: block
 }
 
-.form-side-panel.floating-panel {
-  box-sizing: border-box
-}
-
 .form-ui-host {
   position: relative;
   display: flow-root;
   flex: 0 0 700px;
-}
-
-.form-ui-container {
-  margin: 0;
 }
 
 .form-content-breadcrumb {
